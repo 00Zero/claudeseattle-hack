@@ -1,30 +1,36 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { signOut } from "./actions";
 
 // Nav "Log in" / "Log out". The root layout persists across navigations, so the
-// server-rendered state can go stale (for example, after signing in from the
-// email link in another tab). Re-check the session cookie on every page change.
+// server-rendered nav can go stale (for example, after signing in from the
+// email link in another tab). Re-check the session cookie on every page change;
+// if it no longer matches what the server rendered, refresh so the whole nav
+// (including the Admin link) is rendered again with the current session.
 export function AuthLink({ initialSignedIn }: { initialSignedIn: boolean }) {
   const [signedIn, setSignedIn] = useState(initialSignedIn);
   const pathname = usePathname();
+  const router = useRouter();
 
   useEffect(() => {
     const supabase = createClient();
     let active = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (active) setSignedIn(Boolean(data.session));
-    });
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => setSignedIn(Boolean(session)));
+    const update = (now: boolean) => {
+      if (!active) return;
+      setSignedIn(now);
+      if (now !== initialSignedIn) router.refresh();
+    };
+    supabase.auth.getSession().then(({ data }) => update(Boolean(data.session)));
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => update(Boolean(session)));
     return () => {
       active = false;
       data.subscription.unsubscribe();
     };
-  }, [pathname]);
+  }, [pathname, initialSignedIn, router]);
 
   if (!signedIn) {
     return (
