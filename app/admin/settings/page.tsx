@@ -2,6 +2,7 @@ import { requireAdminPage } from "@/lib/admin";
 import type { AccessRule } from "@/lib/access";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isoToPacificInput } from "@/lib/time";
+import { SubmitButton } from "../submit-button";
 import { addTicket, deleteTicket, saveEventSettings, saveTicketRules } from "./actions";
 
 const STATUSES = ["approved", "pending_approval", "waitlist", "declined"];
@@ -35,7 +36,8 @@ export default async function SettingsPage() {
       <section className="space-y-3">
         <h1 className="text-2xl font-semibold">Settings</h1>
         <h2 className="text-lg font-semibold">Event</h2>
-        <form action={saveEventSettings} className="space-y-3">
+        {/* Keyed by the saved values so the inputs show them after React resets the form. */}
+        <form key={JSON.stringify(settings)} action={saveEventSettings} className="space-y-3">
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block space-y-1">
               <span className="text-sm font-medium">Team formation closes (Pacific)</span>
@@ -64,7 +66,7 @@ export default async function SettingsPage() {
           <label className="flex items-center gap-2">
             <input type="checkbox" name="publish_winners" defaultChecked={settings?.publish_winners} /> Publish winners
           </label>
-          <button className={button}>Save event settings</button>
+          <SubmitButton className={button}>Save event settings</SubmitButton>
         </form>
       </section>
 
@@ -106,8 +108,10 @@ export default async function SettingsPage() {
             <tbody className="divide-y divide-foreground/10">
               {tickets.map((ticket) => {
                 const formId = `rules-${ticket || "none"}`;
+                // Keyed by the saved rules too, so the selects show them after React resets the form.
+                const saved = [roleFor(ticket), ...STATUSES.map((s) => rule(ticket, s)?.access)].join("|");
                 return (
-                  <tr key={ticket}>
+                  <tr key={`${ticket}|${saved}`}>
                     <td className="py-1.5 pr-3 font-medium">
                       {ticket || "(no ticket)"}
                       <form id={formId} action={saveTicketRules}>
@@ -144,7 +148,9 @@ export default async function SettingsPage() {
                       {ticket !== "" && (
                         <form action={deleteTicket}>
                           <input type="hidden" name="ticket_name" value={ticket} />
-                          <button className="text-sm underline">Remove</button>
+                          <SubmitButton className="text-sm underline" pendingText="Removing…">
+                            Remove
+                          </SubmitButton>
                         </form>
                       )}
                     </td>
@@ -165,7 +171,9 @@ export default async function SettingsPage() {
               <option key={r}>{r}</option>
             ))}
           </select>
-          <button className={button}>Add</button>
+          <SubmitButton className={button} pendingText="Adding…">
+            Add
+          </SubmitButton>
         </form>
       </section>
     </div>

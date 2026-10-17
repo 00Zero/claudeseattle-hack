@@ -1,6 +1,7 @@
 import { accessFromRules, type AccessRule } from "@/lib/access";
 import { requireAdminPage } from "@/lib/admin";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { SubmitButton } from "../submit-button";
 import { approvePerson, clearOverride, declinePerson, setPlatformRole } from "./actions";
 
 const ROLES = ["participant", "mentor", "volunteer", "judge", "admin"];
@@ -36,32 +37,40 @@ function ApprovalButtons({ person }: { person: Person }) {
     <div className="flex flex-wrap gap-1">
       <form action={approvePerson}>
         <input type="hidden" name="profile_id" value={person.id} />
-        <button className={small}>Approve</button>
+        <SubmitButton className={small} pendingText="Approving…">
+          Approve
+        </SubmitButton>
       </form>
       <form action={declinePerson}>
         <input type="hidden" name="profile_id" value={person.id} />
-        <button className={small}>Decline</button>
+        <SubmitButton className={small} pendingText="Declining…">
+          Decline
+        </SubmitButton>
       </form>
       {person.status_override && (
         <form action={clearOverride}>
           <input type="hidden" name="profile_id" value={person.id} />
-          <button className={small}>Clear override</button>
+          <SubmitButton className={small} pendingText="Clearing…">
+            Clear override
+          </SubmitButton>
         </form>
       )}
     </div>
   );
 }
 
+// Keyed by the saved role: React resets a form after its action runs, so a
+// fresh form makes the dropdown show the role that was just saved.
 function RoleForm({ person }: { person: Person }) {
   return (
-    <form action={setPlatformRole} className="flex gap-1">
+    <form key={person.platform_role} action={setPlatformRole} className="flex gap-1">
       <input type="hidden" name="profile_id" value={person.id} />
       <select name="platform_role" defaultValue={person.platform_role} className="rounded border border-foreground/20 bg-background text-xs">
         {ROLES.map((r) => (
           <option key={r}>{r}</option>
         ))}
       </select>
-      <button className={small}>Set</button>
+      <SubmitButton className={small}>Set</SubmitButton>
     </form>
   );
 }
