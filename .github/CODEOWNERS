@@ -1,0 +1,26 @@
+# Owners from the layout table in CLAUDE.md. The last matching pattern wins.
+# @dev-a = Nishant (Teams), @dev-b = Rajasuba (Judging): replace with real GitHub handles.
+# With zero required approvals this requests reviews; it doesn't block merges.
+
+# Admin (Adam): everything not listed below
+*                                       @00Zero
+
+# Shared: changes need the other dev's review
+/CLAUDE.md                              @00Zero @dev-a @dev-b
+/lib/supabase/                          @00Zero @dev-a @dev-b
+/proxy.ts                               @00Zero @dev-a @dev-b
+/app/layout.tsx                         @00Zero @dev-a @dev-b
+/app/globals.css                        @00Zero @dev-a @dev-b
+/package.json                           @00Zero @dev-a @dev-b
+/package-lock.json                      @00Zero @dev-a @dev-b
+/supabase/migrations/*_shared*.sql      @00Zero @dev-a @dev-b
+
+# Dev A: Teams (includes app/(teams)/CLAUDE.md)
+/app/(teams)/                           @dev-a
+/app/profile/                           @dev-a @00Zero
+/supabase/migrations/*_teams_*.sql      @dev-a
+
+# Dev B: Judging (includes app/(judge)/CLAUDE.md and app/admin/judging/CLAUDE.md)
+/app/(judge)/                           @dev-b
+/app/admin/judging/                     @dev-b
+/supabase/migrations/*_judge_*.sql      @dev-b
