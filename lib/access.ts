@@ -26,3 +26,13 @@ export function landingPathFor(access: Access | null, profileConfirmed: boolean)
   if (access !== "full") return "/pending";
   return profileConfirmed ? "/" : "/profile";
 }
+
+// Landing path for the user who just signed in on this request's session.
+export async function landingPathAfterSignIn(userId: string) {
+  const supabase = await createClient();
+  const [{ data: access }, { data: profile }] = await Promise.all([
+    supabase.rpc("current_access"),
+    supabase.from("profiles").select("profile_confirmed").eq("id", userId).maybeSingle(),
+  ]);
+  return landingPathFor(access as Access | null, profile?.profile_confirmed ?? false);
+}

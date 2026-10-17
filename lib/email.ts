@@ -1,6 +1,7 @@
 import "server-only";
 
-const FROM = "Claude Impact Lab Hackathon <login@claudeseattle.org>";
+// Must be on the domain verified in Resend (email.claudeseattle.org).
+const FROM = "Claude Seattle <login@email.claudeseattle.org>";
 
 export function normalizeEmail(value: FormDataEntryValue | null) {
   return typeof value === "string" ? value.trim().toLowerCase() : "";

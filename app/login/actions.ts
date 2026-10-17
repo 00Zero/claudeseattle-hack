@@ -36,7 +36,9 @@ export async function sendMagicLink(_prev: LoginState, formData: FormData): Prom
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithOtp({
     email: target,
-    options: { emailRedirectTo: `${await getOrigin()}/auth/callback` },
+    // The email templates link to {{ .RedirectTo }}?token_hash=…, so this also
+    // decides which deployment (localhost, preview, production) the link opens.
+    options: { emailRedirectTo: `${await getOrigin()}/auth/confirm` },
   });
   if (error) {
     return {

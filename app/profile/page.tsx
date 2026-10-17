@@ -24,7 +24,9 @@ export default async function ProfilePage() {
         <h1 className="text-2xl font-semibold">Your profile</h1>
         {!profile.profile_confirmed && (
           <p className="rounded border border-foreground/20 p-3 text-sm">
-            We filled this in from your Luma registration. Check it, answer the technical question, and confirm.
+            {profile.luma_guest_id
+              ? "We filled this in from your Luma registration. Check it, answer the technical question, and confirm."
+              : "Tell us about yourself so teams can find you, then confirm."}
           </p>
         )}
         <ProfileForm profile={profile} />

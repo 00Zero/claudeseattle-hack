@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import { getCurrentProfile } from "@/lib/supabase/profile";
-import { SignOutButton } from "@/app/auth/sign-out-button";
+import { AuthLink } from "@/app/auth/auth-link";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -57,13 +57,7 @@ export default async function RootLayout({
               </li>
             )}
             <li className="ml-auto">
-              {profile ? (
-                <SignOutButton className="hover:underline" />
-              ) : (
-                <Link href="/login" className="hover:underline">
-                  Log in
-                </Link>
-              )}
+              <AuthLink initialSignedIn={Boolean(profile)} />
             </li>
           </ul>
         </nav>
