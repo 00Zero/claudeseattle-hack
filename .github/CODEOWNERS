@@ -3,18 +3,18 @@
 # GitHub skips the PR's author, so only the others are notified.
 # The last matching pattern wins.
 #
-# TODO: when Nishant and Rajasuba have joined the repo and merged their first
-# PR, replace @<nishant> and @<rajasuba> with their GitHub usernames. GitHub
-# ignores owners without write access to the repo.
+# TODO: when Nishant has joined the repo and merged a first PR, replace
+# @<nishant> with their GitHub username. GitHub ignores owners without write
+# access to the repo.
 
 # Any migration: Adam applies it to production after merge.
 /supabase/migrations/               @00Zero
 
 # Shared code and shared tables: affects both apps.
-/supabase/migrations/*_shared*.sql  @00Zero @<nishant> @<rajasuba>
-/lib/supabase/                      @00Zero @<nishant> @<rajasuba>
-/proxy.ts                           @00Zero @<nishant> @<rajasuba>
-/app/layout.tsx                     @00Zero @<nishant> @<rajasuba>
-/app/globals.css                    @00Zero @<nishant> @<rajasuba>
-/package.json                       @00Zero @<nishant> @<rajasuba>
-/CLAUDE.md                          @00Zero @<nishant> @<rajasuba>
+/supabase/migrations/*_shared*.sql  @00Zero @<nishant> @rajasuba
+/lib/supabase/                      @00Zero @<nishant> @rajasuba
+/proxy.ts                           @00Zero @<nishant> @rajasuba
+/app/layout.tsx                     @00Zero @<nishant> @rajasuba
+/app/globals.css                    @00Zero @<nishant> @rajasuba
+/package.json                       @00Zero @<nishant> @rajasuba
+/CLAUDE.md                          @00Zero @<nishant> @rajasuba
