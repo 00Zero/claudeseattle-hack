@@ -22,8 +22,10 @@
   --bg-raised: #ffffff;
   --bg-sunken: var(--paper);
   --fg: var(--ink);
-  --fg-muted: var(--slate);
-  --fg-faint: var(--stone);
+  /* Light-theme text is dark on purpose (it washed out on phones): fg for body, fg-muted a dark
+     grey for secondary text, fg-faint for small labels only. Stone is for lines and fills, not text. */
+  --fg-muted: #3b3a36;
+  --fg-faint: #5c5b55;
   --line: rgba(20, 20, 19, 0.14);
   --line-strong: rgba(20, 20, 19, 0.5);
   --accent: var(--clay);
@@ -59,8 +61,8 @@
   --bg: #dad8d0;
   --bg-raised: #e6e4dc;
   --bg-sunken: #cfcdc5;
-  --fg-muted: #4e4d48;
-  --fg-faint: #7c7b74;
+  --fg-muted: #33322e;
+  --fg-faint: #4e4d48;
   --line: rgba(20, 20, 19, 0.18);
   --line-strong: rgba(20, 20, 19, 0.55);
   --accent-soft: rgba(217, 119, 87, 0.22);
