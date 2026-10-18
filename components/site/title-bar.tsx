@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AuthLink } from "@/app/auth/auth-link";
+import { MobileMenu } from "@/components/site/mobile-menu";
 import { ThinkingDots } from "@/components/site/thinking-dots";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
@@ -33,6 +34,8 @@ export function TitleBar({ signedIn, isAdmin }: { signedIn: boolean; isAdmin: bo
             </Link>
           )}
           <AuthLink initialSignedIn={signedIn} />
+          {/* Phones: the page links above are hidden, so signed-in people get them (and /logout) in a menu. */}
+          {signedIn && <MobileMenu pages={isAdmin ? [...pages, { href: "/admin", label: "admin" }] : pages} />}
           <ThemeToggle />
         </nav>
       </div>
