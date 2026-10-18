@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Impact Lab Hackathon · Variant C · Poster</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;1,6..72,300&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="tokens.css">
+<style>
+/* Layout concept: a gig poster stapled to a pole on Capitol Hill. The hero is the brand square blown up
+   full-bleed (arched lockup, giant serif city name), then torn-paper bands: setlist, lineup, liner notes. */
+.wrap { width: min(1080px, 100%); margin-inline: auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.grain { position: fixed; inset: 0; pointer-events: none; z-index: 9; opacity: .5; mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .08 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+
+/* Nav sits on the poster */
+.nav { position: absolute; inset: 0 0 auto 0; z-index: 3; }
+.nav .wrap { display: flex; align-items: center; gap: var(--s-4); padding-block: var(--s-4); font: 600 var(--text-xs)/1 var(--font-sans); letter-spacing: .12em; text-transform: uppercase; color: var(--ivory); }
+.nav ul { display: flex; gap: var(--s-4); margin-left: auto; }
+.nav a { color: inherit; text-decoration: none; opacity: .85; } .nav a:hover { opacity: 1; text-decoration: underline; text-underline-offset: 4px; }
+.nav .pill { border: 1px solid currentColor; border-radius: 999px; padding: .5rem .9rem; opacity: 1; }
+@media (max-width: 640px) { .nav ul li:not(:last-child) { display: none; } }
+
+/* Hero poster */
+.poster { position: relative; background: var(--clay); color: var(--ink); overflow: hidden; padding-block: var(--s-24) 0;
+  --clawd: var(--ivory); --clawd-bubble-bg: var(--ink); --clawd-bubble-fg: var(--ivory); --clawd-bubble-line: transparent; }
+.poster .wrap { display: grid; justify-items: center; text-align: center; gap: var(--s-2); position: relative; z-index: 2; }
+.arch { width: min(520px, 90vw); height: auto; }
+.arch text { font: 600 30px var(--font-sans); letter-spacing: .3em; fill: var(--ivory); text-transform: uppercase; }
+.poster h1 { font: 300 clamp(5rem, 17vw, 13rem)/0.9 var(--font-display); letter-spacing: -0.02em; margin-top: -.15em; }
+.poster .kind { font: 700 clamp(1rem, 2.6vw, 1.6rem)/1 var(--font-sans); letter-spacing: .3em; text-transform: uppercase; color: var(--ivory); }
+.poster .when { font: 500 var(--text-lg)/1.3 var(--font-sans); color: var(--ivory); }
+.poster .theme { font: 300 var(--text-xl)/1.35 var(--font-display); max-width: 30ch; margin-top: var(--s-4); }
+.poster .actions { display: flex; gap: var(--s-3); flex-wrap: wrap; justify-content: center; margin-top: var(--s-4); }
+.poster .btn { background: var(--ink); color: var(--ivory); } .poster .btn:hover { background: #000; }
+.poster .btn.ghost { background: transparent; color: var(--ink); border-color: var(--ink); }
+.stickers { display: flex; gap: var(--s-2); flex-wrap: wrap; justify-content: center; margin-top: var(--s-6); }
+.sticker { font: 700 var(--text-xs)/1 var(--font-sans); letter-spacing: .12em; text-transform: uppercase; padding: .5rem .8rem; background: var(--ivory); color: var(--ink); border-radius: 3px; transform: rotate(var(--r, -2deg)); box-shadow: 0 1px 0 rgba(0,0,0,.2); }
+.sticker.ink { background: var(--ink); color: var(--ivory); }
+.rain { position: absolute; inset: 0; pointer-events: none; opacity: .11; z-index: 1;
+  background-image: repeating-linear-gradient(102deg, transparent 0 26px, var(--ivory) 26px 27px, transparent 27px 60px); }
+@media (prefers-reduced-motion: no-preference) { .rain { animation: drizzle 1s linear infinite; } }
+@keyframes drizzle { to { background-position: -60px 130px; } }
+/* Clawd walks the bottom edge of the poster, in front of a flannel hem */
+.hem { position: relative; height: 72px; margin-top: var(--s-12); z-index: 2; background:
+    repeating-linear-gradient(90deg, rgba(20,20,19,.55) 0 3px, transparent 3px 22px),
+    repeating-linear-gradient(0deg, rgba(20,20,19,.55) 0 3px, transparent 3px 22px),
+    repeating-linear-gradient(90deg, rgba(250,249,245,.14) 0 1px, transparent 1px 11px),
+    repeating-linear-gradient(0deg, rgba(250,249,245,.14) 0 1px, transparent 1px 11px),
+    var(--evergreen); }
+.stage { position: absolute; left: 0; right: 0; bottom: 100%; height: 0; z-index: 3; }
+/* Torn edge between bands */
+.tear { display: block; width: 100%; height: 22px; margin-top: -1px; }
+.tear path { fill: var(--bg); }
+
+/* Bands */
+.band { padding-block: var(--s-12); }
+.band.sunken { background: var(--bg-sunken); }
+.band h2 { font: 700 clamp(2rem, 5vw, 3.5rem)/0.95 var(--font-sans); letter-spacing: -0.03em; text-transform: uppercase; }
+.band h2 span { font: 300 italic 1em/1 var(--font-display); text-transform: none; letter-spacing: 0; color: var(--accent); }
+.band .rule { height: 3px; background: var(--ink); margin-block: var(--s-4) var(--s-6); }
+.band .lede { max-width: 48ch; color: var(--fg-muted); }
+
+/* Setlist */
+.setlist { display: grid; gap: var(--s-8); grid-template-columns: 1fr; }
+.setlist > * { min-width: 0; }
+@media (min-width: 760px) { .setlist { grid-template-columns: 1fr 2fr; } }
+.set h3 { font: 700 var(--text-sm)/1 var(--font-sans); letter-spacing: .14em; text-transform: uppercase; margin-bottom: var(--s-3); }
+.set li { display: grid; grid-template-columns: 2rem 7.5rem 1fr; gap: var(--s-3); padding-block: var(--s-3); border-bottom: 2px dotted var(--line-strong); align-items: baseline; }
+.set .n { font: 300 var(--text-xl)/1 var(--font-display); color: var(--fg-faint); }
+.set .t { font-family: var(--font-mono); font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
+.set .w { font-weight: 500; }
+.set li.key .w { color: var(--accent); }
+.set li.key .w::after { content: " ★"; }
+
+/* Deadlines as backstage passes */
+.passes { display: grid; gap: var(--s-4); grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin-top: var(--s-8); }
+.pass { position: relative; background: var(--ink); color: var(--ivory); border-radius: var(--radius); padding: var(--s-6); display: grid; gap: var(--s-1); overflow: hidden; }
+.pass::before, .pass::after { content: ""; position: absolute; top: 50%; width: 22px; height: 22px; border-radius: 50%; background: var(--bg); transform: translateY(-50%); }
+.pass::before { left: -11px; } .pass::after { right: -11px; }
+.pass .k { font: 700 var(--text-xs)/1 var(--font-sans); letter-spacing: .14em; text-transform: uppercase; color: var(--stone); }
+.pass .v { font: 300 var(--text-2xl)/1.1 var(--font-display); }
+.pass .left { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--stone); }
+.pass.accent { background: var(--accent); color: var(--ink); } .pass.accent .k, .pass.accent .left { color: rgba(20,20,19,.7); }
+
+/* Lineup */
+.lineup { display: grid; gap: var(--s-3); }
+.act { display: grid; grid-template-columns: 1fr auto; gap: var(--s-3); align-items: baseline; padding-block: var(--s-4); border-bottom: 3px solid var(--ink); }
+.act .name { font: 300 clamp(1.6rem, 4vw, 3rem)/1 var(--font-display); }
+.act .who { font: 700 var(--text-xs)/1 var(--font-sans); letter-spacing: .14em; text-transform: uppercase; color: var(--fg-muted); text-align: right; }
+.act.headliner { border-bottom-color: var(--accent); }
+.act.headliner .name { color: var(--accent); font-size: clamp(2.2rem, 6vw, 4.5rem); }
+
+/* Liner notes */
+.notes-wrap { overflow-x: auto; }
+.notes { width: 100%; min-width: 700px; font-size: var(--text-sm); }
+.notes th { text-align: left; font: 700 var(--text-xs)/1 var(--font-sans); letter-spacing: .12em; text-transform: uppercase; padding: 0 var(--s-3) var(--s-3) 0; border-bottom: 3px solid var(--ink); }
+.notes td { padding: var(--s-3) var(--s-3) var(--s-3) 0; border-bottom: 1px solid var(--line-strong); vertical-align: top; color: var(--fg-muted); }
+.notes td:first-child { color: var(--fg); font-weight: 600; } .notes td:last-child { color: var(--fg); }
+.notes .band-n { font-family: var(--font-mono); }
+
+.venue { display: grid; gap: var(--s-3); }
+.venue .addr { font: 300 var(--text-2xl)/1.2 var(--font-display); }
+.venue .fine { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--fg-muted); }
+
+.footer { background: var(--ink); color: var(--stone); padding-block: var(--s-8); font-family: var(--font-mono); font-size: var(--text-xs); }
+.footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--s-3); }
+.footer .glyph { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="grain" aria-hidden="true"></div>
+
+<header class="nav"><div class="wrap">
+  <span>Claude Community · Seattle</span>
+  <ul><li><a href="/teams">Teams</a></li><li><a href="/submit">Submit</a></li><li><a href="/profile">Profile</a></li><li><a class="pill" href="/login">Log in</a></li></ul>
+</div></header>
+
+<section class="poster">
+  <div class="rain" aria-hidden="true"></div>
+  <div class="wrap">
+    <svg class="arch" viewBox="0 0 520 170" aria-hidden="true">
+      <path id="archPath" d="M30,160 A320,320 0 0 1 490,160" fill="none"/>
+      <text><textPath href="#archPath" startOffset="50%" text-anchor="middle">Claude Community</textPath></text>
+    </svg>
+    <h1>Seattle</h1>
+    <p class="kind">Impact Lab Hackathon</p>
+    <p class="when">Sunday, October 25, 2026 · thinkspace Seattle · doors 9:00 am</p>
+    <p class="theme">Build AI tools, workflows, and playbooks that small businesses can adopt.</p>
+    <div class="actions"><a class="btn" href="/login">Log in</a><a class="btn ghost" href="/teams">Browse teams</a></div>
+    <div class="stickers">
+      <span class="sticker" style="--r:-3deg">All ages</span>
+      <span class="sticker ink" style="--r:2deg">Free · no cover</span>
+      <span class="sticker" style="--r:-1deg">Open source</span>
+      <span class="sticker ink" style="--r:3deg">15–25 teams</span>
+      <span class="sticker" style="--r:-2deg"><span class="glyph" id="verb">Percolating</span>…</span>
+    </div>
+  </div>
+  <div class="hem" aria-hidden="true"><div class="stage" id="stage"></div></div>
+</section>
+<svg class="tear" viewBox="0 0 1200 22" preserveAspectRatio="none" aria-hidden="true"><path d="M0,22 L0,12 L40,6 L90,14 L140,4 L210,12 L260,3 L330,13 L390,5 L450,14 L520,6 L580,12 L640,2 L700,13 L760,6 L820,14 L890,4 L950,12 L1010,5 L1070,13 L1130,6 L1200,11 L1200,22 Z"/></svg>
+
+<main>
+  <section class="band" id="schedule"><div class="wrap">
+    <h2>Setlist <span>one long Sunday</span></h2>
+    <div class="rule"></div>
+    <div class="setlist">
+      <div class="set"><h3>Sat Oct 24</h3><ul>
+        <li><span class="n">0</span><span class="t">4:30–6:30 pm</span><span class="w">Team formation happy hour (optional)</span></li>
+      </ul></div>
+      <div class="set"><h3>Sun Oct 25</h3><ul>
+        <li><span class="n">1</span><span class="t">9:00–9:45 am</span><span class="w">Check-in, breakfast, team formation for anyone unmatched</span></li>
+        <li class="key"><span class="n">2</span><span class="t">10:30 am</span><span class="w">Start building (team formation closes)</span></li>
+        <li class="key"><span class="n">3</span><span class="t">5:30 pm</span><span class="w">Submission deadline</span></li>
+        <li><span class="n">4</span><span class="t">5:30–6:30 pm</span><span class="w">Prelim judging during dinner</span></li>
+        <li><span class="n">5</span><span class="t">6:30–7:30 pm</span><span class="w">Finals on stage: five 5-minute live demos plus Q&amp;A</span></li>
+        <li><span class="n">6</span><span class="t">7:30 pm</span><span class="w">Winners announced (encore)</span></li>
+      </ul></div>
+    </div>
+    <div class="passes">
+      <div class="pass"><span class="k">Team formation closes</span><span class="v">Sun Oct 25 · 10:30 am</span><span class="left" data-countdown="2026-10-25T10:30:00-07:00"></span></div>
+      <div class="pass accent"><span class="k">Submissions close</span><span class="v">Sun Oct 25 · 5:30 pm</span><span class="left" data-countdown="2026-10-25T17:30:00-07:00"></span></div>
+    </div>
+  </div></section>
+
+  <section class="band sunken" id="prizes"><div class="wrap">
+    <h2>The lineup <span>prizes</span></h2>
+    <div class="rule"></div>
+    <div class="lineup">
+      <div class="act headliner"><span class="name">$100 in Claude API credits</span><span class="who">Every participant</span></div>
+      <div class="act"><span class="name">One month of Claude Max 20x, per person</span><span class="who">Winning team</span></div>
+      <div class="act"><span class="name">Seattle AI Week AI Summit tickets</span><span class="who">Winning team · courtesy of WTIA</span></div>
+      <div class="act"><span class="name">A one-year WTIA membership</span><span class="who">Winning team</span></div>
+    </div>
+  </div></section>
+
+  <section class="band" id="judging"><div class="wrap">
+    <h2>Liner notes <span>how judging works</span></h2>
+    <div class="rule"></div>
+    <p class="lede" style="margin-bottom:var(--s-6)">Four criteria, equal weight, each scored 1 to 8 with no middle. An entry's score is the mean of the four. Five judges each score about four entries over dinner and send one to the final; all five score the finalists on stage.</p>
+    <div class="notes-wrap"><table class="notes">
+      <thead><tr><th>Criterion</th><th class="band-n">1–2</th><th class="band-n">3–4</th><th class="band-n">5–6</th><th class="band-n">7–8</th></tr></thead>
+      <tbody>
+        <tr><td>Does it work</td><td>Didn't run or is slides only</td><td>Parts run; core flow incomplete</td><td>Core flow works with bugs or rough edges</td><td>Works end to end; a business could try it today</td></tr>
+        <tr><td>Ease of implementation for a small business</td><td>Needs a developer and custom setup</td><td>Needs technical help to get started</td><td>A motivated owner could set it up with the README</td><td>Plug-and-play; clear README, no code needed</td></tr>
+        <tr><td>Impact on the business's operations</td><td>Unclear who it helps or how</td><td>Helps a narrow task a little</td><td>Saves real time or money on a common task</td><td>Changes how a core part of the business runs</td></tr>
+        <tr><td>Creativity of the solution</td><td>Generic chatbot or template</td><td>Sensible but predictable</td><td>A fresh angle on a known problem</td><td>Something judges hadn't thought of</td></tr>
+      </tbody>
+    </table></div>
+  </div></section>
+
+  <section class="band sunken" id="venue"><div class="wrap venue">
+    <h2>Venue <span>South Lake Union</span></h2>
+    <div class="rule"></div>
+    <p class="addr">thinkspace Seattle<br>1700 Westlake Ave N #200, Seattle</p>
+    <p class="fine">All projects are open-sourced on GitHub, so team and entry pages are public. · 47.6341° N, 122.3401° W · It will drizzle. Come as you are.</p>
+  </div></section>
+</main>
+
+<footer class="footer"><div class="wrap">
+  <span>Claude Community Seattle · hack.claudeseattle.org</span>
+  <span><span class="glyph">✻</span> Co-Authored-By: Clawd · ctrl+c to interrupt</span>
+</div></footer>
+
+<script src="clawd.js"></script>
+<script>
+  Clawd.mount({ stage: '#stage', scale: 1.1, start: 0.7 });
+  (function () {
+    const v = document.getElementById('verb');
+    const list = ['Percolating', 'Drizzling', 'Misting', 'Brewing', 'Grooving', 'Moonwalking', 'Jitterbugging', 'Vibing', 'Thundering', 'Clauding'];
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) setInterval(() => (v.textContent = list[Math.floor(Math.random() * list.length)]), 3000);
+    const fmt = (ms) => { if (ms <= 0) return 'closed'; const d = Math.floor(ms / 864e5), h = Math.floor(ms / 36e5) % 24, m = Math.floor(ms / 6e4) % 60; return `${d}d ${h}h ${m}m left`; };
+    const tick = () => document.querySelectorAll('[data-countdown]').forEach((n) => (n.textContent = fmt(new Date(n.dataset.countdown) - Date.now())));
+    tick(); setInterval(tick, 30000);
+  })();
+</script>
+</body>
+</html>

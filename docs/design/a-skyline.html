@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Impact Lab Hackathon · Variant A · Skyline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;1,6..72,300&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="tokens.css">
+<style>
+/* Layout concept: an editorial page on ivory. One drawn Seattle skyline band carries all the motion
+   (drizzle, a ferry, the Great Wheel, Clawd on the waterfront); everything below it is quiet type on hairlines. */
+.wrap { width: min(1120px, 100%); margin-inline: auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* Nav */
+.nav { display: flex; align-items: center; gap: var(--s-6); padding-block: var(--s-4); border-bottom: 1px solid var(--line); }
+.lockup { display: flex; align-items: baseline; gap: var(--s-2); text-decoration: none; }
+.lockup .cc { font: 600 var(--text-xs)/1 var(--font-sans); letter-spacing: .14em; text-transform: uppercase; }
+.lockup .city { font: 300 var(--text-xl)/1 var(--font-display); }
+.nav ul { display: flex; gap: var(--s-4); margin-left: auto; font-size: var(--text-sm); font-weight: 500; }
+.nav a:not(.lockup):not(.btn) { text-decoration: none; color: var(--fg-muted); }
+.nav a:not(.lockup):not(.btn):hover { color: var(--fg); }
+@media (max-width: 640px) { .nav ul li:not(:last-child) { display: none; } }
+
+/* Hero */
+.hero { padding-block: var(--s-12) var(--s-8); display: grid; gap: var(--s-6); grid-template-columns: 1fr; }
+.hero h1 { font: 300 var(--text-5xl)/0.98 var(--font-display); letter-spacing: -0.01em; }
+.hero h1 em { font-style: italic; color: var(--accent); }
+.hero .meta { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); color: var(--fg-muted); font-size: var(--text-sm); }
+.hero .meta b { color: var(--fg); font-weight: 500; }
+.hero .theme { font: 400 var(--text-lg)/1.4 var(--font-display); max-width: 34ch; }
+.hero .note { font-size: var(--text-sm); color: var(--fg-muted); max-width: 52ch; }
+.hero .actions { display: flex; gap: var(--s-3); flex-wrap: wrap; align-items: center; }
+.status { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--fg-muted); display: inline-flex; flex-wrap: wrap; gap: .25em .5em; align-items: center; }
+.status .glyph { color: var(--accent); display: inline-block; width: 1em; }
+@media (min-width: 900px) { .hero { grid-template-columns: 1.1fr .9fr; align-items: end; } .hero .right { display: grid; gap: var(--s-4); padding-bottom: var(--s-2); } }
+
+/* Skyline band */
+.skyline { position: relative; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); overflow: hidden; background: linear-gradient(var(--bg) 0%, var(--paper) 100%); }
+.skyline svg.scene { width: 100%; height: auto; display: block; }
+.scene .ink { stroke: var(--ink); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.scene .solid { fill: var(--bg); stroke: var(--ink); stroke-width: 1.5; stroke-linejoin: round; }
+.scene .faint { stroke: var(--stone); fill: var(--paper); stroke-width: 1.2; }
+.scene .water { stroke: var(--sound); fill: none; stroke-width: 1.3; opacity: .7; }
+.scene .accent { fill: var(--accent); }
+.rain { position: absolute; inset: 0; pointer-events: none; opacity: .35;
+  background-image: repeating-linear-gradient(100deg, transparent 0 18px, var(--sound) 18px 19px, transparent 19px 42px);
+  background-size: 160px 100%; mask-image: linear-gradient(180deg, transparent 0, #000 30%, #000 72%, transparent 100%); -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 30%, #000 72%, transparent 100%); }
+.clawd-stage { position: absolute; left: 0; right: 0; bottom: 20%; height: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .rain { animation: drizzle 1.1s linear infinite; }
+  .wave { animation: wave 6s linear infinite; }
+  .wave.w2 { animation-duration: 9s; animation-direction: reverse; }
+  .ferry { animation: ferry 48s linear infinite; }
+  .wheel { animation: turn 40s linear infinite; transform-origin: 960px 205px; }
+  .gull { animation: gull 22s ease-in-out infinite; }
+  .gull.g2 { animation-delay: -9s; animation-duration: 29s; }
+}
+@keyframes drizzle { to { background-position: -42px 120px; } }
+@keyframes wave { to { transform: translateX(-60px); } }
+@keyframes ferry { from { transform: translateX(1260px); } to { transform: translateX(-160px); } }
+@keyframes turn { to { transform: rotate(360deg); } }
+@keyframes gull { 0% { transform: translate(0,0); } 50% { transform: translate(-220px,-14px); } 100% { transform: translate(0,0); } }
+
+/* Sections */
+.section { padding-block: var(--s-12); border-bottom: 1px solid var(--line); display: grid; gap: var(--s-6); grid-template-columns: 1fr; }
+.section > * { min-width: 0; }
+.section h2 { font: 300 var(--text-3xl)/1.05 var(--font-display); }
+.section .lede { color: var(--fg-muted); max-width: 48ch; }
+@media (min-width: 900px) { .section { grid-template-columns: 300px 1fr; } .section .head { position: sticky; top: var(--s-6); align-self: start; display: grid; gap: var(--s-3); } }
+
+/* Deadlines ("tide table") */
+.tides { display: grid; gap: var(--s-4); grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.tide { border-top: 2px solid var(--ink); padding-top: var(--s-3); display: grid; gap: var(--s-1); }
+.tide .when { font: 300 var(--text-2xl)/1.1 var(--font-display); }
+.tide .left { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--fg-muted); }
+.tide.accent { border-top-color: var(--accent); }
+.gauge { height: 6px; background: var(--sand); border-radius: 3px; overflow: hidden; margin-top: var(--s-2); }
+.gauge i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 3px; transition: width var(--dur-slow) var(--ease-out); }
+
+/* Schedule */
+.days { display: grid; gap: var(--s-8); grid-template-columns: 1fr; }
+@media (min-width: 720px) { .days { grid-template-columns: 1fr 1fr; } }
+.day h3 { font: 500 var(--text-sm)/1 var(--font-sans); letter-spacing: .1em; text-transform: uppercase; color: var(--fg-muted); padding-bottom: var(--s-3); border-bottom: 1px solid var(--line); }
+.day li { display: grid; grid-template-columns: 7.5rem 1fr; gap: var(--s-3); padding-block: var(--s-3); border-bottom: 1px solid var(--line); align-items: baseline; }
+.day .t { font-family: var(--font-mono); font-size: var(--text-sm); font-variant-numeric: tabular-nums; color: var(--fg-muted); }
+.day li.key .t, .day li.key .w { color: var(--fg); font-weight: 500; }
+.day li.key .w::after { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-left: .5em; vertical-align: middle; }
+
+/* Prizes */
+.prizes { display: grid; gap: var(--s-4); grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.prize { background: var(--bg-raised); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: var(--s-6); display: grid; gap: var(--s-2); align-content: start; }
+.prize.everyone { grid-column: 1 / -1; background: var(--accent-soft); border-color: transparent; }
+.prize .big { font: 300 var(--text-3xl)/1 var(--font-display); }
+.prize .who { font-size: var(--text-xs); letter-spacing: .12em; text-transform: uppercase; color: var(--fg-muted); font-weight: 600; }
+
+/* Rubric */
+.rubric-wrap { overflow-x: auto; }
+.rubric { width: 100%; min-width: 720px; font-size: var(--text-sm); }
+.rubric th { text-align: left; font: 600 var(--text-xs)/1.2 var(--font-sans); letter-spacing: .1em; text-transform: uppercase; color: var(--fg-muted); padding: 0 var(--s-3) var(--s-3) 0; border-bottom: 1px solid var(--ink); }
+.rubric td { padding: var(--s-3) var(--s-3) var(--s-3) 0; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--fg-muted); }
+.rubric td:first-child { color: var(--fg); font-weight: 500; }
+.rubric td:last-child { color: var(--fg); }
+.rubric .band { font-family: var(--font-mono); }
+
+/* Venue */
+.venue { display: grid; gap: var(--s-4); }
+.venue .addr { font: 300 var(--text-xl)/1.3 var(--font-display); }
+.venue .coords { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--fg-muted); }
+
+/* Footer */
+.footer { padding-block: var(--s-8); display: flex; flex-wrap: wrap; gap: var(--s-4); justify-content: space-between; font-size: var(--text-xs); color: var(--fg-muted); font-family: var(--font-mono); }
+</style>
+</head>
+<body>
+<header class="wrap nav">
+  <a class="lockup" href="/"><span class="cc">Claude Community</span><span class="city">Seattle</span></a>
+  <ul>
+    <li><a href="/teams">Teams</a></li>
+    <li><a href="/submit">Submit</a></li>
+    <li><a href="/profile">Profile</a></li>
+    <li><a class="btn ghost" href="/login">Log in</a></li>
+  </ul>
+</header>
+
+<section class="wrap hero">
+  <div>
+    <p class="eyebrow">Sunday, October 25, 2026 · thinkspace Seattle</p>
+    <h1 style="margin-top:.4em">Impact Lab <em>Hackathon</em></h1>
+  </div>
+  <div class="right">
+    <p class="theme">Build AI tools, workflows, and playbooks that small businesses can adopt.</p>
+    <p class="note">All projects are open-sourced on GitHub, so team and entry pages are public. One day, 15 to 25 teams, five judges, five live demos on stage.</p>
+    <div class="actions">
+      <a class="btn" href="/login">Log in with a magic link</a>
+      <a class="btn ghost" href="/teams">Browse teams</a>
+    </div>
+    <p class="status" id="status"><span class="glyph">✻</span><span class="verb">Percolating</span>… <span class="secs">(0s · 83 approved)</span></p>
+  </div>
+</section>
+
+<div class="skyline" aria-label="A drawn Seattle skyline: Space Needle, downtown towers, Smith Tower, the Great Wheel, a ferry on Puget Sound, and Mount Rainier">
+  <svg class="scene" viewBox="0 0 1200 300" role="img" aria-hidden="true">
+    <!-- Rainier -->
+    <path class="faint" d="M520,240 C680,150 820,86 900,84 C985,86 1105,165 1200,232 L1200,240 Z"/>
+    <path class="ink" style="stroke:var(--stone)" d="M868,112 L882,98 L896,106 L906,92 L918,104 L934,100 L948,118" />
+    <!-- gulls -->
+    <path class="ink gull" d="M700,70 q7,-6 14,0 q7,-6 14,0" style="stroke-width:1.1"/>
+    <path class="ink gull g2" d="M1040,56 q6,-5 12,0 q6,-5 12,0" style="stroke-width:1.1"/>
+    <!-- downtown -->
+    <rect class="solid" x="330" y="170" width="40" height="70"/>
+    <rect class="solid" x="380" y="190" width="30" height="50"/>
+    <path class="solid" d="M420,240 L420,160 C420,130 440,118 466,118 L466,240 Z"/>
+    <rect class="solid" x="480" y="175" width="24" height="65"/>
+    <path class="solid" d="M520,240 L520,100 L533,100 L533,76 L561,76 L561,100 L574,100 L574,240 Z"/>
+    <path class="ink" style="stroke:var(--stone)" d="M533,110 L533,232 M547,84 L547,232 M561,110 L561,232"/>
+    <rect class="solid" x="590" y="140" width="36" height="100"/>
+    <rect class="solid" x="636" y="165" width="28" height="75"/>
+    <path class="ink" d="M636,165 L650,156 L664,165"/>
+    <path class="solid" d="M690,240 L690,150 L712,150 L712,240 Z"/>
+    <path class="solid" d="M690,150 L701,116 L712,150 Z"/>
+    <circle class="accent" cx="701" cy="113" r="3"/>
+    <rect class="solid" x="730" y="185" width="34" height="55"/>
+    <!-- Space Needle -->
+    <path class="ink" d="M112,240 C118,196 134,164 148,140 M188,240 C182,196 166,164 152,140 M150,240 L150,140"/>
+    <path class="ink" d="M124,196 L176,196" style="stroke:var(--stone)"/>
+    <path class="solid" d="M102,122 L198,122 L150,142 Z"/>
+    <path class="solid" d="M102,122 Q150,100 198,122 Z"/>
+    <path class="ink" d="M112,116 L188,116" style="stroke:var(--stone);stroke-dasharray:3 3"/>
+    <path class="ink" d="M150,106 L150,58"/>
+    <circle class="accent" cx="150" cy="56" r="2.5"/>
+    <!-- Great Wheel -->
+    <path class="ink" d="M938,240 L960,205 L982,240" />
+    <g class="wheel">
+      <circle class="ink" cx="960" cy="205" r="34"/>
+      <circle class="ink" cx="960" cy="205" r="26" style="stroke:var(--stone)"/>
+      <path class="ink" d="M960,171 L960,239 M926,205 L994,205 M936,181 L984,229 M984,181 L936,229" style="stroke-width:1"/>
+      <g class="accent"><circle cx="960" cy="171" r="2.4"/><circle cx="994" cy="205" r="2.4"/><circle cx="960" cy="239" r="2.4"/><circle cx="926" cy="205" r="2.4"/></g>
+    </g>
+    <!-- ground -->
+    <path class="ink" d="M0,240 L1200,240"/>
+    <!-- water -->
+    <g class="wave"><path class="water" d="M-60,258 q15,-5 30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0"/></g>
+    <g class="wave w2"><path class="water" style="opacity:.45" d="M-60,276 q15,-5 30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0 t30,0"/></g>
+    <!-- ferry -->
+    <g class="ferry">
+      <path class="solid" d="M0,262 L84,262 L76,272 L8,272 Z"/>
+      <path class="solid" d="M12,250 L72,250 L72,262 L12,262 Z"/>
+      <path class="ink" d="M20,256 L64,256" style="stroke:var(--stone)"/>
+      <path class="solid" d="M30,243 L54,243 L54,250 L30,250 Z"/>
+      <path class="ink" d="M38,243 L38,236" /><circle class="accent" cx="38" cy="235" r="1.6"/>
+    </g>
+  </svg>
+  <div class="rain" aria-hidden="true"></div>
+  <div class="clawd-stage" id="stage"></div>
+</div>
+
+<main class="wrap">
+  <section class="section" id="deadlines">
+    <div class="head"><p class="eyebrow">Tide table</p><h2>Two deadlines, both Sunday.</h2><p class="lede">Deadlines come from the event settings, so what you see here is always current.</p></div>
+    <div class="tides">
+      <div class="tide"><span class="eyebrow">Team formation closes</span><span class="when">Sun Oct 25, 10:30 am</span><span class="left" data-countdown="2026-10-25T10:30:00-07:00"></span></div>
+      <div class="tide accent"><span class="eyebrow">Submissions close</span><span class="when">Sun Oct 25, 5:30 pm</span><span class="left" data-countdown="2026-10-25T17:30:00-07:00"></span>
+        <div class="gauge" title="Context window remaining before auto-compact"><i id="gauge"></i></div>
+        <span class="left" id="gauge-label">Context window remaining</span></div>
+    </div>
+  </section>
+
+  <section class="section" id="schedule">
+    <div class="head"><p class="eyebrow">Schedule</p><h2>A happy hour, then one long Sunday.</h2><p class="lede">Teams of 3 to 5. Mentors float between tables. Prelim judging happens over dinner; finals are live on stage.</p></div>
+    <div class="days">
+      <div class="day"><h3>Saturday, October 24</h3><ul>
+        <li><span class="t">4:30–6:30 pm</span><span class="w">Team formation happy hour (optional)</span></li>
+      </ul></div>
+      <div class="day"><h3>Sunday, October 25</h3><ul>
+        <li><span class="t">9:00–9:45 am</span><span class="w">Check-in, breakfast, team formation for anyone unmatched</span></li>
+        <li class="key"><span class="t">10:30 am</span><span class="w">Start building (team formation closes)</span></li>
+        <li class="key"><span class="t">5:30 pm</span><span class="w">Submission deadline</span></li>
+        <li><span class="t">5:30–6:30 pm</span><span class="w">Prelim judging during dinner</span></li>
+        <li><span class="t">6:30–7:30 pm</span><span class="w">Finals on stage: five 5-minute live demos plus Q&amp;A</span></li>
+        <li><span class="t">7:30 pm</span><span class="w">Winners announced</span></li>
+      </ul></div>
+    </div>
+  </section>
+
+  <section class="section" id="prizes">
+    <div class="head"><p class="eyebrow">Prizes</p><h2>Everyone leaves with credits.</h2></div>
+    <div class="prizes">
+      <div class="prize everyone"><span class="who">Every participant</span><span class="big">$100 in Claude API credits</span><p class="lede">Redeem against a Console organization, not a personal account.</p></div>
+      <div class="prize"><span class="who">Winning team</span><span class="big">Claude Max 20x</span><p>One month, per person.</p></div>
+      <div class="prize"><span class="who">Winning team</span><span class="big">AI Summit tickets</span><p>Seattle AI Week, courtesy of WTIA.</p></div>
+      <div class="prize"><span class="who">Winning team</span><span class="big">WTIA membership</span><p>One year.</p></div>
+    </div>
+  </section>
+
+  <section class="section" id="judging">
+    <div class="head"><p class="eyebrow">Judging</p><h2>Four criteria, equal weight.</h2><p class="lede">Each is scored 1 to 8 with no middle. An entry's score is the mean of the four, to one decimal.</p></div>
+    <div class="rubric-wrap"><table class="rubric">
+      <thead><tr><th>Criterion</th><th class="band">1–2</th><th class="band">3–4</th><th class="band">5–6</th><th class="band">7–8</th></tr></thead>
+      <tbody>
+        <tr><td>Does it work</td><td>Didn't run or is slides only</td><td>Parts run; core flow incomplete</td><td>Core flow works with bugs or rough edges</td><td>Works end to end; a business could try it today</td></tr>
+        <tr><td>Ease of implementation for a small business</td><td>Needs a developer and custom setup</td><td>Needs technical help to get started</td><td>A motivated owner could set it up with the README</td><td>Plug-and-play; clear README, no code needed</td></tr>
+        <tr><td>Impact on the business's operations</td><td>Unclear who it helps or how</td><td>Helps a narrow task a little</td><td>Saves real time or money on a common task</td><td>Changes how a core part of the business runs</td></tr>
+        <tr><td>Creativity of the solution</td><td>Generic chatbot or template</td><td>Sensible but predictable</td><td>A fresh angle on a known problem</td><td>Something judges hadn't thought of</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="section" id="venue">
+    <div class="head"><p class="eyebrow">Venue</p><h2>South Lake Union.</h2></div>
+    <div class="venue">
+      <p class="addr">thinkspace Seattle<br>1700 Westlake Ave N #200, Seattle</p>
+      <p class="coords">47.6341° N, 122.3401° W · the Space Needle is a 12-minute walk · bring a layer, it will drizzle</p>
+    </div>
+  </section>
+</main>
+
+<footer class="wrap footer">
+  <span>Claude Community Seattle · hack.claudeseattle.org</span>
+  <span>Co-Authored-By: a room full of humans and one Clawd</span>
+</footer>
+
+<script src="clawd.js"></script>
+<script>
+  // Clawd on the waterfront.
+  Clawd.mount({ stage: '#stage', scale: 1 });
+
+  // Hero status line cycles the Claude Code spinner.
+  (function () {
+    const el = document.getElementById('status');
+    const verb = el.querySelector('.verb'), glyph = el.querySelector('.glyph'), secs = el.querySelector('.secs');
+    const seattle = ['Percolating', 'Drizzling', 'Misting', 'Brewing', 'Ebbing', 'Gusting', 'Precipitating', 'Moseying', 'Spelunking', 'Grooving', 'Clauding'];
+    let i = 0, t0 = Date.now();
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    setInterval(() => { glyph.textContent = Clawd.GLYPHS[i++ % Clawd.GLYPHS.length]; secs.textContent = `(${Math.floor((Date.now() - t0) / 1000)}s · 83 approved · 391 pending)`; }, 180);
+    setInterval(() => { verb.textContent = seattle[Math.floor(Math.random() * seattle.length)]; }, 4200);
+  })();
+
+  // Countdowns and the "context window" gauge (time left until submissions close).
+  (function () {
+    const fmt = (ms) => { if (ms <= 0) return 'closed'; const d = Math.floor(ms / 864e5), h = Math.floor(ms / 36e5) % 24, m = Math.floor(ms / 6e4) % 60; return `${d}d ${h}h ${m}m left`; };
+    const open = new Date('2026-10-17T00:00:00-07:00'), close = new Date('2026-10-25T17:30:00-07:00');
+    const tick = () => {
+      const now = Date.now();
+      document.querySelectorAll('[data-countdown]').forEach((n) => (n.textContent = fmt(new Date(n.dataset.countdown) - now)));
+      const pct = Math.max(0, Math.min(100, 100 * (close - now) / (close - open)));
+      document.getElementById('gauge').style.width = pct.toFixed(1) + '%';
+      document.getElementById('gauge-label').textContent = `Context window: ${pct.toFixed(0)}% remaining · auto-compact at 5:30 pm Sunday`;
+    };
+    tick(); setInterval(tick, 30000);
+  })();
+</script>
+</body>
+</html>
