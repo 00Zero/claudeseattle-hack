@@ -14,6 +14,16 @@ const ACCESS_LABELS: Record<string, string> = {
   blocked: "Blocked",
 };
 const ROLES = ["participant", "mentor", "volunteer", "judge", "admin"];
+const TEXT_FIELDS: { name: string; label: string; type?: "url" | "number" }[] = [
+  { name: "venue_name", label: "Venue name" },
+  { name: "venue_address", label: "Venue address" },
+  { name: "venue_neighborhood", label: "Venue neighborhood" },
+  { name: "luma_calendar_url", label: "Luma calendar link", type: "url" },
+  { name: "venue_lat", label: "Venue latitude", type: "number" },
+  { name: "venue_lon", label: "Venue longitude", type: "number" },
+  { name: "wifi_network", label: "Wi-Fi network" },
+  { name: "wifi_password", label: "Wi-Fi password" },
+];
 const input = "rounded border border-foreground/20 bg-background px-2 py-1";
 const button = "rounded bg-foreground px-3 py-1.5 text-sm text-background";
 
@@ -64,6 +74,42 @@ export default async function SettingsPage() {
                 className={`${input} w-full`}
               />
             </label>
+          </div>
+          <p className="text-sm text-foreground/70">
+            Shown on the home page. Leave a field blank to use the default in lib/event.ts.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">Event starts (Pacific)</span>
+              <input
+                type="datetime-local"
+                name="event_starts_at"
+                defaultValue={settings?.event_starts_at ? isoToPacificInput(settings.event_starts_at) : ""}
+                className={`${input} w-full`}
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">Event ends (Pacific)</span>
+              <input
+                type="datetime-local"
+                name="event_ends_at"
+                defaultValue={settings?.event_ends_at ? isoToPacificInput(settings.event_ends_at) : ""}
+                className={`${input} w-full`}
+              />
+            </label>
+            {TEXT_FIELDS.map(({ name, label, type }) => (
+              <label key={name} className="block space-y-1">
+                <span className="text-sm font-medium">{label}</span>
+                <input
+                  type={type ?? "text"}
+                  name={name}
+                  step={type === "number" ? "any" : undefined}
+                  autoComplete="off"
+                  defaultValue={settings?.[name] ?? ""}
+                  className={`${input} w-full`}
+                />
+              </label>
+            ))}
           </div>
           <label className="flex items-center gap-2">
             <input type="checkbox" name="publish_finalists" defaultChecked={settings?.publish_finalists} /> Publish finalists
