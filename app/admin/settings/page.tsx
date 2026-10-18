@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isoToPacificInput } from "@/lib/time";
 import { SubmitButton } from "../submit-button";
 import { addTicket, deleteTicket, saveEventSettings, saveTicketRules } from "./actions";
+import { removeAdminEmail } from "./admin-email-actions";
+import { AdminEmailForm } from "./admin-email-form";
 
 const STATUSES = ["approved", "pending_approval", "waitlist", "declined"];
 const ACCESS_LABELS: Record<string, string> = {
@@ -16,12 +18,15 @@ const input = "rounded border border-foreground/20 bg-background px-2 py-1";
 const button = "rounded bg-foreground px-3 py-1.5 text-sm text-background";
 
 export default async function SettingsPage() {
-  await requireAdminPage();
+  const viewer = await requireAdminPage();
   const admin = createAdminClient();
-  const [{ data: settings }, { data: rules }, { data: unmapped }] = await Promise.all([
+  const [{ data: settings }, { data: rules }, { data: unmapped }, { data: adminEmails }] = await Promise.all([
     admin.from("event_settings").select("*").eq("id", 1).single(),
     admin.from("access_rules").select("ticket_name, approval_status, access, default_role"),
     admin.from("unmapped_luma_tickets").select("ticket_name, approval_status, guests"),
+    viewer.is_super_admin
+      ? admin.from("admin_emails").select("email, note, created_at").order("created_at")
+      : Promise.resolve({ data: null }),
   ]);
 
   const tickets = [...new Set(((rules ?? []) as AccessRule[]).map((r) => r.ticket_name))].sort((a, b) =>
@@ -121,7 +126,9 @@ export default async function SettingsPage() {
                     <td className="py-1.5 pr-3">
                       <select form={formId} name="default_role" defaultValue={roleFor(ticket)} className={input}>
                         {ROLES.map((r) => (
-                          <option key={r}>{r}</option>
+                          <option key={r} value={r} disabled={r === "admin" && !viewer.is_super_admin}>
+                            {r}
+                          </option>
                         ))}
                       </select>
                     </td>
@@ -168,7 +175,9 @@ export default async function SettingsPage() {
           </label>
           <select name="default_role" defaultValue="participant" className={input}>
             {ROLES.map((r) => (
-              <option key={r}>{r}</option>
+              <option key={r} value={r} disabled={r === "admin" && !viewer.is_super_admin}>
+                            {r}
+                          </option>
             ))}
           </select>
           <SubmitButton className={button} pendingText="Adding…">
@@ -176,6 +185,36 @@ export default async function SettingsPage() {
           </SubmitButton>
         </form>
       </section>
+
+      {viewer.is_super_admin && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">Admin emails</h2>
+          <p className="text-sm text-foreground/70">
+            Anyone who signs in with, or verifies, one of these emails becomes an admin automatically. Adding an email
+            for someone who already has an account promotes them now. Removing an email doesn&apos;t demote anyone;
+            change their role on the People tab. Only super admins see this list.
+          </p>
+          {(adminEmails ?? []).length > 0 && (
+            <ul className="divide-y divide-foreground/10 rounded border border-foreground/15">
+              {adminEmails!.map((row) => (
+                <li key={row.email} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
+                  <span className="break-all">
+                    {row.email}
+                    {row.note && <span className="ml-2 text-foreground/50">{row.note}</span>}
+                  </span>
+                  <form action={removeAdminEmail}>
+                    <input type="hidden" name="email" value={row.email} />
+                    <SubmitButton className="text-sm underline" pendingText="Removing…">
+                      Remove
+                    </SubmitButton>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          )}
+          <AdminEmailForm />
+        </section>
+      )}
     </div>
   );
 }

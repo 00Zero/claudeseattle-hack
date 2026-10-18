@@ -6,6 +6,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 const ROLES = ["participant", "mentor", "volunteer", "judge", "admin"];
 
+export type RoleState = { status: "idle" | "ok" | "error"; message?: string };
+
 function profileId(formData: FormData) {
   const id = formData.get("profile_id");
   if (typeof id !== "string" || !id) throw new Error("Missing profile_id");
@@ -51,13 +53,26 @@ export async function clearOverride(formData: FormData) {
   revalidatePath("/admin/people");
 }
 
-export async function setPlatformRole(formData: FormData) {
+// Admins set participant, mentor, volunteer, and judge. Granting or removing
+// admin takes a super admin. Super admins can't be changed at all (a database
+// trigger enforces that too).
+export async function setPlatformRole(_prev: RoleState, formData: FormData): Promise<RoleState> {
   const me = await assertAdmin();
   const id = profileId(formData);
   const role = formData.get("platform_role");
-  if (typeof role !== "string" || !ROLES.includes(role)) throw new Error("Unknown role");
-  if (id === me.id && role !== "admin") throw new Error("You can't remove your own admin role.");
-  const { error } = await createAdminClient().from("profiles").update({ platform_role: role }).eq("id", id);
-  if (error) throw new Error(error.message);
+  if (typeof role !== "string" || !ROLES.includes(role)) return { status: "error", message: "Unknown role." };
+
+  const admin = createAdminClient();
+  const { data: target } = await admin.from("profiles").select("platform_role, is_super_admin").eq("id", id).single();
+  if (!target) return { status: "error", message: "Person not found." };
+  if (target.is_super_admin) return { status: "error", message: "Super admins can't be changed." };
+  if (target.platform_role === role) return { status: "ok" };
+  if ((role === "admin" || target.platform_role === "admin") && !me.is_super_admin) {
+    return { status: "error", message: "Only a super admin can grant or remove admin." };
+  }
+
+  const { error } = await admin.from("profiles").update({ platform_role: role }).eq("id", id);
+  if (error) return { status: "error", message: "Couldn't save the role. Try again." };
   revalidatePath("/admin/people");
+  return { status: "ok", message: "Saved." };
 }
