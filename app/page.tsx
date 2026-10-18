@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { audience, eventDate, eventCloseAt, eventName, eventOpenAt, hosts, judges, lumaCalendarUrl, openSourceNote, prizes, rubric, sundaySchedule, saturdaySchedule, theme, venue, type Person } from "@/lib/event";
+import { audience, eventDate, eventCloseAt, eventName, eventOpenAt, hosts, judges, lumaCalendarUrl as defaultLumaUrl, openSourceNote, prizes, rubric, sundaySchedule, saturdaySchedule, theme, venue as defaultVenue, type Person } from "@/lib/event";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { Agenda } from "@/components/home/agenda";
@@ -58,13 +58,30 @@ function People({ people }: { people: Person[] }) {
 export default async function Home() {
   const supabase = await createClient();
   const [{ data: settings }, profile] = await Promise.all([
-    supabase.from("event_settings").select("team_formation_closes_at, submissions_close_at").eq("id", 1).single(),
+    supabase
+      .from("event_settings")
+      .select(
+        "team_formation_closes_at, submissions_close_at, event_starts_at, event_ends_at, venue_name, venue_address, venue_neighborhood, venue_lat, venue_lon, luma_calendar_url",
+      )
+      .eq("id", 1)
+      .single(),
     getCurrentProfile(),
   ]);
 
   // Deadlines come from event_settings; the schedule in lib/event.ts is the fallback.
   const teamFormationClosesAt = settings?.team_formation_closes_at ?? "2026-10-25T10:30:00-07:00";
   const submissionsCloseAt = settings?.submissions_close_at ?? "2026-10-25T17:30:00-07:00";
+  // Venue, Luma link, and event bounds too, per column, so a NULL keeps the lib/event.ts value.
+  const openAt = settings?.event_starts_at ?? eventOpenAt;
+  const closeAt = settings?.event_ends_at ?? eventCloseAt;
+  const lumaCalendarUrl = settings?.luma_calendar_url ?? defaultLumaUrl;
+  const venue = {
+    name: settings?.venue_name ?? defaultVenue.name,
+    address: settings?.venue_address ?? defaultVenue.address,
+    neighborhood: settings?.venue_neighborhood ?? defaultVenue.neighborhood,
+    lat: settings?.venue_lat ?? defaultVenue.lat,
+    lon: settings?.venue_lon ?? defaultVenue.lon,
+  };
   const slots = [...saturdaySchedule, ...sundaySchedule]
     .filter((item): item is typeof item & { start: string; end: string } => Boolean(item.start && item.end))
     .map((item) => ({ what: item.what, start: item.start, end: item.end }));
@@ -117,7 +134,7 @@ export default async function Home() {
           </div>
         </div>
         <div className="grid min-w-0 gap-3">
-          <ContextWindow openAt={eventOpenAt} closeAt={eventCloseAt} moments={moments} slots={slots} />
+          <ContextWindow openAt={openAt} closeAt={closeAt} moments={moments} slots={slots} />
           <Wifi />
         </div>
       </section>
@@ -224,7 +241,9 @@ export default async function Home() {
             {venue.address}
           </p>
           <p className="font-mono text-xs text-fg-muted">
-            {venue.neighborhood} · {venue.lat.toFixed(4)}° N, {Math.abs(venue.lon).toFixed(4)}° W · a 12-minute walk from the Space Needle
+            {venue.neighborhood} · {Math.abs(venue.lat).toFixed(4)}° {venue.lat < 0 ? "S" : "N"}, {Math.abs(venue.lon).toFixed(4)}°{" "}
+            {venue.lon < 0 ? "W" : "E"}
+            {venue.address === defaultVenue.address && " · a 12-minute walk from the Space Needle"}
           </p>
         </section>
       </div>

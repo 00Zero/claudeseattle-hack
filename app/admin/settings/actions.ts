@@ -14,11 +14,37 @@ function field(formData: FormData, key: string) {
   return typeof value === "string" ? value : "";
 }
 
+// Optional event details: a blank field saves NULL, and the home page falls back to lib/event.ts.
+function optionalText(formData: FormData, key: string) {
+  return field(formData, key).trim() || null;
+}
+
+function optionalNumber(formData: FormData, key: string, label: string) {
+  const value = field(formData, key).trim();
+  if (!value) return null;
+  const number = Number(value);
+  if (!Number.isFinite(number)) throw new Error(`${label} needs to be a number.`);
+  return number;
+}
+
+function optionalPacific(formData: FormData, key: string, label: string) {
+  const value = field(formData, key);
+  if (!value) return null;
+  const iso = pacificInputToIso(value);
+  if (!iso) throw new Error(`${label} needs a date and time.`);
+  return iso;
+}
+
 export async function saveEventSettings(formData: FormData) {
   await assertAdmin();
   const teamClose = pacificInputToIso(field(formData, "team_formation_closes_at"));
   const submitClose = pacificInputToIso(field(formData, "submissions_close_at"));
   if (!teamClose || !submitClose) throw new Error("Both deadlines need a date and time.");
+  const startsAt = optionalPacific(formData, "event_starts_at", "Event start");
+  const endsAt = optionalPacific(formData, "event_ends_at", "Event end");
+  if (startsAt && endsAt && startsAt >= endsAt) throw new Error("The event has to end after it starts.");
+  const lumaUrl = optionalText(formData, "luma_calendar_url");
+  if (lumaUrl && !/^https?:\/\//.test(lumaUrl)) throw new Error("The Luma link needs to start with https://.");
 
   const { error } = await createAdminClient()
     .from("event_settings")
@@ -27,6 +53,16 @@ export async function saveEventSettings(formData: FormData) {
       submissions_close_at: submitClose,
       publish_finalists: formData.get("publish_finalists") === "on",
       publish_winners: formData.get("publish_winners") === "on",
+      event_starts_at: startsAt,
+      event_ends_at: endsAt,
+      venue_name: optionalText(formData, "venue_name"),
+      venue_address: optionalText(formData, "venue_address"),
+      venue_neighborhood: optionalText(formData, "venue_neighborhood"),
+      venue_lat: optionalNumber(formData, "venue_lat", "Latitude"),
+      venue_lon: optionalNumber(formData, "venue_lon", "Longitude"),
+      luma_calendar_url: lumaUrl,
+      wifi_network: optionalText(formData, "wifi_network"),
+      wifi_password: optionalText(formData, "wifi_password"),
     })
     .eq("id", 1);
   if (error) throw new Error(error.message);
