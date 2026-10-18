@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { audience, eventDate, eventCloseAt, eventName, eventOpenAt, hosts, judges, lumaCalendarUrl as defaultLumaUrl, openSourceNote, prizes, rubric, sundaySchedule, saturdaySchedule, theme, venue as defaultVenue, type Person } from "@/lib/event";
+import { audience, eventDate, eventCloseAt, eventName, eventOpenAt, ambassadors, hosts, judges, lumaCalendarUrl as defaultLumaUrl, openSourceNote, partners, prizes, rubric, sundaySchedule, saturdaySchedule, theme, venue as defaultVenue, type Entry } from "@/lib/event";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { Agenda } from "@/components/home/agenda";
@@ -28,29 +28,47 @@ function LinkedInIcon() {
   );
 }
 
-function People({ people }: { people: Person[] }) {
+function ExternalLinkIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+    </svg>
+  );
+}
+
+// People get a round photo, their title lines, and a LinkedIn link; companies get their logo on a
+// white tile (most logos are drawn for white), a one-sentence description, and a website link.
+function Entries({ entries }: { entries: Entry[] }) {
   return (
     <ul className="grid gap-6 sm:grid-cols-2">
-      {people.map((person) => (
-        <li key={person.name} className="flex items-center gap-4">
-          <Image src={person.photo} alt={person.name} width={192} height={192} className="h-24 w-24 shrink-0 rounded-full border border-line object-cover" />
-          <div className="grid gap-0.5">
-            <span className="flex items-center gap-2 font-display text-xl font-light leading-snug">
-              {person.name}
-              {person.linkedin && (
-                <a href={person.linkedin} target="_blank" rel="noopener noreferrer" aria-label={`${person.name} on LinkedIn`} className="text-fg-muted hover:text-accent">
-                  <LinkedInIcon />
-                </a>
-              )}
-            </span>
-            {person.lines.map((line) => (
-              <span key={line} className="text-sm text-fg-muted">
-                {line}
+      {entries.map((entry) => {
+        const company = "website" in entry;
+        const link = company ? entry.website : entry.linkedin;
+        return (
+          <li key={entry.name} className="flex items-center gap-4">
+            {company ? (
+              <Image src={entry.logo} alt={`${entry.name} logo`} width={192} height={192} className="h-24 w-24 shrink-0 rounded-lg border border-line bg-white object-contain p-2" />
+            ) : (
+              <Image src={entry.photo} alt={entry.name} width={192} height={192} className="h-24 w-24 shrink-0 rounded-full border border-line object-cover" />
+            )}
+            <div className="grid gap-0.5">
+              <span className="flex items-center gap-2 font-display text-xl font-light leading-snug">
+                {entry.name}
+                {link && (
+                  <a href={link} target="_blank" rel="noopener noreferrer" aria-label={company ? `${entry.name} website` : `${entry.name} on LinkedIn`} className="text-fg-muted hover:text-accent">
+                    {company ? <ExternalLinkIcon /> : <LinkedInIcon />}
+                  </a>
+                )}
               </span>
-            ))}
-          </div>
-        </li>
-      ))}
+              {(company ? [entry.description] : entry.lines).map((line) => (
+                <span key={line} className="text-sm text-fg-muted">
+                  {line}
+                </span>
+              ))}
+            </div>
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -224,16 +242,19 @@ export default async function Home() {
           </div>
         </section>
 
-        <section className="grid gap-6 border-b border-line py-12" id="hosts">
-          <Sig call={judges.length ? "Agent(hosts, judges)" : "Agent(hosts)"} title={judges.length ? "Hosts and judges" : "Hosts"} />
-          <People people={hosts} />
-          {judges.length > 0 && (
-            <>
-              <h3 className="font-mono text-xs uppercase tracking-[0.1em] text-fg-faint">Judges</h3>
-              <People people={judges} />
-            </>
-          )}
-        </section>
+        {[
+          { id: "hosts", call: "Agent(hosts)", title: "Hosts", entries: hosts },
+          { id: "partners", call: "WebFetch(partners)", title: "Partners", entries: partners },
+          { id: "judges", call: "Agent(judges)", title: "Judges", entries: judges },
+          { id: "ambassadors", call: "Agent(ambassadors)", title: "Ambassadors", entries: ambassadors },
+        ]
+          .filter((group) => group.entries.length > 0)
+          .map((group) => (
+            <section key={group.id} className="grid gap-6 border-b border-line py-12" id={group.id}>
+              <Sig call={group.call} title={group.title} />
+              <Entries entries={group.entries} />
+            </section>
+          ))}
 
         <section className="grid gap-6 py-12" id="venue">
           <Sig call="Bash(open maps)" title="Venue" />
