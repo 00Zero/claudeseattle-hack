@@ -6,9 +6,9 @@ Spec: `docs/REQUIREMENTS.md`, "Teams app (Dev A)", plus the access table in "Sha
 
 - `app/(teams)/**`: every route under `/teams` (browse, team page, create, apply, roster, public team page).
 - `app/profile/**` once Adam's scaffold lands (Adam may still edit it).
-- Your tables, prefixed `teams_`, in migrations named `<timestamp>_teams_<what>.sql` (`npx supabase migration new teams_<what>`). There is one database and it is production: push a migration only after its PR merges, from an up-to-date `main` (`npx supabase db push`).
+- Your tables, prefixed `teams_`, in migrations named `<timestamp>_teams_<what>.sql` (`npx supabase migration new teams_<what>`). Don't run `supabase db push`; Adam applies migrations to production after your PR merges. Never edit a migration that's already merged.
 
-## Shared data you use (`supabase/migrations/0001_shared.sql`)
+## Shared data you use (`supabase/migrations/*_shared*.sql`)
 
 - `teams` (`id`, `name` unique, `concept`, `looking_for`, `leader_id`, `created_at`, `updated_at`).
 - `team_members` (`team_id`, `profile_id`, `status` = `applied | member | rejected | removed | left`, `applied_at`, `joined_at`). One `member` row per person (unique index `one_team_per_person`).
@@ -30,9 +30,11 @@ Spec: `docs/REQUIREMENTS.md`, "Teams app (Dev A)", plus the access table in "Sha
 - Profile edits: users can update only `first_name`, `last_name`, `role_bucket`, `is_technical`, `job_title`, `company`, `linkedin_url`, `github_username`, `claude_code_level`, `bio`, `interests`, `looking_for`, `profile_confirmed`, `public_profile`. Use `.update()` with just those columns, not `upsert`.
 - Use `lib/supabase/server.ts` (server) or `client.ts` (browser). You shouldn't need the service-role client.
 
-## Don't change
+## Shared code and tables
 
-`0001_shared.sql` or the shared tables (ask Adam for a new migration), `lib/supabase/**`, `proxy.ts`, `app/layout.tsx` (shared: Dev B reviews), or Adam's login, auth, and admin routes.
+- Need a column on a shared table? Add a `shared_` migration in your PR (rules in the root `CLAUDE.md`) and mention it in the dev WhatsApp group.
+- Shared files (`lib/supabase/**`, `proxy.ts`, `app/layout.tsx`, `app/globals.css`, `package.json`) affect the judging app too: keep changes small and check `/submit` still works on your preview.
+- Leave Adam's login, auth, and admin routes alone.
 
 ## Boundary with judging
 

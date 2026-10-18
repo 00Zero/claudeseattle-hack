@@ -13,9 +13,9 @@ Spec: `docs/REQUIREMENTS.md`, "Judging app (Dev B)" and its "Rubric", plus "Even
 - `/results`: public; shows only what `publish_finalists` / `publish_winners` allow. Never raw scores.
 - Public entry pages (after `submissions_close_at`): a dynamic route under `/submit` or `/entries`, your choice.
 - `app/admin/judging/**`: assignments and the results table. It sits inside Adam's admin shell (`app/admin/layout.tsx`), so it's outside this route group but still yours.
-- Your tables, prefixed `judge_` (entries, scores, assignments, AI notes), in migrations named `<timestamp>_judge_<what>.sql` (`npx supabase migration new judge_<what>`). There is one database and it is production: push a migration only after its PR merges, from an up-to-date `main` (`npx supabase db push`).
+- Your tables, prefixed `judge_` (entries, scores, assignments, AI notes), in migrations named `<timestamp>_judge_<what>.sql` (`npx supabase migration new judge_<what>`). Don't run `supabase db push`; Adam applies migrations to production after your PR merges. Never edit a migration that's already merged.
 
-## Shared data you use (`supabase/migrations/0001_shared.sql`)
+## Shared data you use (`supabase/migrations/*_shared*.sql`)
 
 - `teams` (`id`, `name`, `concept` seeds the entry) and `team_members` (`status = 'member'` is the roster).
 - `profiles` for rosters and judges (`display_name`, names, `platform_role`).
@@ -33,11 +33,13 @@ Spec: `docs/REQUIREMENTS.md`, "Judging app (Dev B)" and its "Rubric", plus "Even
 - Write RLS for every `judge_` table in your migration. Scores, assignments, and AI notes are never readable by anonymous users or participants.
 - Public entry pages (after `submissions_close_at`) and the results page read views you create in your migration, granted to `anon`, exposing only entry fields and published results, with members as `display_name`.
 - Admin actions (assign judges, accept or reject late saves, publish toggles): in a server action, load the caller's profile, check `platform_role = 'admin'`, then write with `createAdminClient()` from `lib/supabase/admin.ts`. The admin layout's check is not enough on its own.
-- AI notes: server-side only, through the Vercel AI Gateway (`AI_GATEWAY_API_KEY`), `anthropic/*` models. Never shown publicly, never added to human scores.
+- AI notes: server-side only, through the Vercel AI Gateway (`AI_GATEWAY_API_KEY`); `anthropic/*` and `openai/*` models first, other gateway models allowed. Never shown publicly, never added to human scores.
 
-## Don't change
+## Shared code and tables
 
-`0001_shared.sql` or the shared tables (ask Adam for a new migration), `lib/supabase/**`, `proxy.ts`, `app/layout.tsx` (shared: Dev A reviews), `app/admin/layout.tsx`, or Adam's login, auth, import, people, and settings routes. Never write to `teams` or `team_members`.
+- Need a column on a shared table? Add a `shared_` migration in your PR (rules in the root `CLAUDE.md`) and mention it in the dev WhatsApp group.
+- Shared files (`lib/supabase/**`, `proxy.ts`, `app/layout.tsx`, `app/globals.css`, `package.json`) affect the teams app too: keep changes small and check `/teams` still works on your preview.
+- Leave `app/admin/layout.tsx` and Adam's login, auth, import, people, and settings routes alone. Never write to `teams` or `team_members`.
 
 ## Boundary with teams
 
