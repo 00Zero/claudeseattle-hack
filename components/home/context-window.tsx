@@ -43,16 +43,21 @@ export function ContextWindow({ openAt, closeAt, moments, slots }: { openAt: str
 
   const open = new Date(openAt).getTime();
   const close = new Date(closeAt).getTime();
+  // Share of the hackathon clock left, from the start of the event to its end.
+  // The bar fills with the share used, like Claude Code's context meter: full means auto-compact.
   const pct = now == null ? null : Math.max(0, Math.min(100, (100 * (close - now)) / (close - open)));
 
   const current = now == null ? null : slots.find((s) => now >= new Date(s.start).getTime() && now <= new Date(s.end).getTime());
   const next = now == null ? null : slots.find((s) => now < new Date(s.start).getTime());
   const target = current ?? next;
+  // Don't repeat the "next up" item in the list below it.
+  const nextAt = !current && target ? new Date(target.start).getTime() : null;
+  const listed = moments.filter((m) => new Date(m.at).getTime() !== nextAt);
 
   return (
     <aside aria-label="Where we are in the hackathon" className="grid min-w-0 gap-3 rounded-lg border border-line bg-bg-raised p-4 font-mono text-xs text-fg-muted">
       <div className="flex flex-wrap justify-between gap-3">
-        <span>
+        <span title="Time left in the event">
           <span className="inline-block w-[1em] text-accent" aria-hidden="true">
             {GLYPHS[glyph]}
           </span>{" "}
@@ -62,8 +67,8 @@ export function ContextWindow({ openAt, closeAt, moments, slots }: { openAt: str
           auto-compact <b className="font-medium text-fg">{shortPacific(closeAt)}</b>
         </span>
       </div>
-      <div className="h-2 overflow-hidden rounded border border-line bg-bg-sunken">
-        <i className="block h-full bg-gradient-to-r from-accent to-clay-deep transition-[width] duration-700" style={{ width: pct == null ? "0%" : `${pct.toFixed(1)}%` }} />
+      <div className="h-2 overflow-hidden rounded border border-line bg-bg-sunken" aria-hidden="true">
+        <i className="block h-full bg-gradient-to-r from-accent to-clay-deep transition-[width] duration-700" style={{ width: pct == null ? "0%" : `${(100 - pct).toFixed(1)}%` }} />
       </div>
       <div className="grid gap-1 border-t border-dashed border-line pt-3">
         <span className="text-fg-faint">{current ? "Happening now" : now == null ? "Next up" : target ? "Next up" : "Wrapped"}</span>
@@ -76,7 +81,7 @@ export function ContextWindow({ openAt, closeAt, moments, slots }: { openAt: str
         {target && <span className="text-fg-faint">{formatPacific(target.start)} PT</span>}
       </div>
       <ul className="grid gap-2">
-        {moments.map((m) => {
+        {listed.map((m) => {
           const at = new Date(m.at).getTime();
           const done = now != null && now > at;
           return (

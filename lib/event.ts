@@ -5,11 +5,19 @@ export const eventName = "Claude Impact Lab Hackathon";
 export const eventDate = "Sunday, October 25, 2026";
 export const theme = "Build AI tools, workflows, and playbooks that small businesses can adopt.";
 export const openSourceNote = "All projects are open-sourced on GitHub, so team and entry pages are public.";
+export const lumaCalendarUrl = "https://luma.com/AdamBurgh";
 export const venue = { name: "thinkspace Seattle", address: "1700 Westlake Ave N #200, Seattle", neighborhood: "South Lake Union", lat: 47.6341, lon: -122.3401 };
 
 // Who the event is for, for the home page.
 export const audience =
   "For small-business owners who know the problems, working professionals and students who want to build with Claude, and the technical builders who team up with them. Teams of 3 to 5 ship one thing a real business could put to work the following week, then open-source it.";
+
+// Shown on the home page after the rubric. The judges list stays hidden while it is empty.
+export type Person = { name: string; photo: string; lines: string[]; linkedin?: string };
+export const hosts: Person[] = [
+  { name: "Adam Burgh", photo: "/people/adam-burgh.jpg", lines: ["Founder, We Build With AI", "Seattle Claude Ambassador"], linkedin: "https://www.linkedin.com/in/adamburgh" },
+];
+export const judges: Person[] = [];
 
 export const prizes = {
   everyone: "Every participant gets $100 in Claude API credits.",
@@ -67,8 +75,10 @@ export const rubric = {
 // what is past, happening now, and next. `key` marks the two deadlines.
 export type ScheduleItem = { time: string; what: string; start?: string; end?: string; key?: boolean };
 
-// When the "context window" countdown on the home page starts: the day the platform opened.
-export const eventOpenAt = "2026-10-17T00:00:00-07:00";
+// The "context window" countdown on the home page runs from the team formation happy hour, the
+// first part of the event (100% remaining until then), to the end of the event (auto-compact).
+export const eventOpenAt = "2026-10-24T16:30:00-07:00";
+export const eventCloseAt = "2026-10-25T19:30:00-07:00";
 
 export const saturdaySchedule: ScheduleItem[] = [
   { time: "4:30–6:30 pm", what: "Team formation happy hour (optional)", start: "2026-10-24T16:30:00-07:00", end: "2026-10-24T18:30:00-07:00" },
