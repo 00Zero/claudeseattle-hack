@@ -61,7 +61,7 @@ export default async function Home() {
     supabase
       .from("event_settings")
       .select(
-        "team_formation_closes_at, submissions_close_at, event_starts_at, event_ends_at, venue_name, venue_address, venue_neighborhood, venue_lat, venue_lon, luma_calendar_url",
+        "team_formation_closes_at, submissions_close_at, event_starts_at, event_ends_at, venue_name, venue_address, venue_neighborhood, venue_lat, venue_lon, luma_calendar_url, wifi_network, wifi_password",
       )
       .eq("id", 1)
       .single(),
@@ -75,6 +75,8 @@ export default async function Home() {
   const openAt = settings?.event_starts_at ?? eventOpenAt;
   const closeAt = settings?.event_ends_at ?? eventCloseAt;
   const lumaCalendarUrl = settings?.luma_calendar_url ?? defaultLumaUrl;
+  // Only whether Wi-Fi is set reaches the page; the values themselves load when someone clicks to reveal them.
+  const hasWifi = Boolean(settings?.wifi_network && settings?.wifi_password);
   const venue = {
     name: settings?.venue_name ?? defaultVenue.name,
     address: settings?.venue_address ?? defaultVenue.address,
@@ -135,7 +137,7 @@ export default async function Home() {
         </div>
         <div className="grid min-w-0 gap-3">
           <ContextWindow openAt={openAt} closeAt={closeAt} moments={moments} slots={slots} />
-          <Wifi />
+          {hasWifi && <Wifi openAt={openAt} closeAt={closeAt} />}
         </div>
       </section>
 
