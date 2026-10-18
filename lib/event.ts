@@ -5,7 +5,11 @@ export const eventName = "Claude Impact Lab Hackathon";
 export const eventDate = "Sunday, October 25, 2026";
 export const theme = "Build AI tools, workflows, and playbooks that small businesses can adopt.";
 export const openSourceNote = "All projects are open-sourced on GitHub, so team and entry pages are public.";
-export const venue = { name: "thinkspace Seattle", address: "1700 Westlake Ave N #200, Seattle" };
+export const venue = { name: "thinkspace Seattle", address: "1700 Westlake Ave N #200, Seattle", neighborhood: "South Lake Union", lat: 47.6341, lon: -122.3401 };
+
+// Who the event is for, for the home page.
+export const audience =
+  "For small-business owners who know the problems, working professionals and students who want to build with Claude, and the technical builders who team up with them. Teams of 3 to 5 ship one thing a real business could put to work the following week, then open-source it.";
 
 export const prizes = {
   everyone: "Every participant gets $100 in Claude API credits.",
@@ -59,17 +63,22 @@ export const rubric = {
   ],
 };
 
-export type ScheduleItem = { time: string; what: string };
+// start/end are ISO instants (Pacific wall time with the PDT offset) so the home page can mark
+// what is past, happening now, and next. `key` marks the two deadlines.
+export type ScheduleItem = { time: string; what: string; start?: string; end?: string; key?: boolean };
+
+// When the "context window" countdown on the home page starts: the day the platform opened.
+export const eventOpenAt = "2026-10-17T00:00:00-07:00";
 
 export const saturdaySchedule: ScheduleItem[] = [
-  { time: "4:30–6:30 pm", what: "Team formation happy hour (optional)" },
+  { time: "4:30–6:30 pm", what: "Team formation happy hour (optional)", start: "2026-10-24T16:30:00-07:00", end: "2026-10-24T18:30:00-07:00" },
 ];
 
 export const sundaySchedule: ScheduleItem[] = [
-  { time: "9:00–9:45 am", what: "Check-in, breakfast, team formation for anyone unmatched" },
-  { time: "10:30 am", what: "Start building (team formation closes)" },
-  { time: "5:30 pm", what: "Submission deadline" },
-  { time: "5:30–6:30 pm", what: "Prelim judging during dinner" },
-  { time: "6:30–7:30 pm", what: "Finals on stage: five 5-minute live demos plus Q&A" },
-  { time: "7:30 pm", what: "Winners announced" },
+  { time: "9:00–9:45 am", what: "Check-in, breakfast, team formation for anyone unmatched", start: "2026-10-25T09:00:00-07:00", end: "2026-10-25T09:45:00-07:00" },
+  { time: "10:30 am", what: "Start building (team formation closes)", start: "2026-10-25T10:30:00-07:00", end: "2026-10-25T17:30:00-07:00", key: true },
+  { time: "5:30 pm", what: "Submission deadline", start: "2026-10-25T17:30:00-07:00", end: "2026-10-25T17:30:00-07:00", key: true },
+  { time: "5:30–6:30 pm", what: "Prelim judging during dinner", start: "2026-10-25T17:30:00-07:00", end: "2026-10-25T18:30:00-07:00" },
+  { time: "6:30–7:30 pm", what: "Finals on stage: five 5-minute live demos plus Q&A", start: "2026-10-25T18:30:00-07:00", end: "2026-10-25T19:30:00-07:00" },
+  { time: "7:30 pm", what: "Winners announced", start: "2026-10-25T19:30:00-07:00", end: "2026-10-25T20:00:00-07:00" },
 ];

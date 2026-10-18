@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Impact Lab Hackathon · Variant D · Pixel Seattle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;1,6..72,300&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="tokens.css">
+<style>
+/* Layout concept: a Claude Code title bar, an editorial hero with a live "context window" card,
+   then one full-bleed pixel Seattle band (weather, time of day, Clawd), then quiet single-column sections. */
+.wrap { width: min(1040px, 100%); margin-inline: auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.narrow { width: min(760px, 100%); margin-inline: auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+body { transition: background var(--dur-slow), color var(--dur-slow); }
+
+/* Title bar */
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+.bar .wrap { display: flex; align-items: center; gap: var(--s-4); padding-block: var(--s-3); font-family: var(--font-mono); font-size: var(--text-sm); }
+.dots { display: flex; gap: 6px; } .dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--fg-faint); opacity: .6; } .dots i:first-child { background: var(--accent); opacity: 1; }
+.path { color: var(--fg-muted); text-decoration: none; } .path b { color: var(--fg); font-weight: 500; }
+.cmds { margin-left: auto; display: flex; gap: var(--s-2); align-items: center; }
+.cmds a { text-decoration: none; color: var(--fg-muted); padding: .25rem .5rem; border-radius: var(--radius-sm); }
+.cmds a:hover { color: var(--fg); background: var(--mist); }
+.cmds a::before { content: "/"; color: var(--accent); }
+.cmds a.login { border: 1px solid var(--line-strong); color: var(--fg); }
+.theme-btn { border: 1px solid var(--line); background: transparent; color: var(--fg); font: inherit; border-radius: var(--radius-sm); padding: .25rem .5rem; cursor: pointer; display: inline-flex; gap: .4em; align-items: center; }
+.theme-btn:hover { background: var(--mist); }
+.theme-btn .ico { font-family: var(--font-mono); }
+@media (max-width: 680px) { .cmds a:not(.login) { display: none; } .path span { display: none; } .theme-btn .lbl { display: none; } }
+
+/* Hero */
+.hero { padding-block: var(--s-12) var(--s-8); display: grid; gap: var(--s-8); grid-template-columns: 1fr; align-items: start; }
+@media (min-width: 900px) { .hero { grid-template-columns: 1.15fr .85fr; } }
+.hero .eyebrow { color: var(--accent); }
+.hero h1 { font: 300 clamp(2.8rem, 6.4vw, 5rem)/0.98 var(--font-display); letter-spacing: -0.01em; margin-top: .3em; }
+.hero h1 em { font-style: italic; color: var(--fg-muted); }
+.hero .lede { font: 300 var(--text-xl)/1.4 var(--font-display); max-width: 30ch; margin-top: var(--s-6); }
+.hero .who { color: var(--fg-muted); max-width: 52ch; margin-top: var(--s-4); }
+.hero .who b { color: var(--fg); font-weight: 500; }
+.hero .actions { display: flex; flex-wrap: wrap; gap: var(--s-3); margin-top: var(--s-6); }
+.hero .fine { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--fg-faint); margin-top: var(--s-4); }
+
+/* Context window card */
+.ctx { border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-raised); padding: var(--s-5, 1.25rem) var(--s-4); font-family: var(--font-mono); font-size: var(--text-xs); color: var(--fg-muted); display: grid; gap: var(--s-3); min-width: 0; }
+.ctx .row { display: flex; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; }
+.ctx b { color: var(--fg); font-weight: 500; }
+.ctx .glyph { color: var(--accent); display: inline-block; width: 1em; }
+.ctx .track { height: 8px; background: var(--bg-sunken); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.ctx .track i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--clay-deep)); transition: width var(--dur-slow) var(--ease-out); }
+.ctx .next { border-top: 1px dashed var(--line); padding-top: var(--s-3); display: grid; gap: var(--s-1); }
+.ctx .next .k { color: var(--fg-faint); }
+.ctx .next .v { font: 400 var(--text-lg)/1.25 var(--font-display); color: var(--fg); }
+.ctx .next .v .in { font: 500 var(--text-xs)/1 var(--font-mono); color: var(--accent); margin-left: .5em; vertical-align: middle; white-space: nowrap; display: inline-block; }
+.ctx ul { display: grid; gap: var(--s-2); }
+.ctx li { display: flex; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; }
+.ctx li.done { text-decoration: line-through; color: var(--fg-faint); }
+.ctx li .when { color: var(--fg); }
+
+/* Skyline band */
+.scene { position: relative; border-block: 1px solid var(--line); background: var(--bg-sunken); overflow: hidden; line-height: 0; }
+.scene canvas { display: block; width: 100%; image-rendering: pixelated; image-rendering: crisp-edges; }
+#clawd-stage { position: absolute; left: 0; right: 0; top: 0; height: 0; }
+.wx { position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); top: 14px; line-height: 1.3; display: inline-flex; gap: .6em; align-items: center; flex-wrap: wrap;
+  font: 500 11px/1.3 var(--font-mono); color: var(--fg); background: var(--bg); border: 2px solid var(--fg); box-shadow: 3px 3px 0 var(--fg); padding: 4px 8px; max-width: calc(100% - 32px); }
+.wx .ico { display: inline-block; width: 14px; height: 14px; image-rendering: pixelated; }
+.wx .dim { color: var(--fg-muted); }
+@media (max-width: 680px) { .wx .dim { display: none; } }
+
+/* Sections */
+.section { padding-block: var(--s-12); border-bottom: 1px solid var(--line); display: grid; gap: var(--s-6); }
+.section > * { min-width: 0; }
+.section h2 { font: 300 var(--text-3xl)/1.05 var(--font-display); }
+.section .sig { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--fg-faint); }
+.section .sig::before { content: "⏺ "; color: var(--accent); }
+.section .lede { color: var(--fg-muted); max-width: 60ch; }
+.build { display: grid; gap: var(--s-4); grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.build .cell { border-top: 2px solid var(--fg); padding-top: var(--s-3); display: grid; gap: var(--s-1); align-content: start; }
+.build .cell .k { font: 600 var(--text-xs)/1 var(--font-sans); letter-spacing: .12em; text-transform: uppercase; color: var(--fg-muted); }
+.build .cell .v { font: 300 var(--text-lg)/1.3 var(--font-display); }
+.build .cell p { font-size: var(--text-sm); color: var(--fg-muted); }
+
+/* Agenda (single column) */
+.agenda { display: grid; gap: 0; }
+.agenda h3 { font: 500 var(--text-xs)/1 var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--fg-faint); padding-block: var(--s-6) var(--s-2); }
+.agenda h3:first-child { padding-top: 0; }
+.agenda li { display: grid; grid-template-columns: 8.5rem 1fr; gap: var(--s-4); padding: var(--s-3) var(--s-3); border-top: 1px solid var(--line); align-items: baseline; border-radius: var(--radius-sm); }
+.agenda li:last-child { border-bottom: 1px solid var(--line); }
+.agenda .t { font-family: var(--font-mono); font-size: var(--text-sm); font-variant-numeric: tabular-nums; color: var(--fg-muted); }
+.agenda li.key .w { font-weight: 500; }
+.agenda li.key .w::after { content: ""; display: inline-block; width: 8px; height: 8px; background: var(--accent); margin-left: .6em; vertical-align: middle; }
+.agenda li.past { color: var(--fg-faint); } .agenda li.past .t { color: var(--fg-faint); }
+.agenda li.now { background: var(--accent-soft); border-color: transparent; }
+.agenda li.now .t::before { content: "▶ "; color: var(--accent); }
+@media (max-width: 520px) { .agenda li { grid-template-columns: 1fr; gap: var(--s-1); } }
+
+/* Prizes */
+.prizes { display: grid; gap: var(--s-3); }
+.prize { display: grid; grid-template-columns: 1fr auto; gap: var(--s-4); align-items: baseline; padding-block: var(--s-4); border-top: 1px solid var(--line); }
+.prize:last-child { border-bottom: 1px solid var(--line); }
+.prize .v { font: 300 var(--text-xl)/1.2 var(--font-display); }
+.prize .who { font: 600 var(--text-xs)/1 var(--font-sans); letter-spacing: .12em; text-transform: uppercase; color: var(--fg-muted); text-align: right; }
+.prize.all { background: var(--accent-soft); border-color: transparent; border-radius: var(--radius); padding: var(--s-5, 1.25rem) var(--s-4); }
+.prize.all .v { font-size: var(--text-3xl); }
+.prize.all .who { color: var(--fg); }
+
+/* Rubric */
+.rubric-wrap { overflow-x: auto; }
+.rubric { width: 100%; min-width: 700px; font-size: var(--text-sm); }
+.rubric th { text-align: left; font: 600 var(--text-xs)/1.2 var(--font-sans); letter-spacing: .1em; text-transform: uppercase; color: var(--fg-muted); padding: 0 var(--s-3) var(--s-3) 0; border-bottom: 1px solid var(--fg); }
+.rubric td { padding: var(--s-3) var(--s-3) var(--s-3) 0; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--fg-muted); }
+.rubric td:first-child { color: var(--fg); font-weight: 500; }
+.rubric td:last-child { color: var(--fg); }
+.rubric .band { font-family: var(--font-mono); }
+
+.venue .addr { font: 300 var(--text-xl)/1.3 var(--font-display); }
+.venue .fine { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--fg-muted); }
+
+/* Footer: the flannel is the one grunge nod */
+.flannel { height: 10px; background:
+  repeating-linear-gradient(90deg, rgba(20,20,19,.5) 0 2px, transparent 2px 14px),
+  repeating-linear-gradient(0deg, rgba(20,20,19,.5) 0 2px, transparent 2px 14px),
+  repeating-linear-gradient(90deg, rgba(250,249,245,.14) 0 1px, transparent 1px 7px),
+  var(--evergreen); }
+.footer { padding-block: var(--s-6) var(--s-12); font-family: var(--font-mono); font-size: var(--text-xs); color: var(--fg-faint); display: flex; justify-content: space-between; gap: var(--s-4); flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="wrap">
+    <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+    <a class="path" href="/"><b>claude</b> <span>~/seattle/impact-lab</span></a>
+    <nav class="cmds" aria-label="Pages">
+      <a href="/teams">teams</a><a href="/submit">submit</a><a href="/profile">profile</a><a class="login" href="/login">login</a>
+      <button class="theme-btn" id="theme-btn" type="button" aria-label="Theme: auto"><span class="ico">◐</span><span class="lbl">auto</span></button>
+    </nav>
+  </div>
+</header>
+
+<section class="wrap hero">
+  <div>
+    <p class="eyebrow">Claude Community Seattle · Sunday, October 25, 2026</p>
+    <h1>Impact Lab <em>Hackathon</em></h1>
+    <p class="lede">Build AI tools, workflows, and playbooks that small businesses can adopt.</p>
+    <p class="who">One day at thinkspace Seattle. For <b>small-business owners</b> who know the problems, <b>working professionals</b> and <b>students</b> who want to build with Claude, and the <b>technical builders</b> who team up with them. Teams of 3 to 5 ship one thing a real business could put to work the following week, then open-source it.</p>
+    <div class="actions">
+      <a class="btn" href="/login">Log in with a magic link</a>
+      <a class="btn ghost" href="/teams">Browse teams</a>
+    </div>
+    <p class="fine">All projects are open-sourced on GitHub, so team and entry pages are public.</p>
+  </div>
+  <aside class="ctx" aria-label="Where we are in the hackathon">
+    <div class="row"><span><span class="glyph" id="ctx-glyph">✻</span> Context window <b id="ctx-pct">—</b> remaining</span><span>auto-compact <b>Sun 5:30 pm</b></span></div>
+    <div class="track"><i id="ctx-bar"></i></div>
+    <div class="next"><span class="k" id="next-k">Next up</span><span class="v" id="next-v">—</span><span class="k" id="next-when"></span></div>
+    <ul id="ctx-list">
+      <li data-at="2026-10-24T16:30:00-07:00"><span>Team formation happy hour</span><span class="when">Sat 4:30 pm</span></li>
+      <li data-at="2026-10-25T10:30:00-07:00"><span>Team formation closes</span><span class="when">Sun 10:30 am</span></li>
+      <li data-at="2026-10-25T17:30:00-07:00"><span>Submissions close</span><span class="when">Sun 5:30 pm</span></li>
+      <li data-at="2026-10-25T18:30:00-07:00"><span>Finals on stage</span><span class="when">Sun 6:30 pm</span></li>
+    </ul>
+  </aside>
+</section>
+
+<div class="scene" aria-label="Pixel-art Seattle skyline with live weather at the venue. Clawd, the Claude Code mascot, walks the waterfront.">
+  <canvas id="sky" aria-hidden="true"></canvas>
+  <div id="clawd-stage"></div>
+  <div class="wx" id="wx" role="status"><canvas class="ico" id="wx-ico" width="7" height="7" aria-hidden="true"></canvas><span id="wx-text">thinkspace Seattle · loading weather…</span><span class="dim" id="wx-dim"></span></div>
+</div>
+
+<main class="narrow">
+  <section class="section" id="build">
+    <div><p class="sig">Read(theme.md)</p><h2 style="margin-top:.4em">What you'll build</h2></div>
+    <p class="lede">The theme is practical: AI tools, workflows, and playbooks a small business can adopt without hiring a developer. Judges ask whether it works, whether an owner could set it up from the README, whether it changes how the business runs, and whether it is something they had not seen before.</p>
+    <div class="build">
+      <div class="cell"><span class="k">Who's in the room</span><span class="v">Owners, professionals, students, builders</span><p>A balanced team has at least one of each and someone hands-on with code.</p></div>
+      <div class="cell"><span class="k">What ships</span><span class="v">A working tool with a README</span><p>Plus a repo and a demo video. Slides are optional; the demo is the point.</p></div>
+      <div class="cell"><span class="k">Where it goes</span><span class="v">Open source, on GitHub</span><p>Every entry is public after the deadline, so a business can find it later.</p></div>
+    </div>
+  </section>
+
+  <section class="section" id="agenda">
+    <div><p class="sig">Read(schedule.md)</p><h2 style="margin-top:.4em">Agenda</h2></div>
+    <div class="agenda" id="agenda">
+      <h3>Saturday, October 24</h3>
+      <ul>
+        <li data-start="2026-10-24T16:30:00-07:00" data-end="2026-10-24T18:30:00-07:00"><span class="t">4:30–6:30 pm</span><span class="w">Team formation happy hour (optional)</span></li>
+      </ul>
+      <h3>Sunday, October 25</h3>
+      <ul>
+        <li data-start="2026-10-25T09:00:00-07:00" data-end="2026-10-25T09:45:00-07:00"><span class="t">9:00–9:45 am</span><span class="w">Check-in, breakfast, team formation for anyone unmatched</span></li>
+        <li class="key" data-start="2026-10-25T10:30:00-07:00" data-end="2026-10-25T17:30:00-07:00"><span class="t">10:30 am</span><span class="w">Start building (team formation closes)</span></li>
+        <li class="key" data-start="2026-10-25T17:30:00-07:00" data-end="2026-10-25T17:30:00-07:00"><span class="t">5:30 pm</span><span class="w">Submission deadline</span></li>
+        <li data-start="2026-10-25T17:30:00-07:00" data-end="2026-10-25T18:30:00-07:00"><span class="t">5:30–6:30 pm</span><span class="w">Prelim judging during dinner</span></li>
+        <li data-start="2026-10-25T18:30:00-07:00" data-end="2026-10-25T19:30:00-07:00"><span class="t">6:30–7:30 pm</span><span class="w">Finals on stage: five 5-minute live demos plus Q&amp;A</span></li>
+        <li data-start="2026-10-25T19:30:00-07:00" data-end="2026-10-25T20:00:00-07:00"><span class="t">7:30 pm</span><span class="w">Winners announced</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section" id="prizes">
+    <div><p class="sig">Grant(credits, max)</p><h2 style="margin-top:.4em">Prizes</h2></div>
+    <div class="prizes">
+      <div class="prize all"><span class="v">$100 in Claude API credits</span><span class="who">Every participant</span></div>
+      <div class="prize"><span class="v">One month of Claude Max 20x, per person</span><span class="who">Winning team</span></div>
+      <div class="prize"><span class="v">Tickets to the Seattle AI Week AI Summit</span><span class="who">Winning team · courtesy of WTIA</span></div>
+      <div class="prize"><span class="v">A one-year WTIA membership</span><span class="who">Winning team</span></div>
+    </div>
+  </section>
+
+  <section class="section" id="judging">
+    <div><p class="sig">Review(entry, rubric)</p><h2 style="margin-top:.4em">Judging criteria</h2></div>
+    <p class="lede">Four criteria, equal weight, each scored 1 to 8 with no middle. An entry's score is the mean of the four, to one decimal. Five judges each score about four entries over dinner and send one to the final; all five score the finalists on stage.</p>
+    <div class="rubric-wrap"><table class="rubric">
+      <thead><tr><th>Criterion</th><th class="band">1–2</th><th class="band">3–4</th><th class="band">5–6</th><th class="band">7–8</th></tr></thead>
+      <tbody>
+        <tr><td>Does it work</td><td>Didn't run or is slides only</td><td>Parts run; core flow incomplete</td><td>Core flow works with bugs or rough edges</td><td>Works end to end; a business could try it today</td></tr>
+        <tr><td>Ease of implementation for a small business</td><td>Needs a developer and custom setup</td><td>Needs technical help to get started</td><td>A motivated owner could set it up with the README</td><td>Plug-and-play; clear README, no code needed</td></tr>
+        <tr><td>Impact on the business's operations</td><td>Unclear who it helps or how</td><td>Helps a narrow task a little</td><td>Saves real time or money on a common task</td><td>Changes how a core part of the business runs</td></tr>
+        <tr><td>Creativity of the solution</td><td>Generic chatbot or template</td><td>Sensible but predictable</td><td>A fresh angle on a known problem</td><td>Something judges hadn't thought of</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="section venue" id="venue" style="border-bottom:0">
+    <div><p class="sig">Bash(open maps)</p><h2 style="margin-top:.4em">Venue</h2></div>
+    <p class="addr">thinkspace Seattle<br>1700 Westlake Ave N #200, Seattle</p>
+    <p class="fine">South Lake Union · 47.6341° N, 122.3401° W · a 12-minute walk from the Space Needle</p>
+  </section>
+</main>
+
+<div class="flannel" aria-hidden="true"></div>
+<footer class="narrow footer">
+  <span>Claude Community Seattle · hack.claudeseattle.org</span>
+  <span>Co-Authored-By: Clawd</span>
+</footer>
+
+<script src="skyline.js"></script>
+<script src="clawd-pixel.js"></script>
+<script>
+(function () {
+  const $ = (s) => document.querySelector(s);
+  const VENUE = { lat: 47.6341, lon: -122.3401 };
+
+  // ---------- theme: auto (follows the sun at the venue), light, dark ----------
+  const root = document.documentElement, btn = $('#theme-btn');
+  let mode = 'auto'; try { mode = localStorage.getItem('hack-theme') || 'auto'; } catch (e) {}
+  // Demo overrides in the hash, e.g. #dark,day or #light,night,rain
+  const flags = location.hash.slice(1).split(',');
+  for (const f of flags) if (/^(light|dark|auto)$/.test(f)) mode = f;
+  const sky = initSkyline({ canvas: '#sky', theme: 'light' });
+  if (flags.includes('day')) sky.forceDaylight(1); if (flags.includes('night')) sky.forceDaylight(0); if (flags.includes('dusk')) sky.forceDaylight(0.6);
+  const WX_FORCE = { clear: 0, partly: 2, overcast: 3, fog: 45, drizzle: 53, rain: 63, snow: 73, showers: 81, thunder: 95 };
+  const forcedWx = flags.find((f) => f in WX_FORCE);
+  function applyTheme() {
+    let th = mode;
+    if (mode === 'auto') { const d = sky.daylight(); const sys = matchMedia('(prefers-color-scheme: dark)').matches; th = d < 0.35 || (sys && d < 0.5) ? 'dark' : d < 0.85 ? 'dusk' : 'light'; }
+    root.setAttribute('data-theme', th);
+    sky.setTheme(th === 'dark' ? 'dark' : 'light');
+    const ico = { auto: '◐', light: '☀', dark: '☾' }[mode];
+    btn.querySelector('.ico').textContent = ico; btn.querySelector('.lbl').textContent = mode; btn.setAttribute('aria-label', 'Theme: ' + mode + (mode === 'auto' ? ' (' + th + ')' : ''));
+  }
+  btn.addEventListener('click', () => { mode = { auto: 'light', light: 'dark', dark: 'auto' }[mode]; try { localStorage.setItem('hack-theme', mode); } catch (e) {} applyTheme(); });
+  applyTheme(); setInterval(applyTheme, 60000);
+
+  // ---------- weather: Open-Meteo at the venue (in production this goes through a Next route with a 10-minute cache) ----------
+  const WX_ICON = { clear: ['..###..', '.#####.', '#######', '#######', '#######', '.#####.', '..###..'], partly: ['.......', '..##...', '.####..', '.######', '#######', '#######', '.......'], overcast: ['.......', '.####..', '#######', '#######', '.######', '.......', '.......'], fog: ['.......', '#######', '.......', '#######', '.......', '#######', '.......'], drizzle: ['.####..', '#######', '.......', '.#.#.#.', '.......', '#.#.#..', '.......'], rain: ['.####..', '#######', '.......', '#.#.#.#', '#.#.#.#', '.#.#.#.', '.#.#.#.'], showers: ['.####..', '#######', '.......', '#.#.#.#', '.#.#.#.', '#.#.#.#', '.#.#.#.'], snow: ['.####..', '#######', '.......', '.#.#.#.', '#.#.#.#', '.#.#.#.', '#.#.#.#'], thunder: ['.####..', '#######', '...##..', '..##...', '.####..', '...#...', '..#....'] };
+  function drawWxIcon(kind) { const c = $('#wx-ico').getContext('2d'); c.clearRect(0, 0, 7, 7); c.fillStyle = getComputedStyle(root).getPropertyValue('--fg').trim() || '#141413'; (WX_ICON[kind] || WX_ICON.drizzle).forEach((row, y) => [...row].forEach((ch, x) => { if (ch === '#') c.fillRect(x, y, 1, 1); })); }
+  let weatherLoaded = false;
+  function showWeather(w, fromCache) {
+    weatherLoaded = true;
+    if (forcedWx) w = Object.assign({}, w, { code: WX_FORCE[forcedWx] });
+    sky.setWeather(w);
+    const kind = sky.kind(), label = sky.label();
+    $('#wx-text').textContent = `thinkspace Seattle · ${Math.round(w.tempF)}°F · ${label}`;
+    $('#wx-dim').textContent = `· wind ${Math.round(w.windMph)} mph · ${fromCache ? 'cached' : 'updated'} ${new Date(w.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+    drawWxIcon(kind); applyTheme();
+  }
+  async function loadWeather() {
+    try { const c = JSON.parse(sessionStorage.getItem('hack-wx') || 'null'); if (c && Date.now() - c.at < 10 * 60000) return showWeather(c, true); } catch (e) {}
+    try {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${VENUE.lat}&longitude=${VENUE.lon}&current=temperature_2m,weather_code,wind_speed_10m,is_day&daily=sunrise,sunset&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=America%2FLos_Angeles&forecast_days=1`;
+      const r = await fetch(url); const j = await r.json();
+      const w = { code: j.current.weather_code, isDay: j.current.is_day, windMph: j.current.wind_speed_10m, tempF: j.current.temperature_2m, sunrise: j.daily.sunrise[0], sunset: j.daily.sunset[0], at: Date.now() };
+      try { sessionStorage.setItem('hack-wx', JSON.stringify(w)); } catch (e) {}
+      showWeather(w, false);
+    } catch (e) {
+      // Offline or blocked: it is Seattle, assume drizzle and use the clock for day and night.
+      const h = new Date().getHours(); showWeather({ code: 51, isDay: h >= 7 && h < 18 ? 1 : 0, windMph: 6, tempF: 54, at: Date.now() }, false);
+      $('#wx-dim').textContent = '· weather unavailable, assuming drizzle';
+    }
+  }
+  loadWeather(); setInterval(loadWeather, 10 * 60000);
+
+  // ---------- Clawd on the waterfront ----------
+  const stage = $('#clawd-stage');
+  function placeStage() { stage.style.top = sky.groundY + 'px'; }
+  placeStage(); window.addEventListener('resize', () => setTimeout(placeStage, 150));
+  const clawd = initClawd({ wanderMode: 'stage', stage, scale: sky.scale, walkSpeed: 1, spawnChanceJersey: 0.25, weather: () => (weatherLoaded ? sky.kind() : 'unknown'), landmarks: { get needle() { return sky.landmarks().needle; } } });
+  window.clawd = clawd; window.skyline = sky;
+  console.log('%c✻ Clauding…', 'color:#D97757;font-weight:bold', 'Seattle gave the world grunge, the Space Needle, and this hackathon. Try clawd.toggleJersey() or clawd.perform("dance").');
+
+  // ---------- context window and agenda: live against the event clock ----------
+  const OPEN = new Date('2026-10-17T00:00:00-07:00'), CLOSE = new Date('2026-10-25T17:30:00-07:00');
+  const fmtIn = (ms) => { if (ms <= 0) return 'now'; const d = Math.floor(ms / 864e5), h = Math.floor(ms / 36e5) % 24, m = Math.floor(ms / 6e4) % 60; return d ? `in ${d}d ${h}h` : h ? `in ${h}h ${m}m` : `in ${m}m`; };
+  let gi = 0; const glyphs = initClawd.GLYPHS;
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) setInterval(() => ($('#ctx-glyph').textContent = glyphs[gi++ % glyphs.length]), 180);
+  function tick() {
+    const now = Date.now();
+    const pct = Math.max(0, Math.min(100, 100 * (CLOSE - now) / (CLOSE - OPEN)));
+    $('#ctx-pct').textContent = pct.toFixed(0) + '%'; $('#ctx-bar').style.width = pct.toFixed(1) + '%';
+    // agenda rows: past, now, upcoming
+    const rows = [...document.querySelectorAll('#agenda li')]; let next = null, current = null;
+    rows.forEach((li) => { const s = new Date(li.dataset.start), e = new Date(li.dataset.end); li.classList.remove('past', 'now'); if (now > e) li.classList.add('past'); else if (now >= s) { li.classList.add('now'); current = current || li; } else next = next || li; });
+    const target = current || next;
+    if (target) { $('#next-k').textContent = current ? 'Happening now' : 'Next up'; $('#next-v').innerHTML = target.querySelector('.w').textContent + (current ? '' : `<span class="in">${fmtIn(new Date(target.dataset.start) - now)}</span>`); const d = new Date(target.dataset.start); $('#next-when').textContent = d.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' }) + ' PT'; }
+    else { $('#next-k').textContent = 'Wrapped'; $('#next-v').textContent = 'Winners announced. See you at the next one.'; $('#next-when').textContent = ''; }
+    document.querySelectorAll('#ctx-list li').forEach((li) => { const at = new Date(li.dataset.at); li.classList.toggle('done', now > at); if (now <= at) li.querySelector('.when').textContent = li.querySelector('.when').textContent.replace(/ · in.*$/, '') + ' · ' + fmtIn(at - now); });
+  }
+  tick(); setInterval(tick, 30000);
+})();
+</script>
+</body>
+</html>

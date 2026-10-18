@@ -32,17 +32,19 @@ export function AuthLink({ initialSignedIn }: { initialSignedIn: boolean }) {
     };
   }, [pathname, initialSignedIn, router]);
 
+  // Styled as a slash command to match the title bar in app/layout.tsx.
+  const cmd = "rounded border border-line-strong px-2 py-1 text-fg hover:bg-fg/5";
   if (!signedIn) {
     return (
-      <Link href="/login" className="hover:underline">
-        Log in
+      <Link href="/login" className={cmd}>
+        <span className="text-accent">/</span>login
       </Link>
     );
   }
   return (
     <form action={signOut}>
-      <button type="submit" className="hover:underline">
-        Log out
+      <button type="submit" className={cmd}>
+        <span className="text-accent">/</span>logout
       </button>
     </form>
   );
