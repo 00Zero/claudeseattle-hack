@@ -8,14 +8,24 @@ export function SubmitButton({
   children,
   pendingText = "Saving…",
   className = "",
+  disabled = false,
+  title,
 }: {
   children: React.ReactNode;
   pendingText?: string;
   className?: string;
+  disabled?: boolean;
+  title?: string;
 }) {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" disabled={pending} aria-busy={pending} className={`${className} disabled:cursor-wait disabled:opacity-50`}>
+    <button
+      type="submit"
+      disabled={pending || disabled}
+      aria-busy={pending}
+      title={title}
+      className={`${className} disabled:opacity-40 ${pending ? "cursor-wait" : "disabled:cursor-not-allowed"}`}
+    >
       {pending ? pendingText : children}
     </button>
   );

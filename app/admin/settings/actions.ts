@@ -35,10 +35,11 @@ export async function saveEventSettings(formData: FormData) {
 
 // One ticket's rules: an access level per approval status, plus its starting role.
 export async function saveTicketRules(formData: FormData) {
-  await assertAdmin();
+  const me = await assertAdmin();
   const ticket = field(formData, "ticket_name").trim();
   const role = field(formData, "default_role");
   if (!ROLES.includes(role)) throw new Error("Unknown role");
+  if (role === "admin" && !me.is_super_admin) throw new Error("Only a super admin can make a ticket start as admin");
 
   const rows = STATUSES.map((status) => {
     const access = field(formData, `access_${status}`);
@@ -55,10 +56,11 @@ export async function saveTicketRules(formData: FormData) {
 // New ticket name from Luma: starts with approved = full, declined = blocked,
 // everything else profile only.
 export async function addTicket(formData: FormData) {
-  await assertAdmin();
+  const me = await assertAdmin();
   const ticket = field(formData, "ticket_name").trim();
   const role = field(formData, "default_role") || "participant";
   if (!ROLES.includes(role)) throw new Error("Unknown role");
+  if (role === "admin" && !me.is_super_admin) throw new Error("Only a super admin can make a ticket start as admin");
 
   const rows = STATUSES.map((status) => ({
     ticket_name: ticket,

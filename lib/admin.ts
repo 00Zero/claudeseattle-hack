@@ -24,3 +24,11 @@ export async function assertAdmin() {
   if (!profile) throw new Error("Not authorized");
   return profile;
 }
+
+// Super admins (profiles.is_super_admin) alone grant or remove the admin role
+// and manage the admin email allowlist.
+export async function assertSuperAdmin() {
+  const profile = await assertAdmin();
+  if (!profile.is_super_admin) throw new Error("Only a super admin can do that");
+  return profile;
+}
