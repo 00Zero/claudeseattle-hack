@@ -49,5 +49,5 @@ Next.js 16 differs from older versions (for example, `middleware.ts` is now `pro
 - Secrets live only in `.env.local` and Vercel env. Never commit, print, or log them. `.env.example` lists the names.
 - Luma ticket names come straight from the CSV. When touching the import or access rules, check `unmapped_luma_tickets` and the import's unmapped report for ticket names with no rule.
 - No attendee data in the repo: no CSVs, dumps, or real emails in code, seeds, or tests. Use `@example.com`.
-- `.github/CODEOWNERS` sends review requests as email notifications only; nothing waits on them. When Nishant and Rajasuba have joined the GitHub repo and merged their first PR, replace `@<nishant>` and `@<rajasuba>` there with their GitHub usernames.
+- `.github/CODEOWNERS` sends review requests as email notifications only; nothing waits on them.
 - Personal notes go in `CLAUDE.local.md`, which is gitignored.
