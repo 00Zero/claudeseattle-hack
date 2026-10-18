@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>Your Claude Seattle sign-in link</title>
+</head>
+<!-- Supabase "Magic Link" email. Paste into Auth > Email Templates > Magic Link.
+     Subject: Your Claude Seattle sign-in link
+     Event-neutral on purpose: the site is reused for future Claude Seattle events.
+     The link must stay {{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email (see app/auth/confirm). -->
+<body style="margin:0; padding:0; background-color:#f0eee6;">
+<div style="display:none; max-height:0; overflow:hidden; mso-hide:all;">Tap the button to sign in to Claude Seattle. It works once and expires in an hour.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f0eee6;">
+  <tr>
+    <td align="center" style="padding:32px 16px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px; background-color:#faf9f5; border:1px solid #e3e0d5; border-radius:14px;">
+        <!-- Title bar, like the site header -->
+        <tr>
+          <td style="padding:14px 24px; border-bottom:1px solid #e3e0d5; font-family:'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace; font-size:13px; color:#141413;">
+            <span style="color:#d97757; font-size:10px; letter-spacing:3px; vertical-align:1px;">&#9679;&#9679;&#9679;</span>&nbsp;<b style="font-weight:600;">claude seattle</b>
+          </td>
+        </tr>
+        <!-- Body -->
+        <tr>
+          <td style="padding:32px 24px 8px 24px;">
+            <p style="margin:0 0 12px 0; font-family:'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace; font-size:12px; color:#5c5b55;"><span style="color:#d97757;">&#9679;</span> Auth(magic-link)</p>
+            <h1 style="margin:0 0 16px 0; font-family:Georgia,'Times New Roman',serif; font-size:32px; line-height:1.15; font-weight:normal; color:#141413;">Your sign-in link is <em style="font-style:italic; color:#3b3a36;">ready</em></h1>
+            <p style="margin:0 0 24px 0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; font-size:16px; line-height:1.55; color:#3b3a36;">Tap the button to sign in to Claude Seattle. The link works once and expires in an hour.</p>
+          </td>
+        </tr>
+        <!-- Button -->
+        <tr>
+          <td style="padding:0 24px 28px 24px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td align="center" bgcolor="#d97757" style="border-radius:999px;">
+                  <a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email" target="_blank" style="display:inline-block; padding:14px 28px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; font-size:16px; font-weight:600; line-height:1; color:#faf9f5; text-decoration:none; border-radius:999px;">Sign in to Claude Seattle &rarr;</a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <!-- Fallback link -->
+        <tr>
+          <td style="padding:0 24px 28px 24px;">
+            <p style="margin:0 0 6px 0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; font-size:13px; line-height:1.5; color:#5c5b55;">Button not working? Paste this into your browser:</p>
+            <p style="margin:0; font-family:'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace; font-size:12px; line-height:1.5; word-break:break-all;"><a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email" target="_blank" style="color:#bf5f3f; text-decoration:underline;">{{ .RedirectTo }}?token_hash={{ .TokenHash }}&amp;type=email</a></p>
+          </td>
+        </tr>
+        <!-- Safety note -->
+        <tr>
+          <td style="padding:0 24px 28px 24px;">
+            <p style="margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; font-size:13px; line-height:1.55; color:#5c5b55;">Didn't ask for this? You can ignore it. Nobody can sign in without this link, and it stops working after an hour.</p>
+          </td>
+        </tr>
+      </table>
+      <!-- Footer -->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
+        <tr>
+          <td style="padding:18px 8px 0 8px; font-family:'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace; font-size:11px; line-height:1.7; color:#5c5b55;">
+            <a href="https://luma.com/AdamBurgh" target="_blank" style="color:#5c5b55; text-decoration:underline;">Seattle Claude Community</a> &middot; <a href="https://hack.claudeseattle.org" target="_blank" style="color:#5c5b55; text-decoration:underline;">hack.claudeseattle.org</a> &middot; <a href="mailto:support@claudeseattle.org" style="color:#5c5b55; text-decoration:underline;">support@claudeseattle.org</a><br>
+            Co-authored by Clawd
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

@@ -83,7 +83,8 @@ export const rubric = {
 
 // start/end are ISO instants (Pacific wall time with the PDT offset) so the home page can mark
 // what is past, happening now, and next. `key` marks the two deadlines.
-export type ScheduleItem = { time: string; what: string; start?: string; end?: string; key?: boolean };
+// `short` is the concise name the home page card uses for "Up next".
+export type ScheduleItem = { time: string; what: string; short?: string; start?: string; end?: string; key?: boolean };
 
 // The "context window" countdown on the home page runs from the team formation happy hour, the
 // first part of the event (100% remaining until then), to the end of the event (auto-compact).
@@ -91,14 +92,14 @@ export const eventOpenAt = "2026-10-24T16:30:00-07:00";
 export const eventCloseAt = "2026-10-25T19:30:00-07:00";
 
 export const saturdaySchedule: ScheduleItem[] = [
-  { time: "4:30–6:30 pm", what: "Team formation happy hour (optional)", start: "2026-10-24T16:30:00-07:00", end: "2026-10-24T18:30:00-07:00" },
+  { time: "4:30–6:30 pm", what: "Team formation happy hour (optional)", short: "Team formation happy hour", start: "2026-10-24T16:30:00-07:00", end: "2026-10-24T18:30:00-07:00" },
 ];
 
 export const sundaySchedule: ScheduleItem[] = [
-  { time: "9:00–9:45 am", what: "Check-in, breakfast, team formation for anyone unmatched", start: "2026-10-25T09:00:00-07:00", end: "2026-10-25T09:45:00-07:00" },
-  { time: "10:30 am", what: "Start building (team formation closes)", start: "2026-10-25T10:30:00-07:00", end: "2026-10-25T17:30:00-07:00", key: true },
-  { time: "5:30 pm", what: "Submission deadline", start: "2026-10-25T17:30:00-07:00", end: "2026-10-25T17:30:00-07:00", key: true },
-  { time: "5:30–6:30 pm", what: "Prelim judging during dinner", start: "2026-10-25T17:30:00-07:00", end: "2026-10-25T18:30:00-07:00" },
-  { time: "6:30–7:30 pm", what: "Finals on stage: five 5-minute live demos plus Q&A", start: "2026-10-25T18:30:00-07:00", end: "2026-10-25T19:30:00-07:00" },
-  { time: "7:30 pm", what: "Winners announced", start: "2026-10-25T19:30:00-07:00", end: "2026-10-25T20:00:00-07:00" },
+  { time: "9:00–9:45 am", what: "Check-in, breakfast, team formation for anyone unmatched", short: "Check-in and breakfast", start: "2026-10-25T09:00:00-07:00", end: "2026-10-25T09:45:00-07:00" },
+  { time: "10:30 am", what: "Start building (team formation closes)", short: "Team formation closes", start: "2026-10-25T10:30:00-07:00", end: "2026-10-25T17:30:00-07:00", key: true },
+  { time: "5:30 pm", what: "Submission deadline", short: "Submissions close", start: "2026-10-25T17:30:00-07:00", end: "2026-10-25T17:30:00-07:00", key: true },
+  { time: "5:30–6:30 pm", what: "Prelim judging during dinner", short: "Prelim judging and dinner", start: "2026-10-25T17:30:00-07:00", end: "2026-10-25T18:30:00-07:00" },
+  { time: "6:30–7:30 pm", what: "Finals on stage: five 5-minute live demos plus Q&A", short: "Finals on stage", start: "2026-10-25T18:30:00-07:00", end: "2026-10-25T19:30:00-07:00" },
+  { time: "7:30 pm", what: "Winners announced", short: "Winners announced", start: "2026-10-25T19:30:00-07:00", end: "2026-10-25T20:00:00-07:00" },
 ];

@@ -12,6 +12,7 @@ const EMAIL_TYPES: EmailOtpType[] = ["email", "magiclink", "signup"];
 //   token_hash: links from our email templates; work in any browser or device.
 //   code: links built from Supabase's default template (PKCE); only work in the
 //         browser that requested the link.
+// Failures are logged (error code and message only) so Vercel's runtime logs show why.
 export async function POST(request: NextRequest) {
   const form = await request.formData();
   const tokenHash = form.get("token_hash");
@@ -23,10 +24,12 @@ export async function POST(request: NextRequest) {
   let userId: string | undefined;
   if (typeof tokenHash === "string" && tokenHash && EMAIL_TYPES.includes(type as EmailOtpType)) {
     const { data, error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: type as EmailOtpType });
-    if (!error) userId = data.user?.id;
+    if (error) console.error("sign-in link failed (token_hash):", error.code ?? "", error.message);
+    else userId = data.user?.id;
   } else if (typeof code === "string" && code) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) userId = data.user?.id;
+    if (error) console.error("sign-in link failed (code):", error.code ?? "", error.message);
+    else userId = data.user?.id;
   }
 
   if (!userId) return to("/login?error=link");

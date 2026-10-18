@@ -41,8 +41,9 @@ export function AuthLink({ initialSignedIn }: { initialSignedIn: boolean }) {
       </Link>
     );
   }
+  // On phones /logout lives in the title bar's /menu instead.
   return (
-    <form action={signOut}>
+    <form action={signOut} className="hidden sm:block">
       <button type="submit" className={cmd}>
         <span className="text-accent">/</span>logout
       </button>
