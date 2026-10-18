@@ -104,7 +104,7 @@ export default async function Home() {
   };
   const slots = [...saturdaySchedule, ...sundaySchedule]
     .filter((item): item is typeof item & { start: string; end: string } => Boolean(item.start && item.end))
-    .map((item) => ({ what: item.what, start: item.start, end: item.end }));
+    .map((item) => ({ what: item.what, short: item.short ?? item.what, start: item.start, end: item.end }));
   const finals = sundaySchedule.find((item) => item.what.startsWith("Finals"));
   const moments = [
     { label: "Hackathon starts", at: sundaySchedule[0].start! },
@@ -266,15 +266,22 @@ export default async function Home() {
           <p className="font-mono text-xs text-fg-muted">
             {venue.neighborhood} · {Math.abs(venue.lat).toFixed(4)}° {venue.lat < 0 ? "S" : "N"}, {Math.abs(venue.lon).toFixed(4)}°{" "}
             {venue.lon < 0 ? "W" : "E"}
-            {venue.address === defaultVenue.address && " · a 12-minute walk from the Space Needle"}
           </p>
         </section>
       </div>
 
       <div className="full-bleed flannel" aria-hidden="true" />
       <footer className="mx-auto flex max-w-3xl flex-wrap justify-between gap-4 pt-6 font-mono text-xs text-fg-faint">
-        <span>Claude Community Seattle · hack.claudeseattle.org</span>
-        <span>Co-Authored-By: Clawd</span>
+        <span>
+          <a href={lumaCalendarUrl} target="_blank" rel="noopener noreferrer" className="underline-offset-2 hover:text-accent hover:underline">
+            Seattle Claude Community
+          </a>{" "}
+          · hack.claudeseattle.org ·{" "}
+          <a href="mailto:support@claudeseattle.org" className="underline-offset-2 hover:text-accent hover:underline">
+            support@claudeseattle.org
+          </a>
+        </span>
+        <span>Co-authored by Clawd</span>
       </footer>
     </div>
   );

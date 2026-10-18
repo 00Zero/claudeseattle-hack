@@ -31,6 +31,8 @@
   --accent: var(--clay);
   --accent-fg: var(--ivory);
   --accent-soft: var(--clay-soft);
+  /* "Happening now" on the home page: green for live, so it doesn't read as another orange deadline. */
+  --live: #2e7d4f;
 
   /* Kept for existing pages that use bg-background / text-foreground. */
   --background: var(--bg);
@@ -55,6 +57,7 @@
   --line-strong: rgba(250, 249, 245, 0.5);
   --accent-fg: var(--ink);
   --accent-soft: rgba(217, 119, 87, 0.18);
+  --live: #6fcf97;
 }
 
 :root[data-theme="dusk"] {
@@ -66,6 +69,7 @@
   --line: rgba(20, 20, 19, 0.18);
   --line-strong: rgba(20, 20, 19, 0.55);
   --accent-soft: rgba(217, 119, 87, 0.22);
+  --live: #256b42;
 }
 
 @theme inline {
@@ -82,6 +86,7 @@
   --color-accent: var(--accent);
   --color-accent-fg: var(--accent-fg);
   --color-accent-soft: var(--accent-soft);
+  --color-live: var(--live);
   --color-clay: var(--clay);
   --color-clay-deep: var(--clay-deep);
   --color-ink: var(--ink);
