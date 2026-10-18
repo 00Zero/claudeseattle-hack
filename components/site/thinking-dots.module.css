@@ -1,0 +1,99 @@
+/* Three dots orbiting in 3D, like Claude's "thinking" indicator.
+   The orbit spins around the vertical axis while tilting between edge-on and 35°;
+   each dot counter-rotates so it stays a round disc facing the viewer. */
+.root {
+  --thinking-dot: var(--accent);
+  --spin: 1.2s;
+  --tilt: 3s;
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: 22px;
+  height: 14px;
+  perspective: 80px;
+}
+
+.tilt,
+.spin,
+.place,
+.unspin,
+.untilt {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+
+.tilt {
+  animation: tilt var(--tilt) ease-in-out infinite alternate;
+}
+.spin {
+  animation: spin var(--spin) linear infinite;
+}
+/* Each dot sits 120° apart on an 8px radius (a 16px orbit), then undoes its own placement angle. */
+.place {
+  transform: rotateY(var(--angle)) translateZ(8px) rotateY(calc(-1 * var(--angle)));
+}
+.unspin {
+  animation: spin var(--spin) linear infinite reverse;
+}
+.untilt {
+  animation: untilt var(--tilt) ease-in-out infinite alternate;
+}
+
+.dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 50%;
+  background: var(--thinking-dot);
+  /* In front at the start of the cycle, at the back halfway through; the delay offsets each dot by a third. */
+  animation: depth var(--spin) ease-in-out infinite;
+  animation-delay: calc(var(--spin) * var(--phase) * -1);
+}
+
+@keyframes spin {
+  to {
+    transform: rotateY(360deg);
+  }
+}
+@keyframes tilt {
+  from {
+    transform: rotateX(0deg);
+  }
+  to {
+    transform: rotateX(-35deg);
+  }
+}
+@keyframes untilt {
+  from {
+    transform: rotateX(0deg);
+  }
+  to {
+    transform: rotateX(35deg);
+  }
+}
+@keyframes depth {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(0.6);
+    opacity: 0.55;
+  }
+}
+
+/* Reduced motion: no animation, so the edge-on orbit reads as three dots in a row. */
+@media (prefers-reduced-motion: reduce) {
+  .tilt,
+  .spin,
+  .unspin,
+  .untilt,
+  .dot {
+    animation: none;
+  }
+}
