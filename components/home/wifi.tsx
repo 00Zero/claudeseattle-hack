@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useNow } from "./use-now";
 import { getWifi } from "./wifi-action";
 
 type Details = { network: string; password: string };
@@ -28,9 +29,18 @@ function CopyValue({ label, value }: { label: string; value: string }) {
   );
 }
 
-// Venue Wi-Fi, hidden until clicked; each value copies on click.
-export function Wifi() {
+// The card shows from an hour before the event opens until half an hour after it closes.
+const SHOW_BEFORE_MS = 60 * 60_000;
+const SHOW_AFTER_MS = 30 * 60_000;
+
+// Venue Wi-Fi during the event only (the home page skips it when none is saved), hidden until
+// clicked; each value copies on click.
+export function Wifi({ openAt, closeAt }: { openAt: string; closeAt: string }) {
   const [state, setState] = useState<"hidden" | "loading" | "missing" | Details>("hidden");
+  const now = useNow();
+
+  // null on the server and during hydration, so the card only ever appears in the browser.
+  if (now === null || now < Date.parse(openAt) - SHOW_BEFORE_MS || now > Date.parse(closeAt) + SHOW_AFTER_MS) return null;
 
   async function reveal() {
     setState("loading");
