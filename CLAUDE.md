@@ -39,6 +39,7 @@ Next.js 16 differs from older versions (for example, `middleware.ts` is now `pro
 ## Rules
 
 - **Merging:** each dev merges their own PRs once the preview deploy works. Shared files (`lib/supabase/**`, `proxy.ts`, `app/layout.tsx`, `app/globals.css`, `package.json`) affect both apps: keep changes to them small, check that both `/teams` and `/submit` still work on the preview, and mention the change in the dev WhatsApp group.
+- **Branches:** start each change on a new branch from the latest `main`. Once a branch's PR is merged, don't push to it again (GitHub deletes it on merge); follow-up work goes on a new branch and a new PR.
 - **Migrations:** schema changes only through new migration files in the repo, never the Supabase dashboard. Never edit an existing migration file. Don't run `supabase db push`; Adam applies migrations to production after merge.
 - **Your tables** are prefixed `teams_*` (Dev A) or `judge_*` (Dev B): `npx supabase migration new teams_<what>` or `judge_<what>`.
 - **Shared tables** (`profiles`, `profile_emails`, `teams`, `team_members`, `event_settings`, `luma_guests`, `access_rules`): to change one, add `npx supabase migration new shared_<what>` in your PR. Prefer adding nullable columns over changing or dropping. Keep RLS enabled and add policies for anything new. Mention it in the dev WhatsApp group.
