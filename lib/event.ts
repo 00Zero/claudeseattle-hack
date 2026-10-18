@@ -12,12 +12,22 @@ export const venue = { name: "thinkspace Seattle", address: "1700 Westlake Ave N
 export const audience =
   "For small-business owners who know the problems, working professionals and students who want to build with Claude, and the technical builders who team up with them. Teams of 3 to 5 ship one thing a real business could put to work the following week, then open-source it.";
 
-// Shown on the home page after the rubric. The judges list stays hidden while it is empty.
+// Shown on the home page after the rubric: hosts, then partners, judges, and ambassadors.
+// Each list can mix people and companies, and a section stays hidden while its list is empty.
+// Images go in public/ (people in public/people, logos in public/partners) and are referenced
+// from the site root, e.g. "/partners/acme.png".
 export type Person = { name: string; photo: string; lines: string[]; linkedin?: string };
-export const hosts: Person[] = [
+export type Company = { name: string; logo: string; description: string; website: string };
+export type Entry = Person | Company;
+// Example entries:
+//   { name: "Jane Doe", photo: "/people/jane-doe.jpg", lines: ["Head of AI, Example Co"], linkedin: "https://www.linkedin.com/in/janedoe" }
+//   { name: "Example Co", logo: "/partners/example-co.png", description: "Example Co builds tools for small businesses.", website: "https://example.com" }
+export const hosts: Entry[] = [
   { name: "Adam Burgh", photo: "/people/adam-burgh.jpg", lines: ["Founder, We Build With AI", "Seattle Claude Ambassador"], linkedin: "https://www.linkedin.com/in/adamburgh" },
 ];
-export const judges: Person[] = [];
+export const partners: Entry[] = [];
+export const judges: Entry[] = [];
+export const ambassadors: Entry[] = [];
 
 export const prizes = {
   everyone: "Every participant gets $100 in Claude API credits.",
