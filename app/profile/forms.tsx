@@ -34,10 +34,12 @@ export type ProfileValues = {
   company: string | null;
   linkedin_url: string | null;
   github_username: string | null;
+  claude_code_level: string | null;
   bio: string | null;
   interests: string | null;
   looking_for: string | null;
   profile_confirmed: boolean;
+  public_profile: boolean;
 };
 
 export function ProfileForm({ profile }: { profile: ProfileValues }) {
@@ -46,6 +48,7 @@ export function ProfileForm({ profile }: { profile: ProfileValues }) {
 
   return (
     <form action={formAction} className="space-y-4">
+      {!profile.profile_confirmed && <input type="hidden" name="first_confirm" value="yes" />}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="First name">
           <input name="first_name" required defaultValue={profile.first_name} className={input} />
@@ -89,6 +92,15 @@ export function ProfileForm({ profile }: { profile: ProfileValues }) {
           <input name="github_username" defaultValue={profile.github_username ?? ""} className={input} />
         </Field>
       </div>
+      <Field label="Experience with Claude Code">
+        <input
+          name="claude_code_level"
+          maxLength={200}
+          placeholder="For example: never used it, tried it, use it every day"
+          defaultValue={profile.claude_code_level ?? ""}
+          className={input}
+        />
+      </Field>
       <Field label="One-line bio">
         <input name="bio" maxLength={300} defaultValue={profile.bio ?? ""} className={input} />
       </Field>
@@ -98,6 +110,13 @@ export function ProfileForm({ profile }: { profile: ProfileValues }) {
       <Field label="What I'm looking for">
         <textarea name="looking_for" maxLength={500} rows={3} defaultValue={profile.looking_for ?? ""} className={input} />
       </Field>
+      <label className="flex items-start gap-2">
+        <input type="checkbox" name="public_profile" defaultChecked={profile.public_profile} className="mt-1" />
+        <span className="text-sm">
+          Show my full name, title, company, and LinkedIn on public team pages. If you leave this off, people who
+          aren&apos;t logged in see only your first name and last initial.
+        </span>
+      </label>
       <Status state={state} />
       <button type="submit" disabled={pending} className={button}>
         {pending ? "Saving…" : profile.profile_confirmed ? "Save" : "Confirm profile"}
