@@ -24,6 +24,9 @@ jobs:
     name: Migration review
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    # CLAUDE_CODE_OAUTH_TOKEN lives in this environment, which only main may deploy to, so a
+    # workflow pushed on another branch can't read it. pull_request_target runs with ref = main.
+    environment: migration-review
     steps:
       - name: Check out main (trusted code only)
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
