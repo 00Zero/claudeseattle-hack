@@ -79,7 +79,7 @@ export default async function Home() {
     supabase
       .from("event_settings")
       .select(
-        "team_formation_closes_at, submissions_close_at, event_starts_at, event_ends_at, venue_name, venue_address, venue_neighborhood, venue_lat, venue_lon, luma_calendar_url, wifi_network, wifi_password",
+        "team_formation_closes_at, submissions_close_at, event_starts_at, event_ends_at, venue_name, venue_address, venue_neighborhood, venue_lat, venue_lon, luma_calendar_url, wifi_network, wifi_password, business_insights_url",
       )
       .eq("id", 1)
       .single(),
@@ -180,6 +180,16 @@ export default async function Home() {
               </div>
             ))}
           </div>
+          {settings?.business_insights_url && (
+            <p className="max-w-[60ch] text-fg-muted">
+              Looking for a problem worth solving? Read what small business owners told us about AI: anonymized survey
+              answers and reports in{" "}
+              <a href={settings.business_insights_url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-accent">
+                the small business data folder
+              </a>
+              .
+            </p>
+          )}
           <p className="font-mono text-xs text-fg-faint">{openSourceNote}</p>
         </section>
 
