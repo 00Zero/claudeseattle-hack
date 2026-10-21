@@ -45,6 +45,8 @@ export async function saveEventSettings(formData: FormData) {
   if (startsAt && endsAt && startsAt >= endsAt) throw new Error("The event has to end after it starts.");
   const lumaUrl = optionalText(formData, "luma_calendar_url");
   if (lumaUrl && !/^https?:\/\//.test(lumaUrl)) throw new Error("The Luma link needs to start with https://.");
+  const insightsUrl = optionalText(formData, "business_insights_url");
+  if (insightsUrl && !/^https:\/\//.test(insightsUrl)) throw new Error("The small business data link needs to start with https://.");
 
   const { error } = await createAdminClient()
     .from("event_settings")
@@ -61,6 +63,7 @@ export async function saveEventSettings(formData: FormData) {
       venue_lat: optionalNumber(formData, "venue_lat", "Latitude"),
       venue_lon: optionalNumber(formData, "venue_lon", "Longitude"),
       luma_calendar_url: lumaUrl,
+      business_insights_url: insightsUrl,
       wifi_network: optionalText(formData, "wifi_network"),
       wifi_password: optionalText(formData, "wifi_password"),
     })
