@@ -1,0 +1,85 @@
+# Judging app: implementation plan (Dev B)
+
+Spec: `docs/REQUIREMENTS.md`, "Judging app (Dev B)" and "Rubric". Area rules: `app/(judge)/CLAUDE.md`.
+Event: Sun Oct 25. Submissions close 5:30 pm, prelim 5:30–6:30 pm, finals 6:30–7:30 pm, winners 7:30 pm.
+
+## Milestones
+
+| Date | Goal | Done when |
+| --- | --- | --- |
+| Tue Oct 20 (tonight) | PR 1: `judge_` migration merged | Adam has applied it; `judge_entries` exists in Supabase |
+| Wed Oct 21 | Usable version on production | A team member can save an entry at `/submit`; admin can assign it at `/admin/judging`; a judge can score it at `/judge`. Call with Adam 5:30–8 pm or 10–11 pm |
+| Fri Oct 23 | Working version; judging freeze starts Fri night | Every must-have below checked on a preview deploy, on a phone |
+| Sat Oct 24 | Adam reviews (morning); rehearsal with two real judges and fake entries (evening) | Fake entries cleaned up afterwards; submission and judging finalized by 8 pm |
+| Sun Oct 25 | Live by 9:00 am | |
+
+The Supabase project is shared with production and only Adam applies migrations, so nothing that
+writes judge data can be tested until PR 1 is merged and applied. Get PR 1 out first and keep
+later schema changes to new migrations (never edit a merged one).
+
+## Data model (`supabase/migrations/*_judge_core.sql`)
+
+| Table | Purpose | Who reads | Who writes |
+| --- | --- | --- | --- |
+| `judge_entries` | One entry per team: title, tagline, short and long description, video URL, repo URL, extra links, completeness checklist, last saved | Team members, judges, admins | Team members (participant or admin role) before the deadline; admin any time |
+| `judge_late_saves` | A save made after `submissions_close_at`, keyed on the team (works even if the team never saved before the deadline); kept apart until admin accepts (copied onto the entry, creating it if needed) or rejects | Team members, admins | Team members insert; admin decides |
+| `judge_assignments` | Prelim: entry → judge | The judge (own rows), admins | Admins |
+| `judge_scores` | One row per entry, judge, round (`prelim` / `final`); four criteria 1–8 in rubric order plus a comment | The judge (own rows), admins | Judges: prelim only for assigned entries, final only for finalists |
+| `judge_ai_notes` | Claude's notes and draft scores per entry (nice-to-have) | Judges, admins | Server only (service role) |
+
+Views:
+- `judge_entry_results` (service role only): prelim mean and vote count, final mean and vote count, finalist flag (top prelim mean in each judge's group), place (rank by final mean among finalists). Feeds the admin table and `/judge/results`.
+- `public_judge_entries` (anon): entry fields after `submissions_close_at` only, with team name. Roster comes from `public_team_members`.
+- `public_judge_results` (anon): finalists only when `publish_finalists`, places only when `publish_winners`. Never scores.
+
+Rubric text stays in `lib/event.ts` (`rubric`); score columns are an array in the same order, so
+criteria names and anchors can change without a migration.
+
+## Routes and work items
+
+### 1. `/submit` (team members) — Wed
+- [x] Load the viewer's team (`team_members.status = 'member'`), entry pre-filled from `teams.concept`
+- [x] Form: title, tagline, short and long description, demo video URL (required), repo URL (required), extra links
+- [x] Server action save: before deadline → upsert entry; after → insert `judge_late_saves`
+- [x] "Last saved" timestamp and deadline from `event_settings`; read-only after the deadline
+- [x] Completeness checklist on save: required fields, repo URL returns 200 and is a public GitHub repo, video URL loads (YouTube, Loom, Vimeo, or direct)
+- [x] Mentors, judges, volunteers, and pending users see why they can't submit
+- [ ] Fallback if a team isn't on the Teams app: free-text team name + member emails (admin-created)
+
+### 2. `/admin/judging` (admin) — Wed
+- [ ] Entries table: team, submitted, late flag, assigned judge (dropdown), prelim score and votes, final score and votes, finalist, place; sortable
+- [ ] "Teams without a submission: N" badge
+- [ ] Assign judge per entry; handle entries with no judge and judges with no entries
+- [ ] Accept or reject late saves
+- [ ] Publish toggles: `publish_finalists`, `publish_winners` (writes `event_settings` with the service role after `assertAdmin()`)
+
+### 3. `/judge` (judges, on a phone) — Wed (prelim), Thu (finals)
+- [ ] My assigned entries with my score and status
+- [ ] Entry page: embedded video on top, repo link, tagline, description, roster, collapsed AI notes
+- [ ] Score form: four criteria 1–8 with anchors from `lib/event.ts`, optional comment
+- [ ] Live ranking of my group by mean (one decimal); top = my finalist; flag exact ties ("adjust scores to break the tie")
+- [ ] Final round tab: every finalist, same form, `round = 'final'`
+
+### 4. `/judge/results` — Thu
+- [ ] Finalists ranked by mean final score with judge count; visible only after I've scored every finalist
+
+### 5. `/results` and public entry pages — Thu
+- [ ] `/results`: only what the publish toggles allow
+- [ ] `/submit/[id]` public entry page after the deadline
+
+### 6. Nice-to-haves, in order — Fri, only if must-haves are done
+1. AI notes at the deadline through the Vercel AI Gateway (`AI_GATEWAY_API_KEY`, `anthropic/*` first): 2–3 sentences per criterion plus a draft score; collapsed for judges, never public, never added to scores
+2. Auto-distribute entries evenly across judges, manual override
+3. Hide chosen entry fields from judges
+
+## Open questions for Adam (Wed call)
+- Entry edit rights: any team member (spec) or leader only?
+- Late saves: is "kept apart until admin accepts" the behavior he wants?
+- Judge load: one judge per entry, or pairs?
+- Is AI as a judge in scope at all, beyond AI notes?
+- Where should a "pitch mode" (3-minute pitches) sit if time allows: same score form?
+
+## Testing
+- Fake data uses `@example.com` and names prefixed `TEST`; delete before Saturday evening.
+- Check every judge view on a phone width; check `/teams` still works on each preview.
+- Run `npm run lint` and `npm run build` before each PR.
