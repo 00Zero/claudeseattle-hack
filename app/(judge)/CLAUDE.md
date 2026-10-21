@@ -31,6 +31,7 @@ Spec: `docs/REQUIREMENTS.md`, "Judging app (Dev B)" and its "Rubric", plus "Even
 ## How to build on it
 
 - Write RLS for every `judge_` table in your migration. Scores, assignments, and AI notes are never readable by anonymous users or participants.
+- `security definer` functions in `public` can be called by anyone through the API (`/rest/v1/rpc/<name>`). After creating one, `revoke execute on function … from public, anon` and grant it only to the roles that need it (usually `authenticated`); if it returns anything private, check the caller inside it too (e.g. `is_judge()`).
 - Public entry pages (after `submissions_close_at`) and the results page read views you create in your migration, granted to `anon`, exposing only entry fields and published results, with members as `display_name`.
 - Admin actions (assign judges, accept or reject late saves, publish toggles): in a server action, load the caller's profile, check `platform_role = 'admin'`, then write with `createAdminClient()` from `lib/supabase/admin.ts`. The admin layout's check is not enough on its own.
 - AI notes: server-side only, through the Vercel AI Gateway (`AI_GATEWAY_API_KEY`); `anthropic/*` and `openai/*` models first, other gateway models allowed. Never shown publicly, never added to human scores.
