@@ -10,10 +10,15 @@ export function LoginForm() {
     return (
       <div className="space-y-2">
         <h2 className="text-lg font-semibold">Check your email</h2>
-        {state.redirected ? (
+        {state.redirectedFrom === "linked" ? (
           <p>
             That address is linked to your account, so we sent the sign-in link to your account email,{" "}
             <strong>{state.shownAddress}</strong>.
+          </p>
+        ) : state.redirectedFrom === "luma" ? (
+          <p>
+            That&apos;s the Claude account email on your Luma registration, so we sent the sign-in link to the
+            email you registered with, <strong>{state.shownAddress}</strong>.
           </p>
         ) : (
           <p>
@@ -21,6 +26,15 @@ export function LoginForm() {
           </p>
         )}
         <p className="text-sm text-foreground/70">The link works once. Open it in this browser.</p>
+        {state.directEmail && (
+          <form action={formAction}>
+            <input type="hidden" name="email" value={state.directEmail} />
+            <input type="hidden" name="direct" value="1" />
+            <button type="submit" disabled={pending} className="text-sm underline disabled:opacity-50">
+              Can&apos;t get to that inbox? Send it to {state.directEmail} instead
+            </button>
+          </form>
+        )}
       </div>
     );
   }
@@ -39,7 +53,7 @@ export function LoginForm() {
         />
       </label>
       <p className="text-sm text-foreground/70">
-        Use the email you registered with on Luma, or your Claude account email.
+        Use the email you registered with on Luma. Your Claude account email works too.
       </p>
       {state.status === "error" && <p className="text-sm text-red-600">{state.message}</p>}
       <button

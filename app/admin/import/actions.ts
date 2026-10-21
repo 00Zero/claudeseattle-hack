@@ -7,7 +7,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export type ImportState =
   | { status: "idle" }
-  | { status: "error"; message: string; missingColumns?: string[] }
+  | {
+      status: "error";
+      message: string;
+      missingColumns?: string[];
+      // Ticket and status pairs in the file with no access rule; set when the import was held back.
+      unmappedInFile?: { ticket_name: string; approval_status: string; guests: number }[];
+    }
   | {
       status: "ok";
       inserted: number;
@@ -45,6 +51,28 @@ export async function importLumaCsv(_prev: ImportState, formData: FormData): Pro
   }
 
   const admin = createAdminClient();
+
+  // A renamed or new ticket in Luma would leave its guests at profile-only access, so
+  // hold the import back until there are rules for it, unless the admin confirms.
+  const { data: rules, error: rulesError } = await admin.from("access_rules").select("ticket_name, approval_status");
+  if (rulesError) return { status: "error", message: "Couldn't read the access rules." };
+  const ruled = new Set(rules.map((r) => `${r.ticket_name}\n${r.approval_status}`));
+  const unmappedInFile = new Map<string, { ticket_name: string; approval_status: string; guests: number }>();
+  for (const row of parsed.rows) {
+    const key = `${row.ticket_name}\n${row.approval_status}`;
+    if (ruled.has(key)) continue;
+    const entry = unmappedInFile.get(key) ?? { ticket_name: row.ticket_name, approval_status: row.approval_status, guests: 0 };
+    entry.guests++;
+    unmappedInFile.set(key, entry);
+  }
+  if (unmappedInFile.size > 0 && formData.get("allow_unmapped") !== "on") {
+    return {
+      status: "error",
+      message: "Nothing imported: this file has ticket names with no access rule. Add them in Settings, or tick the box to import anyway.",
+      unmappedInFile: [...unmappedInFile.values()],
+    };
+  }
+
   const linkedCount = async () => {
     const { count } = await admin
       .from("profiles")
