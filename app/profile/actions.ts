@@ -2,6 +2,7 @@
 
 import { createHash, randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { isValidEmail, normalizeEmail, sendEmail } from "@/lib/email";
@@ -60,15 +61,19 @@ export async function saveProfile(_prev: FormState, formData: FormData): Promise
       company: text(formData, "company") || null,
       linkedin_url: linkedinUrl(text(formData, "linkedin_url", 300)) || null,
       github_username: githubUsername(text(formData, "github_username", 300)) || null,
+      claude_code_level: text(formData, "claude_code_level") || null,
       bio: text(formData, "bio", 300) || null,
       interests: text(formData, "interests", 500) || null,
       looking_for: text(formData, "looking_for", 500) || null,
       profile_confirmed: true,
+      public_profile: formData.get("public_profile") === "on",
     })
     .eq("id", userId);
   if (error) return { status: "error", message: "We couldn't save your profile. Try again." };
 
   revalidatePath("/", "layout");
+  // First confirmation: send them on to find or start a team.
+  if (formData.get("first_confirm") === "yes") redirect("/teams");
   return { status: "ok", message: "Saved." };
 }
 
