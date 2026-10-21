@@ -5,6 +5,7 @@ import { acceptApplicant, applyToTeam, declineApplicant, leaveTeam, removeMember
 import { ActionButton } from "../_components/action-button";
 import { BalanceBadges, Pill } from "../_components/badges";
 import { DeadlineBanner } from "../_components/deadline-banner";
+import { normalizeLinkedinUrl } from "../_lib/linkedin";
 import { balanceOf, getViewer, IDEAL_MAX, IDEAL_MIN, TEAM_MAX, TEAM_MIN, type RoleBucket, type Viewer } from "../_lib/teams";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -79,7 +80,7 @@ async function loadFullTeam(id: string, viewerId: string): Promise<Team | null> 
     id: p.id,
     name: `${p.first_name} ${p.last_name}`.trim(),
     subtitle: titleAtCompany(p.job_title, p.company),
-    linkedin: p.linkedin_url,
+    linkedin: normalizeLinkedinUrl(p.linkedin_url),
     github: p.github_username ? `https://github.com/${p.github_username}` : null,
     role_bucket: p.role_bucket,
     is_technical: p.is_technical,

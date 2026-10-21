@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { isValidEmail, normalizeEmail, sendEmail } from "@/lib/email";
 import { getOrigin } from "@/lib/site-url";
+import { normalizeLinkedinUrl } from "@/app/(teams)/teams/_lib/linkedin";
 
 export type FormState = { status: "idle" | "ok" | "error"; message?: string };
 
@@ -29,11 +30,6 @@ function githubUsername(value: string) {
   return value.replace(/^(https?:\/\/)?(www\.)?github\.com\//i, "").replace(/[/?#].*$/, "");
 }
 
-function linkedinUrl(value: string) {
-  if (!value) return "";
-  return /^https?:\/\//i.test(value) ? value : `https://${value}`;
-}
-
 // First-login confirmation and later edits. Only columns users may update
 // (see the column grants in 0001_shared.sql); RLS limits it to their own row.
 export async function saveProfile(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -49,6 +45,11 @@ export async function saveProfile(_prev: FormState, formData: FormData): Promise
   if (technical !== "yes" && technical !== "no") {
     return { status: "error", message: "Tell us whether you're technical." };
   }
+  const linkedinInput = text(formData, "linkedin_url", 300);
+  const linkedin = normalizeLinkedinUrl(linkedinInput);
+  if (linkedinInput && !linkedin) {
+    return { status: "error", message: "Enter your LinkedIn profile URL, like linkedin.com/in/your-name." };
+  }
 
   const { error } = await supabase
     .from("profiles")
@@ -59,7 +60,7 @@ export async function saveProfile(_prev: FormState, formData: FormData): Promise
       is_technical: technical === "yes",
       job_title: text(formData, "job_title") || null,
       company: text(formData, "company") || null,
-      linkedin_url: linkedinUrl(text(formData, "linkedin_url", 300)) || null,
+      linkedin_url: linkedin,
       github_username: githubUsername(text(formData, "github_username", 300)) || null,
       claude_code_level: text(formData, "claude_code_level") || null,
       bio: text(formData, "bio", 300) || null,

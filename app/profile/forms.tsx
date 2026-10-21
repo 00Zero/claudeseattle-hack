@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { startTransition, useActionState } from "react";
 import { addEmail, makeDefaultEmail, saveProfile, type FormState } from "./actions";
 
 const input = "w-full rounded border border-foreground/20 bg-background px-3 py-2";
@@ -47,7 +47,16 @@ export function ProfileForm({ profile }: { profile: ProfileValues }) {
   const technical = profile.is_technical === null ? "" : profile.is_technical ? "yes" : "no";
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form
+      // Submit by hand instead of action={...}: React resets a form after its action runs,
+      // which would wipe what the person typed when saving fails.
+      onSubmit={(event) => {
+        event.preventDefault();
+        const data = new FormData(event.currentTarget);
+        startTransition(() => formAction(data));
+      }}
+      className="space-y-4"
+    >
       {!profile.profile_confirmed && <input type="hidden" name="first_confirm" value="yes" />}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="First name">
@@ -86,7 +95,7 @@ export function ProfileForm({ profile }: { profile: ProfileValues }) {
           <input name="company" defaultValue={profile.company ?? ""} className={input} />
         </Field>
         <Field label="LinkedIn URL">
-          <input name="linkedin_url" defaultValue={profile.linkedin_url ?? ""} className={input} />
+          <input name="linkedin_url" placeholder="linkedin.com/in/your-name" defaultValue={profile.linkedin_url ?? ""} className={input} />
         </Field>
         <Field label="GitHub username">
           <input name="github_username" defaultValue={profile.github_username ?? ""} className={input} />
