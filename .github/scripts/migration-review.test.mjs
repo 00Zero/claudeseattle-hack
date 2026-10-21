@@ -1,7 +1,7 @@
 // Tests for the deterministic part of migration-review.mjs: node --test .github/scripts/migration-review.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { checkChanges, destructiveFindings, listMigrations, parseVerdict, splitStatements } from "./migration-review.mjs";
+import { adminPing, checkChanges, destructiveFindings, listMigrations, parseVerdict, splitStatements } from "./migration-review.mjs";
 
 const M = "supabase/migrations/";
 const main = [
@@ -117,4 +117,15 @@ test("main's migrations: each timestamped one is in order relative to those befo
     });
     assert.deepEqual(r.findings, [], name);
   });
+});
+
+test("Adam is mentioned only for his items, and the key ignores line numbers", () => {
+  const f = (file, message, needsAdam) => ({ file, message, needsAdam });
+  assert.equal(adminPing({ findings: [f("a.sql", "Out of order", false)], ai: { status: "none" } }), null);
+  const one = adminPing({ findings: [f("a.sql:3", "**Needs Adam.** drops a table: `drop table x`", true)], ai: { status: "none" } });
+  const moved = adminPing({ findings: [f("a.sql:9", "**Needs Adam.** drops a table: `drop table  x`", true)], ai: { status: "none" } });
+  assert.match(one.body, /^<!-- migration-review-ping \w+ -->\n@00Zero /);
+  assert.equal(one.key, moved.key);
+  const err = adminPing({ findings: [], ai: { status: "error", error: "HTTP 401" } });
+  assert.match(err.body, /couldn't run/);
 });

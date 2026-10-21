@@ -17,7 +17,7 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { pathToFileURL } from "node:url";
 
 const MIGRATIONS_DIR = "supabase/migrations/";
@@ -37,6 +37,10 @@ const VERSION_RE = /^([0-9]+)_.*\.sql$/;
 const NEW_NAME_RE = /^[0-9]{14}_(shared|teams|judge)_[a-z0-9_]+\.sql$/;
 
 const ADAM = "**Needs Adam.**";
+// Mentioned in a separate comment when the PR needs Adam: GitHub notifies mentions in new
+// comments only, not in edits, and the main comment is edited in place.
+const ADMIN_LOGIN = "00Zero";
+const PING_MARKER = "<!-- migration-review-ping";
 
 // ---------------------------------------------------------------------------------------------
 // Git (data only)
@@ -406,7 +410,7 @@ export function parseVerdict(text) {
 // GitHub
 
 async function gh(path, { method = "GET", body, token } = {}) {
-  const res = await fetch(`https://api.github.com${path}`, {
+  const res = await fetch(`${process.env.GITHUB_API_URL || "https://api.github.com"}${path}`, {
     method,
     headers: {
       authorization: `Bearer ${token}`,
@@ -451,14 +455,36 @@ async function otherPrMigrations({ repo, prNumber, token }) {
   return result;
 }
 
-async function upsertComment({ repo, prNumber, token, body, onlyIfExists }) {
-  const comments = await ghAll(`/repos/${repo}/issues/${prNumber}/comments`, token);
-  const mine = comments.find((c) => c.user?.login === "github-actions[bot]" && c.body?.includes(MARKER));
+const fromBot = (c) => c.user?.login === "github-actions[bot]";
+
+async function upsertComment({ repo, prNumber, token, comments, body, onlyIfExists }) {
+  const mine = comments.find((c) => fromBot(c) && c.body?.includes(MARKER));
   if (mine) {
     await gh(`/repos/${repo}/issues/comments/${mine.id}`, { method: "PATCH", body: { body }, token });
   } else if (!onlyIfExists) {
     await gh(`/repos/${repo}/issues/${prNumber}/comments`, { method: "POST", body: { body }, token });
   }
+}
+
+// The mention for Adam when something needs him, or null. The key changes only when the
+// reasons do (line numbers and error wording ignored), so new pushes don't re-notify.
+export function adminPing({ findings, ai }) {
+  const mine = findings.filter((f) => f.needsAdam);
+  const reasons = mine.map((f) => `- \`${f.file}\`: ${f.message.replace(ADAM, "").trim()}`);
+  const keyParts = mine.map((f) => `${f.file.replace(/:\d+$/, "")} ${f.message.replace(/`[^`]*`$/, "")}`);
+  if (ai.status === "error") {
+    reasons.push(`- The AI review couldn't run: ${ai.error}. The Claude subscription token or its usage limit may need you.`);
+    keyParts.push("ai-error");
+  }
+  if (!reasons.length) return null;
+  const key = createHash("sha256").update(keyParts.join("\n")).digest("hex").slice(0, 12);
+  const body = [`${PING_MARKER} ${key} -->`, `@${ADMIN_LOGIN} this PR needs you (Migration review):`, "", ...reasons, "", "Details are in the Migration review comment."].join("\n");
+  return { key, body };
+}
+
+async function postPing({ repo, prNumber, token, comments, ping }) {
+  if (comments.some((c) => fromBot(c) && c.body?.startsWith(`${PING_MARKER} ${ping.key} -->`))) return;
+  await gh(`/repos/${repo}/issues/${prNumber}/comments`, { method: "POST", body: { body: ping.body }, token });
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -470,7 +496,7 @@ function renderReport({ findings, newMigrations, ai, headSha }) {
   const needsAdam = findings.some((f) => f.needsAdam);
   if (deterministicFail) {
     out.push(needsAdam
-      ? "❌ **Blocked.** Some changes need Adam (see below): ask him in the dev WhatsApp group. Fix the other items and push."
+      ? "❌ **Blocked.** Some changes need Adam (see below); he has been notified. Fix the other items and push."
       : "❌ **Blocked.** Fix the items below and push; this check re-runs on every push.");
     out.push("", ...findings.map((f) => `- \`${f.file}\`: ${f.message}`));
   } else if (!newMigrations.length) {
@@ -556,7 +582,12 @@ async function main() {
     // A PR that doesn't touch supabase/ or .github/ gets no comment, but an earlier one is updated.
     // The verdict stands even if commenting fails; the job summary has the same report.
     try {
-      await upsertComment({ repo, prNumber, token, body: report, onlyIfExists: !relevant });
+      const comments = await ghAll(`/repos/${repo}/issues/${prNumber}/comments`, token);
+      await upsertComment({ repo, prNumber, token, comments, body: report, onlyIfExists: !relevant });
+      const ping = adminPing({ findings, ai });
+      if (ping && (env.PR_AUTHOR || "").toLowerCase() !== ADMIN_LOGIN.toLowerCase()) {
+        await postPing({ repo, prNumber, token, comments, ping });
+      }
     } catch (err) {
       console.log(`::warning::Couldn't post the PR comment: ${err.message}`);
     }
