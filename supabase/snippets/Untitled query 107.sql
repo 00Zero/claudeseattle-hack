@@ -1,1 +1,0 @@
-update event_settings set submissions_close_at = now() - interval '1 minute';

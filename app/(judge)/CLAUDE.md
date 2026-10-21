@@ -13,7 +13,7 @@ Spec: `docs/REQUIREMENTS.md`, "Judging app (Dev B)" and its "Rubric", plus "Even
 - `/results`: public; shows only what `publish_finalists` / `publish_winners` allow. Never raw scores.
 - Public entry pages (after `submissions_close_at`): a dynamic route under `/submit` or `/entries`, your choice.
 - `app/admin/judging/**`: assignments and the results table. It sits inside Adam's admin shell (`app/admin/layout.tsx`), so it's outside this route group but still yours.
-- Your tables, prefixed `judge_` (entries, scores, assignments, AI notes), in migrations named `<timestamp>_judge_<what>.sql` (`npx supabase migration new judge_<what>`). Don't run `supabase db push`; Adam applies migrations to production after your PR merges. Never edit a migration that's already merged.
+- Your tables, prefixed `judge_` (entries, scores, assignments, AI notes), in migrations named `<timestamp>_judge_<what>.sql` (`npx supabase migration new judge_<what>`). Merging to `main` applies them to production automatically (Supabase GitHub integration), so merge only when the "Migration review" check is green; destructive changes are blocked and go to Adam. Never edit a migration that's already merged; if a newer migration lands on `main` first, rename yours with `npx supabase migration new` and move the SQL. Don't run `supabase db push`.
 
 ## Shared data you use (`supabase/migrations/*_shared*.sql`)
 
@@ -38,7 +38,7 @@ Spec: `docs/REQUIREMENTS.md`, "Judging app (Dev B)" and its "Rubric", plus "Even
 ## Shared code and tables
 
 - Need a column on a shared table? Add a `shared_` migration in your PR (rules in the root `CLAUDE.md`) and mention it in the dev WhatsApp group.
-- Shared files (`lib/supabase/**`, `proxy.ts`, `app/layout.tsx`, `app/globals.css`, `package.json`) affect the teams app too: keep changes small and check `/teams` still works on your preview.
+- Shared files (`lib/supabase/**`, `proxy.ts`, `app/layout.tsx`, `app/globals.css`, `package.json`) affect the teams app too: keep changes small and check `/teams` still works on localhost.
 - Leave `app/admin/layout.tsx` and Adam's login, auth, import, people, and settings routes alone. Never write to `teams` or `team_members`.
 
 ## Boundary with teams

@@ -6,7 +6,7 @@ Spec: `docs/REQUIREMENTS.md`, "Teams app (Dev A)", plus the access table in "Sha
 
 - `app/(teams)/**`: every route under `/teams` (browse, team page, create, apply, roster, public team page).
 - `app/profile/**` once Adam's scaffold lands (Adam may still edit it).
-- Your tables, prefixed `teams_`, in migrations named `<timestamp>_teams_<what>.sql` (`npx supabase migration new teams_<what>`). Don't run `supabase db push`; Adam applies migrations to production after your PR merges. Never edit a migration that's already merged.
+- Your tables, prefixed `teams_`, in migrations named `<timestamp>_teams_<what>.sql` (`npx supabase migration new teams_<what>`). Merging to `main` applies them to production automatically (Supabase GitHub integration), so merge only when the "Migration review" check is green; destructive changes are blocked and go to Adam. Never edit a migration that's already merged; if a newer migration lands on `main` first, rename yours with `npx supabase migration new` and move the SQL. Don't run `supabase db push`.
 
 ## Shared data you use (`supabase/migrations/*_shared*.sql`)
 
@@ -34,7 +34,7 @@ Spec: `docs/REQUIREMENTS.md`, "Teams app (Dev A)", plus the access table in "Sha
 ## Shared code and tables
 
 - Need a column on a shared table? Add a `shared_` migration in your PR (rules in the root `CLAUDE.md`) and mention it in the dev WhatsApp group.
-- Shared files (`lib/supabase/**`, `proxy.ts`, `app/layout.tsx`, `app/globals.css`, `package.json`) affect the judging app too: keep changes small and check `/submit` still works on your preview.
+- Shared files (`lib/supabase/**`, `proxy.ts`, `app/layout.tsx`, `app/globals.css`, `package.json`) affect the judging app too: keep changes small and check `/submit` still works on localhost.
 - Leave Adam's login, auth, and admin routes alone.
 
 ## Boundary with judging
