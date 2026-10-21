@@ -1,6 +1,7 @@
-// Builds the public small business dataset from the synced survey: one row per business,
-// shuffled, with only the answer fields below. Contact details, revenue, and the timestamp
-// are never included. Every row is sent through a model that removes names, businesses,
+// Builds the public small business dataset from business_insights, the anonymous copy of the
+// small business survey (0007_shared_business_insights.sql): one row per business, shuffled,
+// with only the fields below. It has no contact details or timestamps to leak; revenue is
+// included, since nothing here ties it to a person or business. Every row is sent through a model that removes names, businesses,
 // websites, places and money figures from the answers, and the result is written for an
 // admin to read in full before it is shared.
 //
@@ -14,6 +15,7 @@ import path from "node:path";
 
 const MODEL = "anthropic/claude-sonnet-5.5";
 const CONCURRENCY = 4;
+const MIN_GROUP = 3;
 
 // Public columns, in order, with their CSV headers.
 const PUBLIC_FIELDS: [key: string, header: string][] = [
@@ -22,6 +24,7 @@ const PUBLIC_FIELDS: [key: string, header: string][] = [
   ["team_size", "People in the business"],
   ["location", "Based in"],
   ["business_age", "Years operating"],
+  ["revenue", "Revenue last year"],
   ["ai_comfort", "Owner's comfort with AI (1-5)"],
   ["ai_use_today", "AI use today"],
   ["ai_tried_areas", "Where they tried AI"],
@@ -58,7 +61,15 @@ function csvCell(value: string) {
   return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
 
-async function scrub(row: Row): Promise<Row> {
+// Single-choice answers (fixed options, no "Other" text) skip the scrubber, so it can't
+// mistake the revenue, spend and budget brackets for money figures to remove.
+const FIXED_CHOICE = new Set([
+  "business_role", "industry", "team_size", "location", "business_age", "revenue",
+  "ai_comfort", "ai_use_today", "ai_spend_monthly", "ai_users", "preferred_format", "one_time_budget",
+]);
+
+async function scrub(full: Row): Promise<Row> {
+  const row = Object.fromEntries(Object.entries(full).filter(([k]) => !FIXED_CHOICE.has(k)));
   const response = await fetch("https://ai-gateway.vercel.sh/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${process.env.AI_GATEWAY_API_KEY}`, "Content-Type": "application/json" },
@@ -75,7 +86,7 @@ async function scrub(row: Row): Promise<Row> {
   const content: string = (await response.json()).choices[0].message.content;
   const parsed = JSON.parse(content.slice(content.indexOf("{"), content.lastIndexOf("}") + 1)) as Row;
   // Only the keys we sent come back, as strings.
-  return Object.fromEntries(Object.keys(row).map((k) => [k, String(parsed[k] ?? "")]));
+  return { ...full, ...Object.fromEntries(Object.keys(row).map((k) => [k, String(parsed[k] ?? "")])) };
 }
 
 async function main() {
@@ -89,13 +100,24 @@ async function main() {
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
     auth: { persistSession: false },
   });
-  const { data, error } = await supabase.from("survey_responses").select("answers").eq("survey", "small_business");
+  const { data, error } = await supabase.from("business_insights").select("answers");
   if (error) throw new Error(error.message);
 
   const rows: Row[] = data
     .map((r) => r.answers as Row)
     .filter((a) => a.business_role && a.business_role !== "Neither")
     .map((a) => Object.fromEntries(PUBLIC_FIELDS.map(([key]) => [key, a[key] ?? ""])));
+
+  // Coarsen the fields that together could single out a business: industries with fewer than
+  // MIN_GROUP respondents become "Other", sizes above 10 merge, and anywhere in Washington outside
+  // Seattle merges.
+  const industryCounts = new Map<string, number>();
+  rows.forEach((r) => industryCounts.set(r.industry, (industryCounts.get(r.industry) ?? 0) + 1));
+  for (const row of rows) {
+    if ((industryCounts.get(row.industry) ?? 0) < MIN_GROUP) row.industry = "Other";
+    if (["11 to 50", "51 to 200", "More than 200"].includes(row.team_size)) row.team_size = "11 or more";
+    if (row.location.startsWith("Elsewhere in")) row.location = "Washington, outside Seattle";
+  }
 
   // Shuffle so row order says nothing about when someone answered.
   for (let i = rows.length - 1; i > 0; i--) {

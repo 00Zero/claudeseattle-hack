@@ -4,12 +4,16 @@ import { createHash } from "node:crypto";
 // Like the Luma import, columns are matched by a lowercase phrase from the question, so
 // small wording edits don't break the sync. Only listed questions are kept: a new question
 // is reported as unmapped and dropped until it's added here. See docs/REQUIREMENTS.md,
-// "Luma data: what goes where", for who may see each tier.
+// "Survey data: what goes where", for who may see each tier.
+//
+// Groups: "answer" is stored with the response and feeds matching; "contact" is stored with
+// the response for admins only; "anonymous" (revenue) is never stored with the response, only
+// in the unlinkable business_insights copy (0007_shared_business_insights.sql).
 
 export const SURVEYS = ["attendee", "small_business"] as const;
 export type Survey = (typeof SURVEYS)[number];
 
-type Group = "answer" | "contact";
+type Group = "answer" | "contact" | "anonymous";
 type Question = { key: string; phrase: string; group: Group };
 
 // Every respondent identifies themselves with these; stored as columns, never in answers.
@@ -48,6 +52,7 @@ const QUESTIONS: Record<Survey, Question[]> = {
     { key: "team_size", phrase: "how many people work in your business", group: "answer" },
     { key: "location", phrase: "where is your business based", group: "answer" },
     { key: "business_age", phrase: "how long has your business been operating", group: "answer" },
+    { key: "revenue", phrase: "revenue", group: "anonymous" },
     { key: "ai_comfort", phrase: "how comfortable are you personally with ai", group: "answer" },
     { key: "ai_use_today", phrase: "business's use of ai today", group: "answer" },
     { key: "ai_tried_areas", phrase: "where have you tried using ai", group: "answer" },
@@ -71,7 +76,7 @@ const QUESTIONS: Record<Survey, Question[]> = {
 };
 
 // Never stored. The Apps Script drops these before sending; this is the second line.
-const NEVER = ["revenue", "your name"];
+const NEVER = ["your name"];
 // Kept by neither tier and not worth flagging.
 const IGNORED = ["how did you hear about this survey"];
 
@@ -84,7 +89,11 @@ export type SurveyRow = {
   answers: Record<string, string>;
 };
 
-export type ParsedSurvey = { rows: SurveyRow[]; unmapped: string[]; dropped: string[] };
+// Small business only: answers plus anonymous fields, with nothing that identifies the
+// respondent or links back to their response. Screened-out respondents are left out.
+export type InsightRow = Record<string, string>;
+
+export type ParsedSurvey = { rows: SurveyRow[]; insights: InsightRow[]; unmapped: string[]; dropped: string[] };
 
 function text(value: unknown) {
   return value == null ? "" : String(value).trim();
@@ -121,6 +130,7 @@ export function parseSurvey(survey: Survey, headers: unknown[], values: unknown[
   });
 
   const byKey = new Map<string, SurveyRow>();
+  const insightByKey = new Map<string, InsightRow>();
   for (const record of values) {
     const cell = (i: number) => (i >= 0 ? text(record[i]) : "");
     const submittedAt = timestamp(cell(meta.submitted_at));
@@ -129,10 +139,12 @@ export function parseSurvey(survey: Survey, headers: unknown[], values: unknown[
 
     const answers: Record<string, string> = {};
     const contact: Record<string, string> = {};
+    const anonymous: Record<string, string> = {};
+    const groups = { answer: answers, contact, anonymous };
     for (const [i, question] of byColumn) {
       const value = cell(i);
       if (!value) continue;
-      const target = question.group === "answer" ? answers : contact;
+      const target = groups[question.group];
       target[question.key] = target[question.key] ? `${target[question.key]}, ${value}` : value;
     }
 
@@ -146,7 +158,12 @@ export function parseSurvey(survey: Survey, headers: unknown[], values: unknown[
       contact,
       answers,
     });
+    if (survey === "small_business" && answers.business_role && answers.business_role !== "Neither") {
+      insightByKey.set(responseKey, { ...answers, ...anonymous });
+    } else {
+      insightByKey.delete(responseKey);
+    }
   }
 
-  return { rows: [...byKey.values()], unmapped, dropped };
+  return { rows: [...byKey.values()], insights: [...insightByKey.values()], unmapped, dropped };
 }
