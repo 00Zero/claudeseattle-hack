@@ -98,7 +98,7 @@ export function ProfileForm({ profile }: { profile: ProfileValues }) {
           <input name="linkedin_url" placeholder="linkedin.com/in/your-name" defaultValue={profile.linkedin_url ?? ""} className={input} />
         </Field>
         <Field label="GitHub username">
-          <input name="github_username" defaultValue={profile.github_username ?? ""} className={input} />
+          <input name="github_username" placeholder="your-username" defaultValue={profile.github_username ?? ""} className={input} />
         </Field>
       </div>
       <Field label="Experience with Claude Code">

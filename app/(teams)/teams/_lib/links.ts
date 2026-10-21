@@ -22,3 +22,17 @@ export function normalizeLinkedinUrl(value: string | null | undefined): string |
   if (!match) return null;
   return `https://www.linkedin.com/${match[1]}/${match[2]}`;
 }
+
+// GitHub usernames: letters, digits, and single hyphens, not at either end, up to 39
+// characters. Accepts a pasted profile URL or "@name".
+// "https://github.com/jane-doe/" -> "jane-doe"; anything else -> null.
+const GITHUB_USERNAME = /^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i;
+
+export function normalizeGithubUsername(value: string | null | undefined): string | null {
+  const raw = value
+    ?.trim()
+    .replace(/^(https?:\/\/)?(www\.)?github\.com\//i, "")
+    .replace(/^@/, "")
+    .replace(/[/?#].*$/, "");
+  return raw && GITHUB_USERNAME.test(raw) ? raw : null;
+}

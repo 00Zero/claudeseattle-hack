@@ -7,7 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { isValidEmail, normalizeEmail, sendEmail } from "@/lib/email";
 import { getOrigin } from "@/lib/site-url";
-import { normalizeLinkedinUrl } from "@/app/(teams)/teams/_lib/linkedin";
+import { normalizeGithubUsername, normalizeLinkedinUrl } from "@/app/(teams)/teams/_lib/links";
 
 export type FormState = { status: "idle" | "ok" | "error"; message?: string };
 
@@ -23,11 +23,6 @@ async function currentUserId() {
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
   return { supabase, userId: data?.claims.sub ?? null };
-}
-
-// "https://github.com/someone/" -> "someone"
-function githubUsername(value: string) {
-  return value.replace(/^(https?:\/\/)?(www\.)?github\.com\//i, "").replace(/[/?#].*$/, "");
 }
 
 // First-login confirmation and later edits. Only columns users may update
@@ -50,6 +45,11 @@ export async function saveProfile(_prev: FormState, formData: FormData): Promise
   if (linkedinInput && !linkedin) {
     return { status: "error", message: "Enter your LinkedIn profile URL, like linkedin.com/in/your-name." };
   }
+  const githubInput = text(formData, "github_username", 300);
+  const github = normalizeGithubUsername(githubInput);
+  if (githubInput && !github) {
+    return { status: "error", message: "Enter your GitHub username (letters, numbers, and hyphens) or profile URL." };
+  }
 
   const { error } = await supabase
     .from("profiles")
@@ -61,7 +61,7 @@ export async function saveProfile(_prev: FormState, formData: FormData): Promise
       job_title: text(formData, "job_title") || null,
       company: text(formData, "company") || null,
       linkedin_url: linkedin,
-      github_username: githubUsername(text(formData, "github_username", 300)) || null,
+      github_username: github,
       claude_code_level: text(formData, "claude_code_level") || null,
       bio: text(formData, "bio", 300) || null,
       interests: text(formData, "interests", 500) || null,
