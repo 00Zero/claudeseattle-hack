@@ -5,6 +5,7 @@ import { acceptApplicant, applyToTeam, declineApplicant, leaveTeam, removeMember
 import { ActionButton } from "../_components/action-button";
 import { BalanceBadges, Pill } from "../_components/badges";
 import { DeadlineBanner } from "../_components/deadline-banner";
+import { normalizeGithubUsername, normalizeLinkedinUrl } from "../_lib/links";
 import { balanceOf, getViewer, IDEAL_MAX, IDEAL_MIN, TEAM_MAX, TEAM_MIN, type RoleBucket, type Viewer } from "../_lib/teams";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -75,20 +76,23 @@ async function loadFullTeam(id: string, viewerId: string): Promise<Team | null> 
   const rows = (team.team_members as unknown as { status: string; profiles: ProfileRow | null }[]).filter(
     (r) => r.profiles,
   );
-  const person = (p: ProfileRow): Person => ({
-    id: p.id,
-    name: `${p.first_name} ${p.last_name}`.trim(),
-    subtitle: titleAtCompany(p.job_title, p.company),
-    linkedin: p.linkedin_url,
-    github: p.github_username ? `https://github.com/${p.github_username}` : null,
-    role_bucket: p.role_bucket,
-    is_technical: p.is_technical,
-    is_mentor: p.platform_role === "mentor",
-    is_leader: p.id === team.leader_id,
-    approved: p.luma_status === "approved",
-    bio: p.bio,
-    looking_for: p.looking_for,
-  });
+  const person = (p: ProfileRow): Person => {
+    const github = normalizeGithubUsername(p.github_username);
+    return {
+      id: p.id,
+      name: `${p.first_name} ${p.last_name}`.trim(),
+      subtitle: titleAtCompany(p.job_title, p.company),
+      linkedin: normalizeLinkedinUrl(p.linkedin_url),
+      github: github ? `https://github.com/${github}` : null,
+      role_bucket: p.role_bucket,
+      is_technical: p.is_technical,
+      is_mentor: p.platform_role === "mentor",
+      is_leader: p.id === team.leader_id,
+      approved: p.luma_status === "approved",
+      bio: p.bio,
+      looking_for: p.looking_for,
+    };
+  };
 
   // Applicants who have since joined another team can only be declined.
   const applied = rows.filter((r) => r.status === "applied").map((r) => r.profiles!);
