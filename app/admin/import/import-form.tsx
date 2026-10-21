@@ -14,12 +14,30 @@ export function ImportForm() {
         <button type="submit" disabled={pending} className="rounded bg-foreground px-4 py-2 text-background disabled:opacity-50">
           {pending ? "Importing…" : "Import"}
         </button>
+        <label className="flex w-full items-center gap-2 text-sm text-foreground/70">
+          <input type="checkbox" name="allow_unmapped" />
+          Import even if some ticket names have no access rule (those guests get profile-only access)
+        </label>
       </form>
 
       {state.status === "error" && (
         <div className="text-sm text-red-600">
           <p>{state.message}</p>
           {state.missingColumns?.length ? <p>Columns not found: {state.missingColumns.join(", ")}</p> : null}
+          {state.unmappedInFile?.length ? (
+            <>
+              <ul className="list-disc pl-5">
+                {state.unmappedInFile.map((u) => (
+                  <li key={u.ticket_name + u.approval_status}>
+                    {u.ticket_name || "(no ticket)"} / {u.approval_status}: {u.guests} guest{u.guests === 1 ? "" : "s"}
+                  </li>
+                ))}
+              </ul>
+              <Link href="/admin/settings" className="underline">
+                Add rules in Settings
+              </Link>
+            </>
+          ) : null}
         </div>
       )}
 

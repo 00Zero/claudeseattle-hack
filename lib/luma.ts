@@ -1,8 +1,11 @@
 import { parseCsv } from "@/lib/csv";
+import { isValidEmail } from "@/lib/email";
 
 // Maps the Luma guests CSV to luma_guests rows. Custom-question columns are
 // matched by a phrase from the question text, so small wording edits in Luma
-// don't break the import.
+// don't break the import. Only the columns below are kept; the rest of the
+// export (QR code, payment, UTM and click IDs, referrals, consent answers) is
+// dropped here. See docs/REQUIREMENTS.md, "Luma data: what goes where".
 
 export const LUMA_STATUSES = ["approved", "pending_approval", "waitlist", "declined"] as const;
 export type LumaStatus = (typeof LUMA_STATUSES)[number];
@@ -76,6 +79,12 @@ export function githubUsername(value: string | null) {
   return value.replace(/^(https?:\/\/)?(www\.)?github\.com\//i, "").replace(/[/?#].*$/, "") || null;
 }
 
+// Free-text answer: keep it only if it is an email ("n/a" and the like become null).
+function claudeEmail(value: string | null) {
+  const email = value?.toLowerCase() ?? "";
+  return isValidEmail(email) ? email : null;
+}
+
 function timestamp(value: string | null) {
   if (!value) return null;
   const date = new Date(value);
@@ -128,7 +137,7 @@ export function parseLumaCsv(text: string): ParseResult {
       first_name: get(record, "first_name"),
       last_name: get(record, "last_name"),
       email,
-      claude_email: get(record, "claude_email")?.toLowerCase() ?? null,
+      claude_email: claudeEmail(get(record, "claude_email")),
       approval_status: status,
       ticket_name: get(record, "ticket_name") ?? "",
       checked_in_at: timestamp(get(record, "checked_in_at")),

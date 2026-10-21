@@ -14,6 +14,7 @@ Spec: `docs/REQUIREMENTS.md`, "Teams app (Dev A)", plus the access table in "Sha
 - `team_members` (`team_id`, `profile_id`, `status` = `applied | member | rejected | removed | left`, `applied_at`, `joined_at`). One `member` row per person (unique index `one_team_per_person`).
 - `profiles`: `display_name`, names, `role_bucket`, `is_technical`, `job_title`, `company`, `linkedin_url`, `github_username`, `claude_code_level`, `bio`, `interests`, `looking_for`, `platform_role`, `luma_status`, `checked_in_at`, `profile_confirmed`, `public_profile`.
 - `event_settings.team_formation_closes_at` for the deadline banner. Read it; don't hardcode.
+- Matching (browse people, "why this team fits"): `getMatchingProfiles()` in `lib/matching.ts` returns profile fields plus the Luma answers and LinkedIn enrichment that profiles don't show. Server-side only; show people what you derive from them, never the raw answers.
 - Views: `public_teams` and `public_team_members` for pages without login (members as "First L." unless `public_profile`); `team_leader_contacts` for the leader's current default email.
 
 ## How the rules work (RLS, enforced in the database)

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentAccess } from "@/lib/access";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/supabase/profile";
-import { AddEmailForm, MakeDefaultButton, ProfileForm } from "./forms";
+import { AddEmailForm, MakeDefaultButton, ProfileForm, VerifyEmailButton } from "./forms";
 
 // Scaffolded by Adam; Dev A extends it (see app/(teams)/CLAUDE.md).
 export default async function ProfilePage() {
@@ -13,7 +13,7 @@ export default async function ProfilePage() {
   const supabase = await createClient();
   const { data: emails } = await supabase
     .from("profile_emails")
-    .select("email, verified, is_default, source")
+    .select("email, verified, is_default, source, verify_expires_at")
     .eq("profile_id", profile.id)
     .order("is_default", { ascending: false })
     .order("email");
@@ -45,8 +45,15 @@ export default async function ProfilePage() {
                 {row.is_default && <span className="rounded bg-foreground/10 px-2 py-0.5">Default</span>}
                 {row.verified ? (
                   <span className="text-green-700">Verified</span>
-                ) : (
+                ) : row.verify_expires_at ? (
                   <span className="text-foreground/60">Check your inbox to verify</span>
+                ) : (
+                  <>
+                    <span className="text-foreground/60">
+                      {row.source === "claude" ? "Claude account email from Luma" : "Not verified"}
+                    </span>
+                    <VerifyEmailButton email={row.email} />
+                  </>
                 )}
                 {row.verified && !row.is_default && <MakeDefaultButton email={row.email} />}
               </span>
