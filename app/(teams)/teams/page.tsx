@@ -49,6 +49,15 @@ export default async function TeamsPage({ searchParams }: PageProps<"/teams">) {
         </div>
       )}
 
+      {viewer.signedIn && (
+        <p className="text-sm">
+          <Link href="/teams/people" className="underline">
+            Browse people without a team
+          </Link>{" "}
+          <span className="text-fg-muted">to find the owner, student, or builder your team needs.</span>
+        </p>
+      )}
+
       <form className="flex gap-2" role="search">
         <input
           type="search"
