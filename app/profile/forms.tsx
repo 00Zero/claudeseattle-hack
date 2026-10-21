@@ -149,6 +149,22 @@ export function AddEmailForm() {
   );
 }
 
+// Sends a verification link to an email already listed on the account (e.g. the Claude
+// account email from Luma), so it can sign in.
+export function VerifyEmailButton({ email }: { email: string }) {
+  const [state, formAction, pending] = useActionState(addEmail, idle);
+  if (state.status === "ok") return <span className="text-sm text-green-700">Link sent</span>;
+  return (
+    <form action={formAction} className="inline">
+      <input type="hidden" name="email" value={email} />
+      <button type="submit" disabled={pending} className="text-sm underline disabled:opacity-50">
+        {pending ? "Sending…" : "Verify"}
+      </button>
+      {state.status === "error" && <span className="ml-2 text-sm text-red-600">{state.message}</span>}
+    </form>
+  );
+}
+
 export function MakeDefaultButton({ email }: { email: string }) {
   const [state, formAction, pending] = useActionState(makeDefaultEmail, idle);
   return (

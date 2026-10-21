@@ -52,14 +52,14 @@ Everything both apps depend on is built once, before day one, so neither dev bui
 | `supabase/migrations/0001_shared.sql` | Adam | Shared tables below; changes need both devs' review |
 | `supabase/migrations/00NN_teams_*.sql`, `00NN_judge_*.sql` | Each dev | Own tables, prefixed `teams_` or `judge_` |
 
-**Login and emails.** Magic link via Supabase Auth with Resend SMTP. A person can have several emails; any linked email logs into the same account; one is marked default and receives platform mail. Adding an email sends a verification link to that address first. The Luma import seeds two emails per guest: the registration email and the Claude-account email, both pre-verified.
+**Login and emails.** Magic link via Supabase Auth with Resend SMTP. A person can have several emails; any linked email logs into the same account; one is marked default and receives platform mail. Adding an email sends a verification link to that address first. The Luma import seeds two emails per guest. The registration email is pre-verified and is the preferred login: typing the Claude-account email sends the link there. The Claude-account email is self-reported (other people's addresses and typos turn up), so it links a guest only when exactly one guest gave it and it isn't someone's Luma email, and it is attached unverified; the person verifies it from their profile to sign in with it.
 
 **Access.** Status comes from the Luma import and a `role` column on the profile.
 
 | Ticket + Luma status | Account | Profile | Browse teams | Create or join team | Submit | Judge | Admin |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Standard, approved | yes | yes | yes | yes | yes | no | no |
-| Standard, pending or waitlist | yes | yes | no (pending page) | no | no | no | no |
+| Participant (was Standard), approved | yes | yes | yes | yes | yes | no | no |
+| Participant, pending or waitlist | yes | yes | no (pending page) | no | no | no | no |
 | Mentor or Ambassador | yes | yes | yes | yes, shown with a mentor badge, not counted in balance | no | no | no |
 | Volunteer | yes | yes | yes | no | no | no | no |
 | Judge | yes | yes | yes | no | no | yes | no |
@@ -68,9 +68,18 @@ Everything both apps depend on is built once, before day one, so neither dev bui
 
 Anyone not in the whitelist can still sign up and lands on the pending page; the admin queue shows them with the Luma email they typed, and Adam approves or ignores. The pending page says registration is awaiting approval and shows the Sunday schedule.
 
-**Luma import.** Admin page: upload the Luma guests CSV, upsert on `guest_id`. Adam re-runs it every time he approves a batch and again Sunday morning for check-ins. Columns used: name, email, Claude-account email, approval status, ticket name, checked-in time, LinkedIn, GitHub, professional role, company, title, employee count, Claude Code level, GitHub experience, "why join", "features of interest". Role buckets: founder, small business owner, small business executive → owner; experienced professional, academia, non-profit, government, artist, other → professional; current student, recent grad → student. Technical flag pre-set to yes when GitHub experience is "run a shared repo" or "contributed to shared repos"; user confirms on first login. A second upload keyed on LinkedIn URL takes the Vientic enrichment export (nice-to-have).
+**Luma import.** Admin page: upload the Luma guests CSV, upsert on `guest_id`. Adam re-runs it every time he approves a batch and again Sunday morning for check-ins. Columns used: name, email, Claude-account email, approval status, ticket name, checked-in time, LinkedIn, GitHub, professional role, company, title, employee count, Claude Code level, GitHub experience, "why join", "features of interest". Role buckets: founder, small business owner, small business executive → owner; experienced professional, academia, non-profit, government, artist, other → professional; current student, recent grad → student. Technical flag pre-set to yes when GitHub experience is "run a shared repo" or "contributed to shared repos"; user confirms on first login. The import holds back a file whose ticket names have no access rule (Luma renamed Standard to Participant once) unless the admin confirms. LinkedIn enrichment (EnrichLayer or Apify) lands in `linkedin_enrichment`, keyed by LinkedIn profile slug: loaded by Adam's script until the field mapping is settled, then through an admin upload next to the Luma import (nice-to-have).
 
-**Shared tables.** `profiles` (one per person: names, role bucket, technical flag, title, company, LinkedIn, GitHub, bio, interests, Luma status, ticket, checked-in, role flag, public-profile opt-in), `profile_emails` (email, verified, is\_default), `teams` (name, concept, leader, created), `team_members` (team, profile, status: applied / member / removed, joined), `luma_guests` (raw import). Entries, scores, assignments, and AI notes are judge-owned tables.
+**Luma data: what goes where.** Classified from the Luma guests export of Oct 20 (625 guests). Enforced by the import (`lib/luma.ts` keeps only the listed columns), RLS, and the `matching_profiles` view in `0005_shared_luma_matching.sql`. The same split applies when guest data later comes from another source (a browser extension or another registration tool): store it in `luma_guests` keyed on `guest_id`.
+
+| Tier | Columns | Where it lives | Who sees it |
+| --- | --- | --- | --- |
+| Profile | first and last name, job title, company, LinkedIn, GitHub, Claude Code level; role bucket (from professional role) and technical flag (from GitHub experience) | Seeds `profiles` on first login; the person edits and confirms | Logged-in attendees with full access; public pages only with the public-profile opt-in |
+| Matching only | professional role (finer than the bucket), employee count, GitHub experience, "why join", "features of interest", portfolio or business website, LinkedIn enrichment (headline, summary, current role, skills, experience, education) | `luma_guests` and `linkedin_enrichment` (admin RLS), read through `matching_profiles` with the service-role client in server code (`lib/matching.ts`) | Nobody directly. Matching shows only what it derives (a score, a reason, a blurb), never the raw answers |
+| Admin only | Luma and Claude-account emails, approval status, ticket, check-in time, guest id, raw enrichment payload | `luma_guests`, `profile_emails`, `linkedin_enrichment.raw` | Admins; the person sees their own emails and status. Claude-account emails are also for distributing API credits |
+| Never stored | QR code URL (works as a check-in pass), phone, payment fields and coupon code, crypto addresses, UTM fields, ad click IDs, referrer and "referred by" (holds other people's emails), survey and terms answers, newsletter opt-in (Anthropic's list, not ours) | Dropped by the import | Nobody |
+
+**Shared tables.** `profiles` (one per person: names, role bucket, technical flag, title, company, LinkedIn, GitHub, bio, interests, Luma status, ticket, checked-in, role flag, public-profile opt-in), `profile_emails` (email, verified, is\_default), `teams` (name, concept, leader, created), `team_members` (team, profile, status: applied / member / removed, joined), `luma_guests` (raw import), `linkedin_enrichment` (admin only). Entries, scores, assignments, and AI notes are judge-owned tables.
 
 **Public vs private.** Team pages and, after 5:30 pm Sunday, entry pages are readable without login through a view that exposes team name, concept, entry fields, and members as first name plus last initial. Full profiles, emails, LinkedIn, company, scores, assignments, and AI notes are never readable anonymously; full profiles are visible to logged-in participants, and on public pages only when the person opted in. This is enforced in RLS in the shared migration, not in page code.
 
@@ -98,7 +107,7 @@ A mobile-first tool people use on their phones at the happy hour and at Sunday c
 1. Invite by email or by name: leader invites someone; invitee accepts from their team page.
 2. Browse people: list of participants without a team, filterable by role bucket and technical flag; a leader can invite from it.
 3. Luma re-import updates approval and check-in badges live (the import itself is shared; this is just reading it).
-4. Vientic LinkedIn enrichment shown on profile cards.
+4. LinkedIn enrichment used for matching (and, if people opt in, shown on profile cards).
 5. Mentor assignment to teams; one mentor can have several teams.
 6. Technical level as a self-rated 1–5 ("how hands-on are you with code") instead of yes/no. The number is never shown to others; teams and profile cards show a band (none / some / builder). `is_technical` becomes rating ≥ 3.
 
@@ -175,7 +184,7 @@ Each dev owns their route group and merges their own PRs without approval; anyth
 Open:
 
 - [ ] Event Slack or Discord link for the "message" buttons; Adam has a Discord but hasn't decided. Fallback: mailto to the leader's default email.
-- [ ] Vientic enrichment export format and timing (Adam, Oct 17)
+- [ ] LinkedIn enrichment provider (EnrichLayer or Apify) and timing (Adam, Oct 17)
 - [x] Sunday schedule and prizes text: taken from Luma, in Event facts above
 - [x] Prelim format: entry page only by default; optional 3-minute pitches if time allows
 - [x] Finals format: 5-minute live demo plus 2 minutes Q&A per finalist
