@@ -5,15 +5,18 @@
 // 1. Deterministic checks (no AI): edited/renamed/deleted merged migrations, out-of-order
 //    versions, naming, snippets, .github changes, files the Supabase integration deploys, and
 //    destructive SQL ("needs Adam").
-// 2. If those pass and the PR adds migrations: an AI review of the new SQL through the Vercel
-//    AI Gateway, with main's migrations and other open PRs' migrations as context.
+// 2. If those pass and the PR adds migrations: an AI review of the new SQL by Claude Code on
+//    Adam's Claude subscription (code work never uses the platform's AI Gateway key), with
+//    main's migrations and other open PRs' migrations as context.
 // 3. One PR comment, updated in place on re-runs. Exit code 1 fails the check.
 //
 // Local test (no AI, no comment):
 //   node .github/scripts/migration-review.mjs --base main --head <branch-or-sha> --no-ai
 
 import { execFileSync } from "node:child_process";
-import { appendFileSync } from "node:fs";
+import { appendFileSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 import { pathToFileURL } from "node:url";
 
@@ -276,7 +279,7 @@ export function checkChanges({ changes, mainMigrations, readNew }) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// AI review (Vercel AI Gateway, Anthropic Messages API)
+// AI review (Claude Code on Adam's Claude subscription)
 
 const VERDICT_SCHEMA = {
   type: "object",
@@ -351,66 +354,32 @@ export function buildPrompt({ mainFiles, newMigrations, otherPrs }) {
   return parts.join("\n");
 }
 
-async function callModel(prompt, { apiKey, baseUrl, model }) {
-  const body = {
-    model,
-    max_tokens: 32000,
-    stream: true,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: "user", content: prompt }],
-    output_config: { effort: "high", format: { type: "json_schema", schema: VERDICT_SCHEMA } },
-  };
-  let lastError;
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    try {
-      // Streaming keeps the connection alive while the model thinks (fetch gives up on
-      // response headers after 5 minutes).
-      const res = await fetch(`${baseUrl.replace(/\/$/, "")}/v1/messages`, {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(9 * 60 * 1000),
-      });
-      if (!res.ok) {
-        const text = (await res.text()).slice(0, 500);
-        const err = new Error(`HTTP ${res.status}: ${text}`);
-        if (res.status !== 429 && res.status < 500) throw Object.assign(err, { fatal: true });
-        throw err;
-      }
-      return await readStream(res);
-    } catch (err) {
-      lastError = err;
-      if (err.fatal || attempt === 2) break;
-      await new Promise((r) => setTimeout(r, 15000));
-    }
+// Runs Claude Code headless with no tools: it can only read the prompt and return the verdict
+// JSON. Auth comes from CLAUDE_CODE_OAUTH_TOKEN (Adam's Claude subscription) in CI. It runs in an
+// empty directory so no repo settings or CLAUDE.md load, and gets no GitHub token.
+function runClaude(prompt, { model, bin }) {
+  const cwd = mkdtempSync(join(tmpdir(), "migration-review-"));
+  const env = { ...process.env };
+  delete env.GITHUB_TOKEN;
+  const args = [
+    "-p", "--model", model, "--effort", "high", "--tools", "", "--strict-mcp-config",
+    "--system-prompt", SYSTEM_PROMPT, "--json-schema", JSON.stringify(VERDICT_SCHEMA),
+    "--output-format", "json", "--max-turns", "5", "--no-session-persistence",
+  ];
+  let stdout;
+  try {
+    stdout = execFileSync(bin, args, {
+      cwd, env, input: prompt, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, timeout: 15 * 60 * 1000,
+    });
+  } catch (err) {
+    const detail = String(err.stdout || err.stderr || err.message).slice(0, 500);
+    throw new Error(`Claude Code failed: ${detail}`);
   }
-  throw lastError;
-}
-
-async function readStream(res) {
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let text = "";
-  let stopReason = null;
-  const handle = (raw) => {
-    const data = raw.split("\n").filter((l) => l.startsWith("data:")).map((l) => l.slice(5).trim()).join("");
-    if (!data) return;
-    const ev = JSON.parse(data);
-    if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta") text += ev.delta.text;
-    else if (ev.type === "message_delta" && ev.delta?.stop_reason) stopReason = ev.delta.stop_reason;
-    else if (ev.type === "error") throw new Error(`stream error: ${JSON.stringify(ev.error).slice(0, 500)}`);
-  };
-  for await (const chunk of res.body) {
-    buffer += decoder.decode(chunk, { stream: true });
-    let idx;
-    while ((idx = buffer.search(/\r?\n\r?\n/)) !== -1) {
-      handle(buffer.slice(0, idx));
-      buffer = buffer.slice(idx).replace(/^\r?\n\r?\n/, "");
-    }
+  const out = JSON.parse(stdout);
+  if (out.is_error || !out.structured_output) {
+    throw new Error(`Claude Code returned no verdict (${out.subtype ?? "unknown"}): ${String(out.result ?? "").slice(0, 300)}`);
   }
-  if (buffer.trim()) handle(buffer);
-  if (stopReason !== "end_turn") throw new Error(`model stopped with stop_reason=${stopReason}`);
-  return text;
+  return JSON.stringify(out.structured_output);
 }
 
 export function parseVerdict(text) {
@@ -524,7 +493,7 @@ function renderReport({ findings, newMigrations, ai, headSha }) {
   if (newMigrations.length) {
     out.push("", `<sub>New migrations: ${newMigrations.map((m) => `\`${m.path.slice(MIGRATIONS_DIR.length)}\``).join(", ")}</sub>`);
   }
-  out.push("", `<sub>Commit ${headSha ? headSha.slice(0, 7) : "?"} · deterministic checks${ai.status === "done" ? " + AI review (Claude via Vercel AI Gateway)" : ""} · this comment updates on every push · rules in CLAUDE.md</sub>`);
+  out.push("", `<sub>Commit ${headSha ? headSha.slice(0, 7) : "?"} · deterministic checks${ai.status === "done" ? " + AI review (Claude)" : ""} · this comment updates on every push · rules in CLAUDE.md</sub>`);
   return out.join("\n");
 }
 
@@ -563,14 +532,14 @@ async function main() {
       ai = { status: "skipped" };
     } else {
       try {
-        const apiKey = env.AI_GATEWAY_API_KEY;
-        if (!apiKey) throw new Error("the AI_GATEWAY_API_KEY secret isn't set for GitHub Actions");
+        if (env.GITHUB_ACTIONS && !env.CLAUDE_CODE_OAUTH_TOKEN) {
+          throw new Error("the CLAUDE_CODE_OAUTH_TOKEN secret isn't set for GitHub Actions");
+        }
         const mainFiles = [...mainMigrations].sort().map((name) => ({ name, sql: readFile(args.base, MIGRATIONS_DIR + name) }));
         const otherPrs = repo && token ? await otherPrMigrations({ repo, prNumber, token }) : [];
-        const text = await callModel(buildPrompt({ mainFiles, newMigrations, otherPrs }), {
-          apiKey,
-          baseUrl: env.AI_BASE_URL || "https://ai-gateway.vercel.sh",
-          model: env.AI_MODEL || "anthropic/claude-opus-5.5",
+        const text = runClaude(buildPrompt({ mainFiles, newMigrations, otherPrs }), {
+          model: env.CLAUDE_MODEL || "claude-opus-5-5",
+          bin: env.CLAUDE_BIN || "claude",
         });
         ai = { status: "done", result: parseVerdict(text) };
       } catch (err) {
