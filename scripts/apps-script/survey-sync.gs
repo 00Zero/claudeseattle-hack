@@ -8,14 +8,15 @@
 //
 // Schedule (Pacific): every 2 hours until Sat Oct 24, 12:00 pm; every 30 minutes until
 // Sun Oct 25, 8:00 am; one last sync after that, then the trigger removes itself.
-// Revenue and the respondent's name never leave this sheet.
+// The respondent's name never leaves this sheet. Revenue is sent, and the site stores it only in
+// an anonymous copy with no email, name, business or timestamp.
 
 const SURVEY = 'attendee'; // or 'small_business'
 const SHEET_NAME = 'Form Responses 1';
 const ENDPOINT = 'https://hack.claudeseattle.org/api/surveys/sync';
 const FREQUENT_FROM = new Date('2026-10-24T12:00:00-07:00');
 const STOP_AT = new Date('2026-10-25T08:00:00-07:00');
-const NEVER_SEND = ['revenue', 'your name'];
+const NEVER_SEND = ['your name'];
 
 function install() {
   removeTriggers_();

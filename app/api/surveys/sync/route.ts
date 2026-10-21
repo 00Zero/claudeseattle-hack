@@ -5,8 +5,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 // Survey sync, called by the Apps Script in each response sheet (scripts/apps-script/survey-sync.gs)
 // with Authorization: Bearer SURVEY_SYNC_SECRET. Body: { survey, headers, rows } with every
-// response in the sheet; the survey's stored rows are replaced with them. The response holds
-// counts only, never answers.
+// response in the sheet; the survey's stored rows are replaced with them, and for the small
+// business survey so is the anonymous business_insights copy. The response holds counts only.
 function authorized(request: Request) {
   const secret = process.env.SURVEY_SYNC_SECRET;
   const given = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
@@ -44,6 +44,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Couldn't store responses" }, { status: 500 });
   }
 
-  console.log("Survey sync", survey, { stored, unmapped: parsed.unmapped.length, dropped: parsed.dropped.length });
-  return NextResponse.json({ survey, stored, unmapped: parsed.unmapped, dropped: parsed.dropped });
+  let anonymous: number | null = null;
+  if (survey === "small_business" && parsed.insights.length > 0) {
+    const { data, error: insightsError } = await createAdminClient().rpc("replace_business_insights", {
+      p_rows: parsed.insights,
+    });
+    if (insightsError) {
+      console.error("Business insights sync failed", insightsError.message);
+      return NextResponse.json({ error: "Couldn't store the anonymous copy" }, { status: 500 });
+    }
+    anonymous = data;
+  }
+
+  console.log("Survey sync", survey, { stored, anonymous, unmapped: parsed.unmapped.length, dropped: parsed.dropped.length });
+  return NextResponse.json({ survey, stored, anonymous, unmapped: parsed.unmapped, dropped: parsed.dropped });
 }
