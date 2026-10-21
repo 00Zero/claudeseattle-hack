@@ -2,7 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { DeadlineBanner } from "../_components/deadline-banner";
 import { getViewer, IDEAL_MAX, IDEAL_MIN } from "../_lib/teams";
-import { CreateTeamForm } from "./form";
+import { createTeam } from "../actions";
+import { TeamForm } from "../_components/team-form";
 
 export default async function NewTeamPage() {
   const viewer = await getViewer();
@@ -28,7 +29,7 @@ export default async function NewTeamPage() {
             You&apos;ll lead the team and accept people who apply. Teams should be {IDEAL_MIN}–{IDEAL_MAX} people and
             balanced: a small business owner, a professional, a student, and someone technical.
           </p>
-          <CreateTeamForm />
+          <TeamForm action={createTeam} submitLabel="Create team" pendingLabel="Creating…" />
         </>
       )}
     </div>

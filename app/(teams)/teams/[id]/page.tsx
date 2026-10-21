@@ -272,9 +272,14 @@ function ViewerPanel({ viewer, team, teamId, full }: { viewer: Viewer; team: Tea
   }
   if (team.iLead) {
     return (
-      <p className={`${box} text-sm`}>
-        You lead this team. Accept people who apply below; the team should be {IDEAL_MIN}–{IDEAL_MAX} people.
-      </p>
+      <div className={box}>
+        <p className="text-sm">
+          You lead this team. Accept people who apply below; the team should be {IDEAL_MIN}–{IDEAL_MAX} people.
+        </p>
+        <Link href={`/teams/${teamId}/edit`} className="text-sm text-fg-muted underline">
+          Edit name, concept, or who you&apos;re looking for
+        </Link>
+      </div>
     );
   }
 
