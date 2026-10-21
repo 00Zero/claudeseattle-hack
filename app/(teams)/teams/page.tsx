@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BalanceBadges, Pill } from "./_components/badges";
 import { DeadlineBanner } from "./_components/deadline-banner";
+import { TeamsTabs } from "./_components/teams-tabs";
 import { getViewer, listTeams, sortTeams, TEAM_MAX, type TeamSummary } from "./_lib/teams";
 
 export default async function TeamsPage({ searchParams }: PageProps<"/teams">) {
@@ -22,6 +23,7 @@ export default async function TeamsPage({ searchParams }: PageProps<"/teams">) {
         <h1 className="text-2xl font-semibold">Teams</h1>
         <DeadlineBanner />
       </div>
+      {viewer.signedIn && <TeamsTabs active="teams" />}
 
       {!viewer.signedIn ? (
         <p className="text-sm">
@@ -47,15 +49,6 @@ export default async function TeamsPage({ searchParams }: PageProps<"/teams">) {
           </Link>
           <span className="text-sm text-fg-muted">or find one below and apply.</span>
         </div>
-      )}
-
-      {viewer.signedIn && (
-        <p className="text-sm">
-          <Link href="/teams/people" className="underline">
-            Browse people without a team
-          </Link>{" "}
-          <span className="text-fg-muted">to find the owner, student, or builder your team needs.</span>
-        </p>
       )}
 
       <form className="flex gap-2" role="search">
