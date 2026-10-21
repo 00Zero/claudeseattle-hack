@@ -3,27 +3,12 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { acceptApplicant, applyToTeam, declineApplicant, leaveTeam, removeMember } from "../actions";
 import { ActionButton } from "../_components/action-button";
-import { BalanceBadges, Pill } from "../_components/badges";
+import { BalanceBadges } from "../_components/badges";
 import { DeadlineBanner } from "../_components/deadline-banner";
-import { normalizeGithubUsername, normalizeLinkedinUrl } from "../_lib/links";
-import { balanceOf, getViewer, IDEAL_MAX, IDEAL_MIN, TEAM_MAX, TEAM_MIN, type RoleBucket, type Viewer } from "../_lib/teams";
+import { PERSON_COLUMNS, PersonDetails, personFromProfile, titleAtCompany, type Person, type ProfileRow } from "../_components/person";
+import { balanceOf, getViewer, IDEAL_MAX, IDEAL_MIN, TEAM_MAX, TEAM_MIN, type Viewer } from "../_lib/teams";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-type Person = {
-  id: string | null; // null on the public page
-  name: string;
-  subtitle: string | null;
-  linkedin: string | null;
-  github: string | null;
-  role_bucket: RoleBucket | null;
-  is_technical: boolean | null;
-  is_mentor: boolean;
-  is_leader: boolean;
-  approved: boolean | null; // null when not shown (public page)
-  bio: string | null;
-  looking_for: string | null;
-};
 
 type Applicant = Person & { onOtherTeam: boolean };
 
@@ -37,29 +22,6 @@ type Team = {
   iLead: boolean;
 };
 
-const ROLE_LABEL: Record<RoleBucket, string> = { owner: "Owner", professional: "Professional", student: "Student" };
-
-function titleAtCompany(title: string | null, company: string | null) {
-  if (title && company) return `${title} at ${company}`;
-  return title || company || null;
-}
-
-type ProfileRow = {
-  id: string;
-  first_name: string;
-  last_name: string;
-  job_title: string | null;
-  company: string | null;
-  linkedin_url: string | null;
-  github_username: string | null;
-  role_bucket: RoleBucket | null;
-  is_technical: boolean | null;
-  platform_role: string;
-  luma_status: string | null;
-  bio: string | null;
-  looking_for: string | null;
-};
-
 // Logged-in with full access: the tables, with links, approval badges, and every
 // membership row so we can show applicants and the viewer's own status (RLS: can_browse).
 async function loadFullTeam(id: string, viewerId: string): Promise<Team | null> {
@@ -67,7 +29,7 @@ async function loadFullTeam(id: string, viewerId: string): Promise<Team | null> 
   const { data: team } = await supabase
     .from("teams")
     .select(
-      "name, concept, looking_for, leader_id, team_members(status, profiles(id, first_name, last_name, job_title, company, linkedin_url, github_username, role_bucket, is_technical, platform_role, luma_status, bio, looking_for))",
+      `name, concept, looking_for, leader_id, team_members(status, profiles(${PERSON_COLUMNS}))`,
     )
     .eq("id", id)
     .maybeSingle();
@@ -76,23 +38,7 @@ async function loadFullTeam(id: string, viewerId: string): Promise<Team | null> 
   const rows = (team.team_members as unknown as { status: string; profiles: ProfileRow | null }[]).filter(
     (r) => r.profiles,
   );
-  const person = (p: ProfileRow): Person => {
-    const github = normalizeGithubUsername(p.github_username);
-    return {
-      id: p.id,
-      name: `${p.first_name} ${p.last_name}`.trim(),
-      subtitle: titleAtCompany(p.job_title, p.company),
-      linkedin: normalizeLinkedinUrl(p.linkedin_url),
-      github: github ? `https://github.com/${github}` : null,
-      role_bucket: p.role_bucket,
-      is_technical: p.is_technical,
-      is_mentor: p.platform_role === "mentor",
-      is_leader: p.id === team.leader_id,
-      approved: p.luma_status === "approved",
-      bio: p.bio,
-      looking_for: p.looking_for,
-    };
-  };
+  const person = (p: ProfileRow) => personFromProfile(p, team.leader_id);
 
   // Applicants who have since joined another team can only be declined.
   const applied = rows.filter((r) => r.status === "applied").map((r) => r.profiles!);
@@ -333,42 +279,6 @@ function ViewerPanel({ viewer, team, teamId, full }: { viewer: Viewer; team: Tea
     <div className="space-y-1">
       <ActionButton action={applyToTeam} fields={fields} label="Apply to join" pendingLabel="Applying…" />
       <p className="text-sm text-fg-muted">The leader sees your profile and accepts or declines.</p>
-    </div>
-  );
-}
-
-function PersonDetails({ person: p, showAbout = false }: { person: Person; showAbout?: boolean }) {
-  return (
-    <div className="space-y-1">
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="font-medium">{p.name}</span>
-        {p.is_leader && <Pill tone="accent">Leader</Pill>}
-        {p.is_mentor && <Pill>Mentor</Pill>}
-        {p.role_bucket && !p.is_mentor && <Pill>{ROLE_LABEL[p.role_bucket]}</Pill>}
-        {p.is_technical && !p.is_mentor && <Pill>Technical</Pill>}
-        {p.approved === false && <Pill tone="warn">Not yet approved</Pill>}
-      </div>
-      {p.subtitle && <p className="text-sm text-fg-muted">{p.subtitle}</p>}
-      {showAbout && p.bio && <p className="text-sm">{p.bio}</p>}
-      {showAbout && p.looking_for && (
-        <p className="text-sm">
-          <span className="font-medium">Looking for:</span> <span className="text-fg-muted">{p.looking_for}</span>
-        </p>
-      )}
-      {(p.linkedin || p.github) && (
-        <p className="flex gap-4 text-sm">
-          {p.linkedin && (
-            <a href={p.linkedin} target="_blank" rel="noopener noreferrer" className="underline">
-              LinkedIn
-            </a>
-          )}
-          {p.github && (
-            <a href={p.github} target="_blank" rel="noopener noreferrer" className="underline">
-              GitHub
-            </a>
-          )}
-        </p>
-      )}
     </div>
   );
 }
