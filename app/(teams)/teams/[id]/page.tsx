@@ -222,9 +222,14 @@ function ViewerPanel({ viewer, team, teamId, full }: { viewer: Viewer; team: Tea
         <p className="text-sm">
           You lead this team. Accept people who apply below; the team should be {IDEAL_MIN}–{IDEAL_MAX} people.
         </p>
-        <Link href={`/teams/${teamId}/edit`} className="text-sm text-fg-muted underline">
-          Edit name, concept, or who you&apos;re looking for
-        </Link>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <Link href="/teams/people" className="btn btn-ghost">
+            Find people for your team
+          </Link>
+          <Link href={`/teams/${teamId}/edit`} className="text-sm text-fg-muted underline">
+            Edit name, concept, or who you&apos;re looking for
+          </Link>
+        </div>
       </div>
     );
   }

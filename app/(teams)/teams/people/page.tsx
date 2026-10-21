@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getMatchingProfiles } from "@/lib/matching";
 import { createClient } from "@/lib/supabase/server";
 import { DeadlineBanner } from "../_components/deadline-banner";
+import { TeamsTabs } from "../_components/teams-tabs";
 import { PERSON_COLUMNS, PersonDetails, personFromProfile, type ProfileRow } from "../_components/person";
 import { fitFor, type Fit } from "../_lib/fit";
 import { balanceOf, getViewer, type RoleBucket } from "../_lib/teams";
@@ -107,11 +108,11 @@ export default async function PeoplePage({ searchParams }: PageProps<"/teams/peo
   return (
     <div className="space-y-6">
       <div className="space-y-3">
-        <Link href="/teams" className="text-sm text-fg-muted underline">
-          ← All teams
-        </Link>
-        <h1 className="text-2xl font-semibold">People without a team</h1>
+        <h1 className="text-2xl font-semibold">Teams</h1>
         <DeadlineBanner />
+      </div>
+      <TeamsTabs active="people" />
+      <div className="space-y-3">
         <p className="text-sm text-fg-muted">
           {everyone.length} {everyone.length === 1 ? "person is" : "people are"} still looking. Find someone your team
           needs and say hi, or{" "}
