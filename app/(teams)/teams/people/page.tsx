@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { getMatchingProfiles } from "@/lib/matching";
 import { createClient } from "@/lib/supabase/server";
 import { DeadlineBanner } from "../_components/deadline-banner";
 import { PERSON_COLUMNS, PersonDetails, personFromProfile, type ProfileRow } from "../_components/person";
-import { getViewer } from "../_lib/teams";
+import { fitFor, type Fit } from "../_lib/fit";
+import { balanceOf, getViewer, type RoleBucket } from "../_lib/teams";
 
 const ROLES = [
   ["", "Any role"],
@@ -41,6 +43,38 @@ async function listUnmatched(viewerId: string) {
     );
 }
 
+// The viewer's team, for "best fit": its words and which balance roles it's missing.
+async function loadMyTeam(teamId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("teams")
+    .select("name, concept, looking_for, team_members(status, profiles(role_bucket, is_technical, platform_role))")
+    .eq("id", teamId)
+    .maybeSingle();
+  if (!data) return null;
+  const rows = data.team_members as unknown as {
+    status: string;
+    profiles: { role_bucket: RoleBucket | null; is_technical: boolean | null; platform_role: string } | null;
+  }[];
+  const members = rows
+    .filter((r) => r.status === "member" && r.profiles)
+    .map((r) => ({ ...r.profiles!, is_mentor: r.profiles!.platform_role === "mentor" }));
+  return { name: data.name, concept: data.concept, looking_for: data.looking_for, balance: balanceOf(members) };
+}
+
+// Fit per person id, from the matching signals. Only the score and derived reasons leave
+// this function. If matching is unavailable, the page falls back to sorting by name.
+async function scoreFits(team: NonNullable<Awaited<ReturnType<typeof loadMyTeam>>>, ids: string[]) {
+  const fits = new Map<string, Fit>();
+  if (!ids.length) return fits;
+  try {
+    for (const signals of await getMatchingProfiles(ids)) fits.set(signals.profile_id, fitFor(team, signals));
+  } catch (error) {
+    console.error("Best-fit matching unavailable", error);
+  }
+  return fits;
+}
+
 export default async function PeoplePage({ searchParams }: PageProps<"/teams/people">) {
   const viewer = await getViewer();
   if (!viewer.signedIn) redirect("/login");
@@ -62,6 +96,12 @@ export default async function PeoplePage({ searchParams }: PageProps<"/teams/peo
       (!query || `${p.first_name} ${p.last_name}`.toLowerCase().includes(query)),
   );
   const filtered = role !== "" || technical || query !== "";
+
+  // "Best fit for <team>" is the default order for people on a team; "name" is the other.
+  const myTeam = viewer.myTeamId ? await loadMyTeam(viewer.myTeamId) : null;
+  const fits = myTeam && pick("sort") !== "name" ? await scoreFits(myTeam, people.map((p) => p.id)) : new Map<string, Fit>();
+  const byFit = fits.size > 0;
+  if (byFit) people.sort((a, b) => (fits.get(b.id)?.score ?? 0) - (fits.get(a.id)?.score ?? 0));
   const control = "rounded border border-line-strong bg-bg-raised px-3 py-2";
 
   return (
@@ -107,6 +147,12 @@ export default async function PeoplePage({ searchParams }: PageProps<"/teams/peo
         <label className={`${control} flex items-center gap-2`}>
           <input type="checkbox" name="technical" value="yes" defaultChecked={technical} /> Technical only
         </label>
+        {myTeam && (
+          <select name="sort" defaultValue={pick("sort") === "name" ? "name" : "fit"} aria-label="Order" className={control}>
+            <option value="fit">Best fit for {myTeam.name}</option>
+            <option value="name">Name</option>
+          </select>
+        )}
         <button type="submit" className="btn btn-ghost">
           Filter
         </button>
@@ -123,15 +169,25 @@ export default async function PeoplePage({ searchParams }: PageProps<"/teams/peo
         </p>
       ) : (
         <>
-          {filtered && (
+          {(filtered || byFit) && (
             <p className="text-sm text-fg-muted">
-              Showing {people.length} of {everyone.length}
+              {filtered ? `Showing ${people.length} of ${everyone.length}` : `${people.length} people`}
+              {byFit && `, best fit for ${myTeam!.name} first`}
             </p>
           )}
           <ul className="grid gap-4 sm:grid-cols-2">
             {people.map((p) => (
-              <li key={p.id} className="rounded-lg border border-line bg-bg-raised p-4">
+              <li key={p.id} className="space-y-2 rounded-lg border border-line bg-bg-raised p-4">
                 <PersonDetails person={personFromProfile(p)} showAbout />
+                {byFit && (fits.get(p.id)?.reasons.length ?? 0) > 0 && (
+                  <ul className="flex flex-wrap gap-1.5" aria-label="Why they might fit">
+                    {fits.get(p.id)!.reasons.map((reason) => (
+                      <li key={reason} className="rounded-full bg-accent-soft px-2.5 py-0.5 text-xs text-fg">
+                        {reason}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </li>
             ))}
           </ul>
