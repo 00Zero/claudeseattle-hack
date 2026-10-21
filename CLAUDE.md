@@ -30,8 +30,8 @@ Next.js 16 differs from older versions (for example, `middleware.ts` is now `pro
 
 ## Table contract (`supabase/migrations/*_shared*.sql`)
 
-- Tables: `profiles`, `profile_emails`, `teams`, `team_members`, `event_settings`, `luma_guests`, `access_rules`, `admin_emails`, `linkedin_enrichment` (admin).
-- Views: `public_teams`, `public_team_members` (anonymous-safe), `team_leader_contacts` (logged-in, full access), `unmapped_luma_tickets` (admin), `matching_profiles` (team-matching signals; service role, server only, via `lib/matching.ts`).
+- Tables: `profiles`, `profile_emails`, `teams`, `team_members`, `event_settings`, `luma_guests`, `access_rules`, `admin_emails`, `linkedin_enrichment` (admin), `survey_responses` (admin; synced from the two survey sheets).
+- Views: `public_teams`, `public_team_members` (anonymous-safe), `team_leader_contacts` (logged-in, full access), `unmapped_luma_tickets` (admin), `matching_profiles` (team-matching signals incl. survey answers; service role, server only, via `lib/matching.ts`), `survey_matches` (admin).
 - Helpers: `current_access()`, `can_browse()`, `can_join_teams()`, `is_judge()`, `is_admin()`, `is_super_admin()`, `current_profile_role()`, `is_team_member(team_id)`, `is_team_leader(team_id)`.
 - Access is `access_rules[ticket_name, luma_status]` → `full` / `profile_only` / `blocked`; admins are always `full`. Roles live in `profiles.platform_role`.
 - Read the migrations for columns; don't guess them.
@@ -45,7 +45,7 @@ Next.js 16 differs from older versions (for example, `middleware.ts` is now `pro
 - **Shared tables** (`profiles`, `profile_emails`, `teams`, `team_members`, `event_settings`, `luma_guests`, `access_rules`): to change one, add `npx supabase migration new shared_<what>` in your PR. Prefer adding nullable columns over changing or dropping. Keep RLS enabled and add policies for anything new. Mention it in the dev WhatsApp group.
 - **Dependencies:** adding an npm package is fine. Don't add one that duplicates a library already in `package.json` (a second date, UI, or form library); prefer well-known, maintained packages. Never commit a lockfile conflict: take main's `package-lock.json` and re-run `npm install`.
 - Admin writes go through the service-role client (`lib/supabase/admin.ts`) after a server-side admin check. Everything else uses `lib/supabase/server.ts` or `client.ts`, so RLS applies. The one exception is team matching: `lib/matching.ts` reads `matching_profiles` with the service role after checking the caller can browse.
-- Luma answers that aren't on `profiles` (why join, features of interest, employee count, enrichment) are for matching only: never render them or send them to the browser raw. The tiers are in `docs/REQUIREMENTS.md`, "Luma data: what goes where".
+- Luma answers that aren't on `profiles` (why join, features of interest, employee count, enrichment) and all survey answers are for matching only: never render them or send them to the browser raw. The tiers are in `docs/REQUIREMENTS.md`, "Luma data: what goes where".
 - Users can update only their own self-service profile columns (see the grants in the migration); `profile_emails` is read-only to users.
 - **Models:** use the Vercel AI Gateway (`AI_GATEWAY_API_KEY`); use `anthropic/*` and `openai/*` models first; other gateway models are allowed. Server-side only.
 - Secrets live only in `.env.local` and Vercel env. Never commit, print, or log them. `.env.example` lists the names.

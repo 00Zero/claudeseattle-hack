@@ -3,7 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 // Team matching signals from the matching_profiles view (0005_shared_luma_matching.sql):
-// profile fields, the Luma answers that never appear on profiles, and LinkedIn enrichment.
+// profile fields, the Luma answers that never appear on profiles, LinkedIn enrichment, and
+// survey answers (0006_shared_surveys.sql; keys in lib/surveys.ts).
 // Server-side only. Use them to rank people or teams, or as model input for a "why this
 // fits" blurb; send the browser only what you derive, never these raw fields.
 export type MatchingProfile = {
@@ -31,6 +32,10 @@ export type MatchingProfile = {
   linkedin_skills: string[] | null;
   linkedin_experiences: unknown;
   linkedin_education: unknown;
+  // Latest attendee survey; small business survey only for owners who registered. Answers
+  // keyed as in lib/surveys.ts. Job-search answers must never show up in anything people see.
+  attendee_survey: Record<string, string> | null;
+  business_survey: Record<string, string> | null;
 };
 
 // Signals for the given profiles (all browsable people when omitted), for a caller who

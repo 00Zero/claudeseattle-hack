@@ -19,6 +19,7 @@ const TEXT_FIELDS: { name: string; label: string; type?: "url" | "number" }[] = 
   { name: "venue_address", label: "Venue address" },
   { name: "venue_neighborhood", label: "Venue neighborhood" },
   { name: "luma_calendar_url", label: "Luma calendar link", type: "url" },
+  { name: "business_insights_url", label: "Small business data folder (public link)", type: "url" },
   { name: "venue_lat", label: "Venue latitude", type: "number" },
   { name: "venue_lon", label: "Venue longitude", type: "number" },
   { name: "wifi_network", label: "Wi-Fi network" },
