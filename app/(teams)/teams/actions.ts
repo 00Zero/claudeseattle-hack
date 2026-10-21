@@ -159,3 +159,33 @@ export async function declineApplicant(_prev: FormState, formData: FormData) {
 export async function removeMember(_prev: FormState, formData: FormData) {
   return leaderUpdate(formData, "member", "removed");
 }
+
+// Leader edits the team's name, concept, and looking-for (RLS: teams_leader). Allowed after
+// the deadline; the pages show that it's past the deadline.
+export async function updateTeam(_prev: FormState, formData: FormData): Promise<FormState> {
+  const teamId = id(formData, "team_id");
+  if (!teamId) return { status: "error", message: "That team doesn't exist." };
+  const viewer = await getViewer();
+  if (!viewer.signedIn) return { status: "error", message: "Your session expired. Log in again." };
+
+  const name = text(formData, "name", 60);
+  if (name.length < 2) return { status: "error", message: "Give your team a name." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("teams")
+    .update({
+      name,
+      concept: text(formData, "concept", 1000) || null,
+      looking_for: text(formData, "looking_for", 300) || null,
+    })
+    .eq("id", teamId)
+    .eq("leader_id", viewer.profile.id)
+    .select("id");
+  if (error?.code === "23505") return { status: "error", message: "A team with that name already exists. Pick another." };
+  if (error) return { status: "error", message: "We couldn't save your changes. Try again." };
+  if (!data?.length) return { status: "error", message: "Only the team leader can edit the team." };
+
+  revalidatePath("/teams");
+  redirect(`/teams/${teamId}`);
+}
