@@ -9,12 +9,13 @@ const tabs = [
   { href: "/admin/judging", label: "Judging" },
   { href: "/admin/settings", label: "Settings" },
 ];
+const superAdminTabs = [{ href: "/admin/enrichment", label: "Enrichment" }];
 
-export function AdminTabs() {
+export function AdminTabs({ superAdmin }: { superAdmin: boolean }) {
   const pathname = usePathname();
   return (
-    <nav className="flex gap-1 border-b border-foreground/10">
-      {tabs.map((tab) => {
+    <nav className="flex gap-1 overflow-x-auto border-b border-foreground/10">
+      {[...tabs, ...(superAdmin ? superAdminTabs : [])].map((tab) => {
         const active = pathname.startsWith(tab.href);
         return (
           <Link
