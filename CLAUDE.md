@@ -30,8 +30,8 @@ Next.js 16 differs from older versions (for example, `middleware.ts` is now `pro
 
 ## Table contract (`supabase/migrations/*_shared*.sql`)
 
-- Tables: `profiles`, `profile_emails`, `teams`, `team_members`, `event_settings`, `luma_guests`, `access_rules`, `admin_emails`, `linkedin_enrichment` (admin), `survey_responses` (admin; synced from the two survey sheets), `business_insights` (admin; anonymous copy of the business survey, with revenue, for the public dataset).
-- Views: `public_teams`, `public_team_members` (anonymous-safe), `team_leader_contacts` (logged-in, full access), `unmapped_luma_tickets` (admin), `matching_profiles` (team-matching signals incl. survey answers; service role, server only, via `lib/matching.ts`), `survey_matches` (admin).
+- Tables: `profiles`, `profile_emails`, `teams`, `team_members`, `event_settings`, `luma_guests`, `access_rules`, `admin_emails`, `linkedin_enrichment` (admin; one row per profile per source), `survey_responses` (admin; synced from the two survey sheets), `business_insights` (admin; anonymous copy of the business survey, with revenue, for the public dataset).
+- Views: `public_teams`, `public_team_members` (anonymous-safe), `team_leader_contacts` (logged-in, full access), `unmapped_luma_tickets` (admin), `matching_profiles` (team-matching signals incl. survey answers; service role, server only, via `lib/matching.ts`), `survey_matches` (admin), `linkedin_profiles` (merged enrichment; feeds `matching_profiles`), `linkedin_enrichment_check` (admin).
 - Helpers: `current_access()`, `can_browse()`, `can_join_teams()`, `is_judge()`, `is_admin()`, `is_super_admin()`, `current_profile_role()`, `is_team_member(team_id)`, `is_team_leader(team_id)`.
 - Access is `access_rules[ticket_name, luma_status]` → `full` / `profile_only` / `blocked`; admins are always `full`. Roles live in `profiles.platform_role`.
 - Read the migrations for columns; don't guess them.
