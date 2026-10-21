@@ -4,7 +4,7 @@
 # The last matching pattern wins.
 # GitHub ignores owners without write access to the repo.
 
-# Any migration: Adam applies it to production after merge.
+# Any migration: applied to production automatically on merge (Migration review check).
 /supabase/migrations/               @00Zero
 
 # Shared code and shared tables: affects both apps.

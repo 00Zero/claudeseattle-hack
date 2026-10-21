@@ -34,9 +34,10 @@ yarn-error.log*
 .env*
 !.env.example
 
-# database snapshots (pg_dump) and Supabase CLI state
+# database snapshots (pg_dump), Supabase CLI state and Studio scratch queries
 snapshots/
 supabase/.temp/
+supabase/snippets/
 
 # personal agent notes
 CLAUDE.local.md
