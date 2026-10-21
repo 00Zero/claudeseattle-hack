@@ -32,6 +32,8 @@ Views:
 - `public_judge_entries` (anon): entry fields after `submissions_close_at` only, with team name. Roster comes from `public_team_members`.
 - `public_judge_results` (anon): finalists only when `publish_finalists`, places only when `publish_winners`. Never scores.
 
+Functions (`*_judge_access.sql`): `judge_finalists()` (judges only) and `judge_final_standings()` (judges only, and empty until the caller has scored every finalist).
+
 Rubric text stays in `lib/event.ts` (`rubric`); score columns are an array in the same order, so
 criteria names and anchors can change without a migration.
 
@@ -47,29 +49,29 @@ criteria names and anchors can change without a migration.
 - [ ] Fallback if a team isn't on the Teams app: free-text team name + member emails (admin-created)
 
 ### 2. `/admin/judging` (admin) — Wed
-- [ ] Entries table: team, submitted, late flag, assigned judge (dropdown), prelim score and votes, final score and votes, finalist, place; sortable
-- [ ] "Teams without a submission: N" badge
-- [ ] Assign judge per entry; handle entries with no judge and judges with no entries
-- [ ] Accept or reject late saves
-- [ ] Publish toggles: `publish_finalists`, `publish_winners` (writes `event_settings` with the service role after `assertAdmin()`)
+- [x] Entries table: team, submitted, late flag, assigned judge (dropdown), prelim score and votes, final score and votes, finalist, place; sortable
+- [x] "Teams without a submission: N" badge
+- [x] Assign judge per entry; handle entries with no judge and judges with no entries
+- [x] Accept or reject late saves
+- [x] Publish toggles: `publish_finalists`, `publish_winners` (writes `event_settings` with the service role after `assertAdmin()`)
 
 ### 3. `/judge` (judges, on a phone) — Wed (prelim), Thu (finals)
-- [ ] My assigned entries with my score and status
-- [ ] Entry page: embedded video on top, repo link, tagline, description, roster, collapsed AI notes
-- [ ] Score form: four criteria 1–8 with anchors from `lib/event.ts`, optional comment
-- [ ] Live ranking of my group by mean (one decimal); top = my finalist; flag exact ties ("adjust scores to break the tie")
-- [ ] Final round tab: every finalist, same form, `round = 'final'`
+- [x] My assigned entries with my score and status
+- [x] Entry page: embedded video on top, repo link, tagline, description, roster, collapsed AI notes
+- [x] Score form: four criteria 1–8 with anchors from `lib/event.ts`, optional comment
+- [x] Live ranking of my group by mean (one decimal); top = my finalist; flag exact ties ("adjust scores to break the tie")
+- [x] Final round tab: every finalist, same form, `round = 'final'`
 
 ### 4. `/judge/results` — Thu
-- [ ] Finalists ranked by mean final score with judge count; visible only after I've scored every finalist
+- [x] Finalists ranked by mean final score with judge count; visible only after I've scored every finalist
 
 ### 5. `/results` and public entry pages — Thu
-- [ ] `/results`: only what the publish toggles allow
-- [ ] `/submit/[id]` public entry page after the deadline
+- [x] `/results`: only what the publish toggles allow
+- [x] `/entries` and `/entries/[id]`: public entry pages after the deadline
 
 ### 6. Nice-to-haves, in order — Fri, only if must-haves are done
 1. AI notes at the deadline through the Vercel AI Gateway (`AI_GATEWAY_API_KEY`, `anthropic/*` first): 2–3 sentences per criterion plus a draft score; collapsed for judges, never public, never added to scores
-2. Auto-distribute entries evenly across judges, manual override
+2. ~~Auto-distribute entries evenly across judges, manual override~~ (done: "Auto-assign" on `/admin/judging`)
 3. Hide chosen entry fields from judges
 
 ## Open questions for Adam (Wed call)
