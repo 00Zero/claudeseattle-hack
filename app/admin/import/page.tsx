@@ -22,6 +22,9 @@ export default async function ImportPage() {
         {latest?.imported_at ? `, last import ${new Date(latest.imported_at).toLocaleString("en-US", { timeZone: "America/Los_Angeles" })}` : ""}.
       </p>
       <ImportForm />
+      <p className="text-sm text-foreground/70">
+        LinkedIn enrichment exports (Apify, EnrichLayer) are uploaded on the Enrichment tab, which only super admins see.
+      </p>
     </div>
   );
 }
