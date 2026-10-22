@@ -9,7 +9,8 @@ export const TEAM_MAX = 6;
 export const IDEAL_MIN = 3;
 export const IDEAL_MAX = 5;
 
-export type RoleBucket = "owner" | "professional" | "student";
+export type { RoleBucket } from "@/lib/roles";
+import type { RoleBucket } from "@/lib/roles";
 
 // What the balance badges need about one member. Same shape from the
 // logged-in tables and from the public_team_members view.

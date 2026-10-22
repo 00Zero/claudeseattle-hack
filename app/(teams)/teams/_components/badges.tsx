@@ -1,9 +1,10 @@
+import { ROLE_SHORT } from "@/lib/roles";
 import type { Balance } from "../_lib/teams";
 
 const LABELS: [keyof Balance, string][] = [
-  ["owner", "Owner"],
-  ["professional", "Professional"],
-  ["student", "Student"],
+  ["owner", ROLE_SHORT.owner],
+  ["professional", ROLE_SHORT.professional],
+  ["student", ROLE_SHORT.student],
   ["technical", "Technical"],
 ];
 

@@ -27,7 +27,8 @@ export default async function NewTeamPage() {
         <>
           <p className="text-sm text-fg-muted">
             You&apos;ll lead the team and accept people who apply. Teams should be {IDEAL_MIN}–{IDEAL_MAX} people and
-            balanced: a small business owner, a professional, a student, and someone technical.
+            balanced: a business owner or founder, an experienced professional, a student or recent grad, and someone
+            technical.
           </p>
           <TeamForm action={createTeam} submitLabel="Create team" pendingLabel="Creating…" />
         </>
