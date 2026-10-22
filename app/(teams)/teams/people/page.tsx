@@ -36,17 +36,17 @@ async function listUnmatched(viewerId: string) {
   if (members.error) throw members.error;
 
   const onTeam = new Set((members.data ?? []).map((m) => m.profile_id));
-  const unmatched = ((people.data ?? []) as Row[]).filter((p) => p.id !== viewerId && !onTeam.has(p.id));
-  // People approved without a Luma match have no name until they fill in their profile; a
-  // blank card tells a leader nothing, so they're counted instead of listed.
-  const named = unmatched.filter((p) => p.first_name.trim());
-  const sorted = named.sort(
-      // Confirmed profiles first (they've added a bio and what they're looking for), then by name.
+  const name = (p: Row) => `${p.first_name} ${p.last_name}`.trim();
+  return ((people.data ?? []) as Row[])
+    .filter((p) => p.id !== viewerId && !onTeam.has(p.id))
+    .sort(
+      // Confirmed profiles first (they've added a bio and what they're looking for), then by
+      // name. People with no name yet (approved without a Luma match) go last.
       (a, b) =>
         Number(b.profile_confirmed) - Number(a.profile_confirmed) ||
-        `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`),
+        Number(!name(a)) - Number(!name(b)) ||
+        name(a).localeCompare(name(b)),
     );
-  return { everyone: sorted, unnamed: unmatched.length - named.length };
 }
 
 // The viewer's team, for "best fit": its words and which balance roles it's missing.
@@ -100,7 +100,7 @@ export default async function PeoplePage({ searchParams }: PageProps<"/teams/peo
   const technical = pick("technical") === "yes";
   const query = pick("q").trim().toLowerCase();
 
-  const { everyone, unnamed } = await listUnmatched(viewer.profile.id);
+  const everyone = await listUnmatched(viewer.profile.id);
   const people = everyone.filter(
     (p) =>
       (role === "" ||
@@ -152,12 +152,6 @@ export default async function PeoplePage({ searchParams }: PageProps<"/teams/peo
           )}
           .
         </p>
-        {unnamed > 0 && (
-          <p className="text-sm text-fg-muted">
-            {unnamed} more {unnamed === 1 ? "hasn't" : "haven't"} filled in their profile yet, so they&apos;re not
-            listed.
-          </p>
-        )}
       </div>
 
       <form className="flex flex-wrap gap-2" role="search">
