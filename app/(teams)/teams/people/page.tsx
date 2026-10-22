@@ -98,6 +98,7 @@ export default async function PeoplePage({ searchParams }: PageProps<"/teams/peo
   const pick = (key: string) => (typeof params[key] === "string" ? (params[key] as string) : "");
   const role = ROLES.some(([value]) => value === pick("role")) ? pick("role") : "";
   const technical = pick("technical") === "yes";
+  const here = pick("here") === "yes";
   const query = pick("q").trim().toLowerCase();
 
   const everyone = await listUnmatched(viewer.profile.id);
@@ -106,9 +107,11 @@ export default async function PeoplePage({ searchParams }: PageProps<"/teams/peo
       (role === "" ||
         (role === "mentor" ? p.platform_role === "mentor" : p.platform_role !== "mentor" && p.role_bucket === role)) &&
       (!technical || p.is_technical === true) &&
+      (!here || Boolean(p.checked_in_at)) &&
       (!query || `${p.first_name} ${p.last_name}`.toLowerCase().includes(query)),
   );
-  const filtered = role !== "" || technical || query !== "";
+  const filtered = role !== "" || technical || here || query !== "";
+  const checkedIn = everyone.filter((p) => p.checked_in_at).length;
 
   // "Best fit for <team>" is the default order for people on a team; "name" is the other.
   const myTeam = viewer.myTeamId ? await loadMyTeam(viewer.myTeamId) : null;
@@ -152,6 +155,12 @@ export default async function PeoplePage({ searchParams }: PageProps<"/teams/peo
           )}
           .
         </p>
+        {checkedIn > 0 && (
+          <p className="text-sm">
+            <span className="font-medium text-live">{checkedIn} checked in</span>{" "}
+            <span className="text-fg-muted">at the venue, per the latest Luma check-in.</span>
+          </p>
+        )}
       </div>
 
       <form className="flex flex-wrap gap-2" role="search">
@@ -173,6 +182,11 @@ export default async function PeoplePage({ searchParams }: PageProps<"/teams/peo
         <label className={`${control} flex items-center gap-2`}>
           <input type="checkbox" name="technical" value="yes" defaultChecked={technical} /> Technical only
         </label>
+        {checkedIn > 0 && (
+          <label className={`${control} flex items-center gap-2`}>
+            <input type="checkbox" name="here" value="yes" defaultChecked={here} /> Checked in only
+          </label>
+        )}
         {myTeam && (
           <select name="sort" defaultValue={pick("sort") === "name" ? "name" : "fit"} aria-label="Order" className={control}>
             <option value="fit">Best fit for {myTeam.name}</option>

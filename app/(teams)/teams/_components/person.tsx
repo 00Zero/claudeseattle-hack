@@ -14,13 +14,14 @@ export type Person = {
   is_mentor: boolean;
   is_leader: boolean;
   approved: boolean | null; // null when not shown (public page)
+  checked_in: boolean; // Luma check-in, from the admin's re-import on event day
   bio: string | null;
   looking_for: string | null;
 };
 
 // The profile columns a Person is built from (logged-in pages; RLS: can_browse).
 export const PERSON_COLUMNS =
-  "id, first_name, last_name, job_title, company, linkedin_url, github_username, role_bucket, is_technical, platform_role, luma_status, bio, looking_for";
+  "id, first_name, last_name, job_title, company, linkedin_url, github_username, role_bucket, is_technical, platform_role, luma_status, checked_in_at, bio, looking_for";
 
 export type ProfileRow = {
   id: string;
@@ -34,6 +35,7 @@ export type ProfileRow = {
   is_technical: boolean | null;
   platform_role: string;
   luma_status: string | null;
+  checked_in_at: string | null;
   bio: string | null;
   looking_for: string | null;
 };
@@ -62,6 +64,7 @@ export function personFromProfile(p: ProfileRow, leaderId: string | null = null)
     is_mentor: p.platform_role === "mentor",
     is_leader: p.id === leaderId,
     approved: p.luma_status === "approved",
+    checked_in: Boolean(p.checked_in_at),
     bio: p.bio,
     looking_for: p.looking_for,
   };
@@ -77,6 +80,7 @@ export function PersonDetails({ person: p, showAbout = false }: { person: Person
         {p.role_bucket && !p.is_mentor && <Pill>{ROLE_LABEL[p.role_bucket]}</Pill>}
         {p.is_technical && !p.is_mentor && <Pill>Technical</Pill>}
         {p.approved === false && <Pill tone="warn">Not yet approved</Pill>}
+        {p.checked_in && <Pill tone="live">Checked in</Pill>}
       </div>
       {p.subtitle && <p className="text-sm text-fg-muted">{p.subtitle}</p>}
       {showAbout && p.bio && <p className="text-sm">{p.bio}</p>}

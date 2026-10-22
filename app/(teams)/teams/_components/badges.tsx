@@ -26,11 +26,18 @@ export function BalanceBadges({ balance }: { balance: Balance }) {
   );
 }
 
-export function Pill({ children, tone = "plain" }: { children: React.ReactNode; tone?: "plain" | "accent" | "warn" }) {
+export function Pill({
+  children,
+  tone = "plain",
+}: {
+  children: React.ReactNode;
+  tone?: "plain" | "accent" | "warn" | "live";
+}) {
   const tones = {
     plain: "bg-fg/10 text-fg",
     accent: "bg-accent text-accent-fg",
     warn: "border border-accent text-fg",
+    live: "border border-live text-live",
   };
   return <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${tones[tone]}`}>{children}</span>;
 }
