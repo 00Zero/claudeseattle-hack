@@ -13,9 +13,19 @@
 -- The rule is added as restrictive policies, which Postgres ANDs with the existing permissive
 -- ones, so no existing policy changes.
 
--- 1. The flag, derived from the Luma link (users can't change luma_guest_id).
-alter table profiles
-  add column is_test boolean generated always as (coalesce(starts_with(luma_guest_id, 'test_'), false)) stored;
+-- 1. The flag, derived from the Luma link by a trigger on every write (users can update
+-- neither luma_guest_id nor is_test). Existing profiles are all real, so the default is right.
+alter table profiles add column is_test boolean default false;
+
+create or replace function set_profile_is_test() returns trigger
+language plpgsql as $$
+begin
+  new.is_test := coalesce(starts_with(new.luma_guest_id, 'test_'), false);
+  return new;
+end $$;
+create trigger profiles_is_test before insert or update on profiles
+  for each row execute function set_profile_is_test();
+revoke execute on function set_profile_is_test() from public, anon, authenticated;
 
 -- 2. Helpers for the policies.
 create or replace function viewer_is_test() returns boolean
