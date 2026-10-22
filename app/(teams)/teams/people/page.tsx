@@ -36,13 +36,16 @@ async function listUnmatched(viewerId: string) {
   if (members.error) throw members.error;
 
   const onTeam = new Set((members.data ?? []).map((m) => m.profile_id));
+  const name = (p: Row) => `${p.first_name} ${p.last_name}`.trim();
   return ((people.data ?? []) as Row[])
     .filter((p) => p.id !== viewerId && !onTeam.has(p.id))
     .sort(
-      // Confirmed profiles first (they've added a bio and what they're looking for), then by name.
+      // Confirmed profiles first (they've added a bio and what they're looking for), then by
+      // name. People with no name yet (approved without a Luma match) go last.
       (a, b) =>
         Number(b.profile_confirmed) - Number(a.profile_confirmed) ||
-        `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`),
+        Number(!name(a)) - Number(!name(b)) ||
+        name(a).localeCompare(name(b)),
     );
 }
 
