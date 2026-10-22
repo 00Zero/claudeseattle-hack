@@ -3,7 +3,9 @@ import type { AccessRule } from "@/lib/access";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isoToPacificInput } from "@/lib/time";
 import { SubmitButton } from "../submit-button";
+import { RESOURCE_SECTIONS, type Resource } from "@/lib/resources";
 import { addTicket, deleteTicket, saveEventSettings, saveTicketRules } from "./actions";
+import { deleteResource, saveResource } from "./resource-actions";
 import { removeAdminEmail } from "./admin-email-actions";
 import { AdminEmailForm } from "./admin-email-form";
 
@@ -19,7 +21,6 @@ const TEXT_FIELDS: { name: string; label: string; type?: "url" | "number" }[] = 
   { name: "venue_address", label: "Venue address" },
   { name: "venue_neighborhood", label: "Venue neighborhood" },
   { name: "luma_calendar_url", label: "Luma calendar link", type: "url" },
-  { name: "business_insights_url", label: "Small business data folder (public link)", type: "url" },
   { name: "venue_lat", label: "Venue latitude", type: "number" },
   { name: "venue_lon", label: "Venue longitude", type: "number" },
   { name: "wifi_network", label: "Wi-Fi network" },
@@ -31,14 +32,16 @@ const button = "rounded bg-foreground px-3 py-1.5 text-sm text-background";
 export default async function SettingsPage() {
   const viewer = await requireAdminPage();
   const admin = createAdminClient();
-  const [{ data: settings }, { data: rules }, { data: unmapped }, { data: adminEmails }] = await Promise.all([
+  const [{ data: settings }, { data: rules }, { data: unmapped }, { data: adminEmails }, { data: resourceRows }] = await Promise.all([
     admin.from("event_settings").select("*").eq("id", 1).single(),
     admin.from("access_rules").select("ticket_name, approval_status, access, default_role"),
     admin.from("unmapped_luma_tickets").select("ticket_name, approval_status, guests"),
     viewer.is_super_admin
       ? admin.from("admin_emails").select("email, note, created_at").order("created_at")
       : Promise.resolve({ data: null }),
+    admin.from("resources").select("id, section, title, description, url, sort_order, visible").order("section").order("sort_order"),
   ]);
+  const resources = (resourceRows ?? []) as Resource[];
 
   const tickets = [...new Set(((rules ?? []) as AccessRule[]).map((r) => r.ticket_name))].sort((a, b) =>
     a === "" ? 1 : b === "" ? -1 : a.localeCompare(b),
@@ -119,6 +122,103 @@ export default async function SettingsPage() {
             <input type="checkbox" name="publish_winners" defaultChecked={settings?.publish_winners} /> Publish winners
           </label>
           <SubmitButton className={button}>Save event settings</SubmitButton>
+        </form>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">Resources</h2>
+        <p className="text-sm text-foreground/70">
+          Links on the Resources page (/resources): credits, the name tag form, the small business data folder. Only
+          approved attendees see them, and only the visible ones. Each link is the same for everyone. Lower order numbers
+          come first within a section.
+        </p>
+        {resources.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="text-foreground/60">
+                <tr>
+                  <th className="py-1 pr-2">Section</th>
+                  <th className="py-1 pr-2">Title</th>
+                  <th className="py-1 pr-2">Link</th>
+                  <th className="py-1 pr-2">Description</th>
+                  <th className="py-1 pr-2">Order</th>
+                  <th className="py-1 pr-2">Visible</th>
+                  <th className="py-1" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-foreground/10">
+                {resources.map((r) => {
+                  const formId = `resource-${r.id}`;
+                  return (
+                    // Keyed by the saved values so the inputs show them after React resets the form.
+                    <tr key={JSON.stringify(r)} className="align-top">
+                      <td className="py-1.5 pr-2">
+                        <form id={formId} action={saveResource}>
+                          <input type="hidden" name="id" value={r.id} />
+                        </form>
+                        <select form={formId} name="section" defaultValue={r.section} className={input}>
+                          {RESOURCE_SECTIONS.map((s) => (
+                            <option key={s.key} value={s.key}>
+                              {s.label}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="py-1.5 pr-2">
+                        <input form={formId} name="title" required defaultValue={r.title} className={`${input} w-40`} />
+                      </td>
+                      <td className="py-1.5 pr-2">
+                        <input form={formId} name="url" type="url" required defaultValue={r.url} className={`${input} w-56`} />
+                      </td>
+                      <td className="py-1.5 pr-2">
+                        <input form={formId} name="description" defaultValue={r.description ?? ""} className={`${input} w-56`} />
+                      </td>
+                      <td className="py-1.5 pr-2">
+                        <input form={formId} name="sort_order" type="number" step="1" defaultValue={r.sort_order} className={`${input} w-16`} />
+                      </td>
+                      <td className="py-1.5 pr-2">
+                        <input form={formId} name="visible" type="checkbox" defaultChecked={r.visible} />
+                      </td>
+                      <td className="flex gap-2 py-1.5">
+                        <button form={formId} className={button}>
+                          Save
+                        </button>
+                        <form action={deleteResource}>
+                          <input type="hidden" name="id" value={r.id} />
+                          <SubmitButton className="rounded border border-foreground/20 px-3 py-1.5 text-sm" pendingText="Deleting…">
+                            Delete
+                          </SubmitButton>
+                        </form>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {/* Keyed by the count so the form clears after an add. */}
+        <form key={resources.length} action={saveResource} className="grid gap-2 rounded border border-foreground/20 p-3 sm:grid-cols-2">
+          <span className="text-sm font-medium sm:col-span-2">Add a resource</span>
+          <select name="section" defaultValue="credits" className={input}>
+            {RESOURCE_SECTIONS.map((s) => (
+              <option key={s.key} value={s.key}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+          <input name="title" required placeholder="Title, e.g. Claude API credits" className={input} />
+          <input name="url" type="url" required placeholder="https://…" className={input} />
+          <input name="description" placeholder="One line on what it is or how to claim it" className={input} />
+          <label className="flex items-center gap-2 text-sm">
+            Order <input name="sort_order" type="number" step="1" defaultValue={0} className={`${input} w-20`} />
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input name="visible" type="checkbox" defaultChecked /> Visible
+          </label>
+          <SubmitButton className={`${button} sm:col-span-2 sm:w-fit`} pendingText="Adding…">
+            Add resource
+          </SubmitButton>
         </form>
       </section>
 
