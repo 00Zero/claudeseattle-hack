@@ -1,6 +1,7 @@
 "use client";
 
 import { startTransition, useActionState } from "react";
+import { ROLE_LABEL, type RoleBucket } from "@/lib/roles";
 import { addEmail, makeDefaultEmail, saveProfile, type FormState } from "./actions";
 
 const input = "w-full rounded border border-foreground/20 bg-background px-3 py-2";
@@ -71,9 +72,11 @@ export function ProfileForm({ profile }: { profile: ProfileValues }) {
           <option value="" disabled>
             Choose one
           </option>
-          <option value="owner">Small business owner or founder</option>
-          <option value="professional">Professional</option>
-          <option value="student">Student or recent grad</option>
+          {(Object.keys(ROLE_LABEL) as RoleBucket[]).map((bucket) => (
+            <option key={bucket} value={bucket}>
+              {ROLE_LABEL[bucket]}
+            </option>
+          ))}
         </select>
       </Field>
       <fieldset className="space-y-1">

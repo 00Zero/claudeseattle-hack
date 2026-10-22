@@ -12,9 +12,9 @@ import { balanceOf, getViewer, TEAM_MAX, type RoleBucket } from "../_lib/teams";
 
 const ROLES = [
   ["", "Any role"],
-  ["owner", "Small business owners"],
-  ["professional", "Professionals"],
-  ["student", "Students"],
+  ["owner", "Business owners and founders"],
+  ["professional", "Experienced professionals"],
+  ["student", "Students and recent grads"],
   ["mentor", "Mentors"],
 ] as const;
 

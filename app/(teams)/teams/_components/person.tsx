@@ -1,4 +1,5 @@
 import { normalizeGithubUsername, normalizeLinkedinUrl } from "../_lib/links";
+import { ROLE_SHORT } from "@/lib/roles";
 import type { RoleBucket } from "../_lib/teams";
 import { Pill } from "./badges";
 
@@ -42,7 +43,6 @@ export type ProfileRow = {
 
 export const NO_NAME = "Name not set yet";
 
-export const ROLE_LABEL: Record<RoleBucket, string> = { owner: "Owner", professional: "Professional", student: "Student" };
 
 export function titleAtCompany(title: string | null, company: string | null) {
   if (title && company) return `${title} at ${company}`;
@@ -77,7 +77,7 @@ export function PersonDetails({ person: p, showAbout = false }: { person: Person
         <span className={p.name === NO_NAME ? "font-medium italic text-fg-muted" : "font-medium"}>{p.name}</span>
         {p.is_leader && <Pill tone="accent">Leader</Pill>}
         {p.is_mentor && <Pill>Mentor</Pill>}
-        {p.role_bucket && !p.is_mentor && <Pill>{ROLE_LABEL[p.role_bucket]}</Pill>}
+        {p.role_bucket && !p.is_mentor && <Pill>{ROLE_SHORT[p.role_bucket]}</Pill>}
         {p.is_technical && !p.is_mentor && <Pill>Technical</Pill>}
         {p.approved === false && <Pill tone="warn">Not yet approved</Pill>}
         {p.checked_in && <Pill tone="live">Checked in</Pill>}

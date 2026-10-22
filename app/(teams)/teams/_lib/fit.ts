@@ -30,7 +30,11 @@ export type FitPerson = {
 
 export type Fit = { score: number; reasons: string[] };
 
-const ROLE_NAME: Record<RoleBucket, string> = { owner: "owner", professional: "professional", student: "student" };
+const ROLE_NAME: Record<RoleBucket, string> = {
+  owner: "a business owner or founder",
+  professional: "an experienced professional",
+  student: "a student or recent grad",
+};
 
 // Words too common at this event to say anything about fit.
 const STOPWORDS = new Set(
@@ -64,7 +68,7 @@ export function fitFor(team: FitTeam, person: FitPerson): Fit {
   const bucket = person.role_bucket as RoleBucket | null;
   if (!mentor && bucket && bucket in ROLE_NAME && !team.balance[bucket]) {
     score += 3;
-    reasons.push(`Your team needs a ${ROLE_NAME[bucket]}`);
+    reasons.push(`Your team needs ${ROLE_NAME[bucket]}`);
   }
   if (!mentor && person.is_technical && !team.balance.technical) {
     score += 3;

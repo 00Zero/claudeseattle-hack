@@ -172,7 +172,7 @@ export default async function Home() {
           </p>
           <div className="grid gap-4 sm:grid-cols-3">
             {[
-              { k: "Who's in the room", v: "Owners, professionals, students, builders", p: "A balanced team has at least one of each and someone hands-on with code." },
+              { k: "Who's in the room", v: "Owners/founders, professionals, students/grads, builders", p: "A balanced team has at least one of each and someone hands-on with code." },
               { k: "What ships", v: "A working tool with a README", p: "Plus a repo and a demo video. Slides are optional; the demo is the point." },
               { k: "Where it goes", v: "Open source, on GitHub", p: "Every entry is public after the deadline, so a business can find it later." },
             ].map((cell) => (
