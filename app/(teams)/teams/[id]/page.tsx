@@ -12,6 +12,7 @@ import {
   removeMember,
 } from "../actions";
 import { ActionButton } from "../_components/action-button";
+import { AdminPanel } from "../_components/admin-panel";
 import { BalanceBadges } from "../_components/badges";
 import { DeadlineBanner } from "../_components/deadline-banner";
 import { PERSON_COLUMNS, PersonDetails, personFromProfile, titleAtCompany, type Person, type ProfileRow } from "../_components/person";
@@ -249,6 +250,10 @@ export default async function TeamPage({ params }: PageProps<"/teams/[id]">) {
           ))}
         </ul>
       </section>
+
+      {viewer.signedIn && viewer.profile.platform_role === "admin" && (
+        <AdminPanel teamId={id} teamName={team.name} members={members} />
+      )}
     </div>
   );
 }
