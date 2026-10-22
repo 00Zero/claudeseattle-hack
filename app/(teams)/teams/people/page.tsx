@@ -2,11 +2,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getMatchingProfiles } from "@/lib/matching";
 import { createClient } from "@/lib/supabase/server";
+import { cancelInvite, inviteToTeam } from "../actions";
+import { ActionButton } from "../_components/action-button";
 import { DeadlineBanner } from "../_components/deadline-banner";
 import { TeamsTabs } from "../_components/teams-tabs";
 import { PERSON_COLUMNS, PersonDetails, personFromProfile, type ProfileRow } from "../_components/person";
 import { fitFor, type Fit } from "../_lib/fit";
-import { balanceOf, getViewer, type RoleBucket } from "../_lib/teams";
+import { balanceOf, getViewer, TEAM_MAX, type RoleBucket } from "../_lib/teams";
 
 const ROLES = [
   ["", "Any role"],
@@ -49,7 +51,7 @@ async function loadMyTeam(teamId: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("teams")
-    .select("name, concept, looking_for, team_members(status, profiles(role_bucket, is_technical, platform_role))")
+    .select("name, concept, looking_for, leader_id, team_members(status, profiles(role_bucket, is_technical, platform_role))")
     .eq("id", teamId)
     .maybeSingle();
   if (!data) return null;
@@ -60,7 +62,14 @@ async function loadMyTeam(teamId: string) {
   const members = rows
     .filter((r) => r.status === "member" && r.profiles)
     .map((r) => ({ ...r.profiles!, is_mentor: r.profiles!.platform_role === "mentor" }));
-  return { name: data.name, concept: data.concept, looking_for: data.looking_for, balance: balanceOf(members) };
+  return {
+    name: data.name,
+    concept: data.concept,
+    looking_for: data.looking_for,
+    leaderId: data.leader_id as string,
+    full: members.length >= TEAM_MAX,
+    balance: balanceOf(members),
+  };
 }
 
 // Fit per person id, from the matching signals. Only the score and derived reasons leave
@@ -102,6 +111,19 @@ export default async function PeoplePage({ searchParams }: PageProps<"/teams/peo
   const myTeam = viewer.myTeamId ? await loadMyTeam(viewer.myTeamId) : null;
   const fits = myTeam && pick("sort") !== "name" ? await scoreFits(myTeam, people.map((p) => p.id)) : new Map<string, Fit>();
   const byFit = fits.size > 0;
+
+  // Leaders can invite from here; people they've already invited show as invited.
+  const iLead = myTeam?.leaderId === viewer.profile.id;
+  const invited = new Set<string>();
+  if (iLead) {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("teams_invites")
+      .select("profile_id")
+      .eq("team_id", viewer.myTeamId!)
+      .eq("status", "pending");
+    for (const row of data ?? []) invited.add(row.profile_id);
+  }
   if (byFit) people.sort((a, b) => (fits.get(b.id)?.score ?? 0) - (fits.get(a.id)?.score ?? 0));
   const control = "rounded border border-line-strong bg-bg-raised px-3 py-2";
 
@@ -188,6 +210,30 @@ export default async function PeoplePage({ searchParams }: PageProps<"/teams/peo
                       </li>
                     ))}
                   </ul>
+                )}
+                {iLead && !myTeam!.full && (
+                  <div className="flex flex-wrap items-center gap-3 pt-1">
+                    {invited.has(p.id) ? (
+                      <>
+                        <span className="text-sm font-medium">✓ Invited to {myTeam!.name}</span>
+                        <ActionButton
+                          action={cancelInvite}
+                          fields={{ team_id: viewer.myTeamId!, profile_id: p.id }}
+                          label="Cancel invite"
+                          pendingLabel="Cancelling…"
+                          variant="link"
+                        />
+                      </>
+                    ) : (
+                      <ActionButton
+                        action={inviteToTeam}
+                        fields={{ team_id: viewer.myTeamId!, profile_id: p.id }}
+                        label={`Invite to ${myTeam!.name}`}
+                        pendingLabel="Inviting…"
+                        variant="ghost"
+                      />
+                    )}
+                  </div>
                 )}
               </li>
             ))}

@@ -155,3 +155,18 @@ export function sortTeams(teams: TeamSummary[]) {
       a.name.localeCompare(b.name),
   );
 }
+
+// Open invites to the current user, newest first (RLS: teams_invites_read).
+export async function getMyInvites(profileId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("teams_invites")
+    .select("team_id, created_at, teams(name)")
+    .eq("profile_id", profileId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+  return (data ?? []).map((row) => ({
+    teamId: row.team_id as string,
+    teamName: (row.teams as unknown as { name: string } | null)?.name ?? "A team",
+  }));
+}
