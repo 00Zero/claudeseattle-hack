@@ -1,13 +1,21 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdminPage } from "@/lib/admin";
+import { TEST_GUEST_PREFIX } from "@/lib/test-accounts";
 import { ImportForm } from "./import-form";
 
 export default async function ImportPage() {
   await requireAdminPage();
   const admin = createAdminClient();
   const [{ count }, { data: latest }] = await Promise.all([
-    admin.from("luma_guests").select("guest_id", { count: "exact", head: true }),
-    admin.from("luma_guests").select("imported_at").order("imported_at", { ascending: false }).limit(1).maybeSingle(),
+    // Without the guest copies behind test accounts (lib/test-accounts.ts).
+    admin.from("luma_guests").select("guest_id", { count: "exact", head: true }).not("guest_id", "like", `${TEST_GUEST_PREFIX}%`),
+    admin
+      .from("luma_guests")
+      .select("imported_at")
+      .not("guest_id", "like", `${TEST_GUEST_PREFIX}%`)
+      .order("imported_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   return (

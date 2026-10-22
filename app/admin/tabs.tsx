@@ -7,6 +7,7 @@ const tabs = [
   { href: "/admin/import", label: "Import" },
   { href: "/admin/people", label: "People" },
   { href: "/admin/judging", label: "Judging" },
+  { href: "/admin/test-accounts", label: "Test accounts" },
   { href: "/admin/settings", label: "Settings" },
 ];
 const superAdminTabs = [{ href: "/admin/enrichment", label: "Enrichment" }];

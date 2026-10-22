@@ -39,13 +39,21 @@ export type MatchingProfile = {
 };
 
 // Signals for the given profiles (all browsable people when omitted), for a caller who
-// can browse. Only people with full access are returned. Throws for other callers.
+// can browse. Only people with full access in the caller's own world (real, or test accounts;
+// lib/test-accounts.ts) are returned. Throws for other callers.
 export async function getMatchingProfiles(profileIds?: string[]): Promise<MatchingProfile[]> {
   const supabase = await createClient();
-  const { data: canBrowse } = await supabase.rpc("can_browse");
+  const [{ data: canBrowse }, { data: viewerIsTest }] = await Promise.all([
+    supabase.rpc("can_browse"),
+    supabase.rpc("viewer_is_test"),
+  ]);
   if (!canBrowse) throw new Error("Not authorized");
 
-  let query = createAdminClient().from("matching_profiles").select("*").eq("access", "full");
+  let query = createAdminClient()
+    .from("matching_profiles")
+    .select("*")
+    .eq("access", "full")
+    .eq("is_test", Boolean(viewerIsTest));
   if (profileIds) query = query.in("profile_id", profileIds);
   const { data, error } = await query;
   if (error) throw new Error(`Couldn't read matching profiles: ${error.message}`);

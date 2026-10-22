@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireAdminPage } from "@/lib/admin";
 import { apifyInput, linkedinSlug } from "@/lib/enrichment";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { TEST_GUEST_PREFIX } from "@/lib/test-accounts";
 import { CopyBox, UploadForm } from "./upload-form";
 
 // LinkedIn enrichment for Luma guests: who has it, the URLs to send to Apify for who doesn't,
@@ -47,7 +48,11 @@ export default async function EnrichmentPage({ searchParams }: PageProps<"/admin
 
   const admin = createAdminClient();
   const [{ data: guests }, { data: enrichment }] = await Promise.all([
-    admin.from("luma_guests").select("guest_id, name, approval_status, ticket_name, linkedin_url").order("name"),
+    admin
+      .from("luma_guests")
+      .select("guest_id, name, approval_status, ticket_name, linkedin_url")
+      .not("guest_id", "like", `${TEST_GUEST_PREFIX}%`) // test-account copies (lib/test-accounts.ts)
+      .order("name"),
     admin.from("linkedin_enrichment").select("linkedin_slug, source, fetched_at"),
   ]);
 

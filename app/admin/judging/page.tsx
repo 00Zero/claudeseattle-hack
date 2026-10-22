@@ -26,6 +26,7 @@ type Result = {
   final_votes: number;
   is_finalist: boolean;
   place: number | null;
+  is_test: boolean;
 };
 
 const SORTS = {
@@ -44,19 +45,28 @@ const small = "rounded border border-foreground/20 px-2 py-0.5 text-xs hover:bg-
 
 export default async function JudgingAdminPage({ searchParams }: PageProps<"/admin/judging">) {
   await requireAdminPage();
-  const { sort: sortParam } = await searchParams;
+  const { sort: sortParam, world } = await searchParams;
   const sort: SortKey = typeof sortParam === "string" && sortParam in SORTS ? (sortParam as SortKey) : "team";
+  // Test accounts' teams, entries and judges (lib/test-accounts.ts) are a separate world:
+  // ?world=test shows them instead of the real ones. Nothing mixes across.
+  const isTest = world === "test";
+  const worldParam = isTest ? "&world=test" : "";
 
   const admin = createAdminClient();
   const [results, entries, assignments, judges, teams, lateSaves, settings] = await Promise.all([
     admin.from("judge_entry_results").select("*"),
     admin.from("judge_entries").select("id, finalist_override"),
     admin.from("judge_assignments").select("entry_id, judge_id"),
-    admin.from("profiles").select("id, display_name, platform_role").in("platform_role", ["judge", "admin"]).order("display_name"),
-    admin.from("teams").select("id", { count: "exact", head: true }),
+    admin
+      .from("profiles")
+      .select("id, display_name, platform_role")
+      .in("platform_role", ["judge", "admin"])
+      .eq("is_test", isTest)
+      .order("display_name"),
+    admin.from("teams").select("id, leader:profiles!teams_leader_id_fkey!inner(is_test)", { count: "exact", head: true }).eq("leader.is_test", isTest),
     admin
       .from("judge_late_saves")
-      .select("id, saved_at, payload, teams(name), saver:profiles!judge_late_saves_saved_by_fkey(display_name)")
+      .select("id, saved_at, payload, teams(name), saver:profiles!judge_late_saves_saved_by_fkey(display_name, is_test)")
       .eq("decision", "pending")
       .order("saved_at"),
     admin.from("event_settings").select("submissions_close_at, publish_finalists, publish_winners").eq("id", 1).single(),
@@ -74,7 +84,8 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
     );
   }
 
-  const rows = (results.data ?? []) as Result[];
+  const rows = ((results.data ?? []) as Result[]).filter((r) => r.is_test === isTest);
+  const late = (lateSaves.data ?? []).filter((l) => (l.saver as unknown as { is_test: boolean } | null)?.is_test === isTest);
   const overrides = new Map((entries.data ?? []).map((e) => [e.id as string, e.finalist_override as boolean | null]));
   const judgeOf = new Map((assignments.data ?? []).map((a) => [a.entry_id as string, a.judge_id as string]));
   const load = new Map<string, number>();
@@ -100,7 +111,7 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
 
   const header = (key: SortKey, label: string) => (
     <th className={th}>
-      <Link href={`/admin/judging?sort=${key}`} className={sort === key ? "font-semibold text-foreground" : "underline-offset-2 hover:underline"}>
+      <Link href={`/admin/judging?sort=${key}${worldParam}`} className={sort === key ? "font-semibold text-foreground" : "underline-offset-2 hover:underline"}>
         {label}
         {sort === key ? " ↓" : ""}
       </Link>
@@ -110,7 +121,33 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
   return (
     <div className="space-y-10">
       <div className="space-y-2">
-        <h1 className="text-2xl font-semibold">Judging</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-2xl font-semibold">Judging{isTest && " (test)"}</h1>
+          <nav className="flex gap-1 text-sm">
+            {[
+              ["", "Real entries"],
+              ["&world=test", "Test entries"],
+            ].map(([param, label]) => (
+              <Link
+                key={label}
+                href={`/admin/judging?sort=${sort}${param}`}
+                className={`rounded px-2 py-1 ${param === worldParam ? "bg-foreground/10 font-medium" : "hover:bg-foreground/5"}`}
+              >
+                {label}
+              </Link>
+            ))}
+          </nav>
+        </div>
+        {isTest && (
+          <p className="text-sm text-foreground/70">
+            Test teams, projects and judges from{" "}
+            <Link href="/admin/test-accounts" className="underline">
+              Test accounts
+            </Link>
+            . Only admins see them; test judges score them and get their own finalists and places. Publishing applies to
+            real entries only.
+          </p>
+        )}
         <div className="flex flex-wrap gap-2 text-sm">
           <span className="rounded bg-foreground/5 px-2 py-1">{submittedCount} submitted</span>
           <span className={`rounded px-2 py-1 ${withoutSubmission ? "bg-accent-soft" : "bg-foreground/5"}`}>
@@ -126,6 +163,7 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
         <div className="flex flex-wrap items-end justify-between gap-3">
           <h2 className="text-lg font-semibold">Entries</h2>
           <form action={autoAssign}>
+            <input type="hidden" name="world" value={isTest ? "test" : "real"} />
             <SubmitButton className={small} pendingText="Assigning…">
               Auto-assign entries without a judge
             </SubmitButton>
@@ -188,15 +226,15 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Late saves ({lateSaves.data?.length ?? 0})</h2>
+        <h2 className="text-lg font-semibold">Late saves ({late.length})</h2>
         <p className="text-sm text-foreground/70">
           Saved after the deadline. Accept to replace the team&apos;s entry with this version; reject to keep the one saved on time.
         </p>
-        {!lateSaves.data?.length ? (
+        {!late.length ? (
           <p className="text-sm">None waiting.</p>
         ) : (
           <ul className="space-y-2">
-            {lateSaves.data.map((l) => {
+            {late.map((l) => {
               const team = (l.teams as unknown as { name: string } | null)?.name ?? "Unknown team";
               const saver = (l.saver as unknown as { display_name: string } | null)?.display_name ?? "someone";
               const title = (l.payload as { title?: string } | null)?.title ?? "";
@@ -226,33 +264,35 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
         )}
       </section>
 
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Publish</h2>
-        <p className="text-sm text-foreground/70">
-          The public <Link href="/results" className="underline">results page</Link> shows only what&apos;s on here. Scores are never public.
-        </p>
-        {s && (
-          <div className="flex flex-wrap gap-3">
-            {(
-              [
-                ["publish_finalists", "Finalists", s.publish_finalists],
-                ["publish_winners", "Winners and places", s.publish_winners],
-              ] as const
-            ).map(([field, label, on]) => (
-              <form key={field} action={setPublish} className="flex items-center gap-2 rounded border border-foreground/15 px-3 py-2 text-sm">
-                <input type="hidden" name="field" value={field} />
-                <input type="hidden" name="value" value={on ? "false" : "true"} />
-                <span>
-                  {label}: <strong>{on ? "published" : "hidden"}</strong>
-                </span>
-                <SubmitButton className={small} pendingText="Saving…">
-                  {on ? "Hide" : "Publish"}
-                </SubmitButton>
-              </form>
-            ))}
-          </div>
-        )}
-      </section>
+      {!isTest && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">Publish</h2>
+          <p className="text-sm text-foreground/70">
+            The public <Link href="/results" className="underline">results page</Link> shows only what&apos;s on here. Scores are never public.
+          </p>
+          {s && (
+            <div className="flex flex-wrap gap-3">
+              {(
+                [
+                  ["publish_finalists", "Finalists", s.publish_finalists],
+                  ["publish_winners", "Winners and places", s.publish_winners],
+                ] as const
+              ).map(([field, label, on]) => (
+                <form key={field} action={setPublish} className="flex items-center gap-2 rounded border border-foreground/15 px-3 py-2 text-sm">
+                  <input type="hidden" name="field" value={field} />
+                  <input type="hidden" name="value" value={on ? "false" : "true"} />
+                  <span>
+                    {label}: <strong>{on ? "published" : "hidden"}</strong>
+                  </span>
+                  <SubmitButton className={small} pendingText="Saving…">
+                    {on ? "Hide" : "Publish"}
+                  </SubmitButton>
+                </form>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
     </div>
   );
 }
