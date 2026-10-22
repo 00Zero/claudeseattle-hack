@@ -10,8 +10,12 @@ const pages = [
   { href: "/profile", label: "profile" },
 ];
 
+// Signed-in people only; /resources itself checks approval.
+const signedInPages = [{ href: "/resources", label: "resources" }];
+
 // The site header, styled as a Claude Code title bar: thinking dots, a path, slash-command nav.
 export function TitleBar({ signedIn, isAdmin }: { signedIn: boolean; isAdmin: boolean }) {
+  const visible = signedIn ? [...pages, ...signedInPages] : pages;
   return (
     <header className="sticky top-0 z-20 border-b border-line bg-bg/90 backdrop-blur">
       <div className="mx-auto flex max-w-4xl items-center gap-4 px-4 py-3 font-mono text-sm">
@@ -22,7 +26,7 @@ export function TitleBar({ signedIn, isAdmin }: { signedIn: boolean; isAdmin: bo
           </span>
         </Link>
         <nav aria-label="Pages" className="ml-auto flex items-center gap-1 sm:gap-2">
-          {pages.map((page) => (
+          {visible.map((page) => (
             <Link key={page.href} href={page.href} className="hidden rounded px-2 py-1 text-fg-muted hover:bg-fg/5 hover:text-fg sm:inline">
               <span className="text-accent">/</span>
               {page.label}
@@ -35,7 +39,7 @@ export function TitleBar({ signedIn, isAdmin }: { signedIn: boolean; isAdmin: bo
           )}
           <AuthLink initialSignedIn={signedIn} />
           {/* Phones: the page links above are hidden, so signed-in people get them (and /logout) in a menu. */}
-          {signedIn && <MobileMenu pages={isAdmin ? [...pages, { href: "/admin", label: "admin" }] : pages} />}
+          {signedIn && <MobileMenu pages={isAdmin ? [...visible, { href: "/admin", label: "admin" }] : visible} />}
           <ThemeToggle />
         </nav>
       </div>
