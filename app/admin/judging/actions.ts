@@ -22,9 +22,16 @@ function done(): RowState {
   return { status: "ok" };
 }
 
-async function judgeIds(admin: ReturnType<typeof createAdminClient>, roles: string[]) {
-  const { data } = await admin.from("profiles").select("id").in("platform_role", roles);
+// Judges in one world: real judges score real entries, test judges test entries
+// (lib/test-accounts.ts). Admins are real.
+async function judgeIds(admin: ReturnType<typeof createAdminClient>, roles: string[], isTest: boolean) {
+  const { data } = await admin.from("profiles").select("id").in("platform_role", roles).eq("is_test", isTest);
   return (data ?? []).map((p) => p.id as string);
+}
+
+async function entryIsTest(admin: ReturnType<typeof createAdminClient>, entryId: string) {
+  const { data } = await admin.from("judge_entry_results").select("is_test").eq("entry_id", entryId).maybeSingle();
+  return Boolean(data?.is_test);
 }
 
 // Prelim: one judge per entry from the table's dropdown. An empty choice unassigns.
@@ -36,8 +43,8 @@ export async function assignJudge(_prev: RowState, formData: FormData): Promise<
   if (formData.get("judge_id") && !judgeId) return { status: "error", message: "Unknown judge." };
 
   const admin = createAdminClient();
-  if (judgeId && !(await judgeIds(admin, ["judge", "admin"])).includes(judgeId)) {
-    return { status: "error", message: "That person isn't a judge. Set their role on the People tab." };
+  if (judgeId && !(await judgeIds(admin, ["judge", "admin"], await entryIsTest(admin, entryId))).includes(judgeId)) {
+    return { status: "error", message: "That person isn't a judge for this entry. Set their role on the People tab." };
   }
   const { error: clearError } = await admin.from("judge_assignments").delete().eq("entry_id", entryId);
   if (clearError) return { status: "error", message: clearError.message };
@@ -50,14 +57,23 @@ export async function assignJudge(_prev: RowState, formData: FormData): Promise<
 
 // Spread submitted entries that have no judge across people with the judge role, filling
 // whoever has the fewest first. Existing assignments are kept, so it's safe to run again.
-export async function autoAssign(): Promise<void> {
+// One world at a time (the page's "world" field): real entries to real judges, test to test.
+export async function autoAssign(formData: FormData): Promise<void> {
   await assertAdmin();
+  const isTest = formData.get("world") === "test";
   const admin = createAdminClient();
-  const judges = await judgeIds(admin, ["judge"]);
-  if (!judges.length) throw new Error("No one has the judge role yet. Set roles on the People tab.");
+  const judges = await judgeIds(admin, ["judge"], isTest);
+  if (!judges.length) {
+    throw new Error(isTest ? "No test account has the judge role yet." : "No one has the judge role yet. Set roles on the People tab.");
+  }
 
   const [{ data: entries }, { data: assignments }] = await Promise.all([
-    admin.from("judge_entries").select("id").not("last_saved_at", "is", null).order("created_at"),
+    admin
+      .from("judge_entry_results")
+      .select("entry_id")
+      .eq("submitted", true)
+      .eq("is_test", isTest)
+      .order("last_saved_at"),
     admin.from("judge_assignments").select("entry_id, judge_id"),
   ]);
   const assigned = new Set((assignments ?? []).map((a) => a.entry_id));
@@ -65,10 +81,10 @@ export async function autoAssign(): Promise<void> {
   for (const a of assignments ?? []) if (load.has(a.judge_id)) load.set(a.judge_id, load.get(a.judge_id)! + 1);
 
   const rows: { entry_id: string; judge_id: string }[] = [];
-  for (const entry of entries ?? []) {
-    if (assigned.has(entry.id)) continue;
+  for (const { entry_id } of entries ?? []) {
+    if (assigned.has(entry_id)) continue;
     const [judge] = [...load.entries()].sort((a, b) => a[1] - b[1])[0];
-    rows.push({ entry_id: entry.id, judge_id: judge });
+    rows.push({ entry_id, judge_id: judge });
     load.set(judge, load.get(judge)! + 1);
   }
   if (rows.length) {

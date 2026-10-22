@@ -117,6 +117,7 @@ export default async function PeoplePage({ searchParams }: PageProps<"/admin/peo
       .select(
         "id, first_name, last_name, luma_guest_id, luma_status, status_override, ticket_name, platform_role, is_super_admin, profile_confirmed, created_at",
       )
+      .eq("is_test", false) // test accounts are on /admin/test-accounts
       .order("last_name"),
     admin.from("profile_emails").select("profile_id, email").eq("is_default", true),
     admin.from("access_rules").select("ticket_name, approval_status, access, default_role"),

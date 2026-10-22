@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Newsreader } from "next/font/google";
 import { getCurrentProfile } from "@/lib/supabase/profile";
+import { TestAccountBanner } from "@/components/site/test-account-banner";
 import { TitleBar } from "@/components/site/title-bar";
 import { ThemeSync } from "@/components/theme/theme-sync";
 import { THEME_BOOT_SCRIPT } from "@/components/theme/theme";
@@ -45,6 +46,7 @@ export default async function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} ${newsreader.variable} antialiased`}>
+        {profile?.is_test && <TestAccountBanner name={`${profile.first_name} ${profile.last_name}`} />}
         <TitleBar signedIn={Boolean(profile)} isAdmin={isAdmin} />
         <ThemeSync />
         <main className="mx-auto max-w-4xl px-4 py-8">{children}</main>
