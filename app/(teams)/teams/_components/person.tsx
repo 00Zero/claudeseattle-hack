@@ -38,6 +38,8 @@ export type ProfileRow = {
   looking_for: string | null;
 };
 
+export const NO_NAME = "Name not set yet";
+
 export const ROLE_LABEL: Record<RoleBucket, string> = { owner: "Owner", professional: "Professional", student: "Student" };
 
 export function titleAtCompany(title: string | null, company: string | null) {
@@ -50,7 +52,8 @@ export function personFromProfile(p: ProfileRow, leaderId: string | null = null)
   const github = normalizeGithubUsername(p.github_username);
   return {
     id: p.id,
-    name: `${p.first_name} ${p.last_name}`.trim(),
+    // Accounts approved without a Luma match start with no name until they fill in their profile.
+    name: `${p.first_name} ${p.last_name}`.trim() || NO_NAME,
     subtitle: titleAtCompany(p.job_title, p.company),
     linkedin: normalizeLinkedinUrl(p.linkedin_url),
     github: github ? `https://github.com/${github}` : null,
@@ -68,7 +71,7 @@ export function PersonDetails({ person: p, showAbout = false }: { person: Person
   return (
     <div className="space-y-1">
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="font-medium">{p.name}</span>
+        <span className={p.name === NO_NAME ? "font-medium italic text-fg-muted" : "font-medium"}>{p.name}</span>
         {p.is_leader && <Pill tone="accent">Leader</Pill>}
         {p.is_mentor && <Pill>Mentor</Pill>}
         {p.role_bucket && !p.is_mentor && <Pill>{ROLE_LABEL[p.role_bucket]}</Pill>}
