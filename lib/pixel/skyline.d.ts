@@ -16,6 +16,7 @@ export type Skyline = {
   setWeather(weather: WeatherInput): void;
   setTheme(theme: "light" | "dark"): void;
   forceDaylight(value: number | null): void;
+  setTime(time: Date | number | null): void; // preview another time of day; null follows the clock
   destroy(): void;
   landmarks(): { needle: { x: number; top: number }; ground: number };
   daylight(): number;
