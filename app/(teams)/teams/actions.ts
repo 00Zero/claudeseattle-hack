@@ -189,3 +189,95 @@ export async function updateTeam(_prev: FormState, formData: FormData): Promise<
   revalidatePath("/teams");
   redirect(`/teams/${teamId}`);
 }
+
+// Leader invites someone who can join and isn't on a team (RLS: teams_invites_create /
+// teams_invites_leader_update). Re-inviting after a decline or cancel reopens the same row.
+export async function inviteToTeam(_prev: FormState, formData: FormData): Promise<FormState> {
+  const teamId = id(formData, "team_id");
+  const profileId = id(formData, "profile_id");
+  if (!teamId || !profileId) return { status: "error", message: "Something went wrong. Reload and try again." };
+  const viewer = await getViewer();
+  if (!viewer.signedIn) return { status: "error", message: "Your session expired. Log in again." };
+
+  const supabase = await createClient();
+  const [{ data: team }, { data: person }, { data: theirTeam }, { data: existing }] = await Promise.all([
+    supabase.from("teams").select("leader_id").eq("id", teamId).maybeSingle(),
+    supabase.from("profiles").select("first_name, luma_status, platform_role").eq("id", profileId).maybeSingle(),
+    supabase.from("team_members").select("team_id").eq("profile_id", profileId).eq("status", "member").maybeSingle(),
+    supabase.from("teams_invites").select("status").eq("team_id", teamId).eq("profile_id", profileId).maybeSingle(),
+  ]);
+  if (team?.leader_id !== viewer.profile.id) return { status: "error", message: "Only the team leader can invite people." };
+  if (!person || person.luma_status !== "approved" || !["participant", "mentor", "admin"].includes(person.platform_role)) {
+    return { status: "error", message: "They can't join a team." };
+  }
+  if (theirTeam) return { status: "error", message: `${person.first_name} is already on a team.` };
+  if ((await memberCount(supabase, teamId)) >= TEAM_MAX) {
+    return { status: "error", message: `Your team is full (${TEAM_MAX} people).` };
+  }
+  if (existing?.status === "pending") return { status: "error", message: `${person.first_name} is already invited.` };
+
+  const { error } = existing
+    ? await supabase
+        .from("teams_invites")
+        .update({ status: "pending", responded_at: null })
+        .eq("team_id", teamId)
+        .eq("profile_id", profileId)
+    : await supabase.from("teams_invites").insert({ team_id: teamId, profile_id: profileId, invited_by: viewer.profile.id });
+  if (error) return { status: "error", message: "We couldn't send the invite. Try again." };
+  revalidatePath("/teams/people");
+  return done(teamId);
+}
+
+export async function cancelInvite(_prev: FormState, formData: FormData): Promise<FormState> {
+  const teamId = id(formData, "team_id");
+  const profileId = id(formData, "profile_id");
+  if (!teamId || !profileId) return { status: "error", message: "Something went wrong. Reload and try again." };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("teams_invites")
+    .update({ status: "cancelled", responded_at: new Date().toISOString() })
+    .eq("team_id", teamId)
+    .eq("profile_id", profileId)
+    .eq("status", "pending")
+    .select("profile_id");
+  if (error || !data?.length) return { status: "error", message: "That didn't work. Reload the page and try again." };
+  revalidatePath("/teams/people");
+  return done(teamId);
+}
+
+const ACCEPT_ERRORS: Record<string, string> = {
+  not_signed_in: "Your session expired. Log in again.",
+  not_allowed: "You can't join a team.",
+  no_invite: "This invite isn't open anymore.",
+  already_on_team: "You're already on a team. Leave it first to accept.",
+  team_full: `This team is full (${TEAM_MAX} people).`,
+};
+
+// Invitee accepts: accept_team_invite() checks everything and adds them as a member.
+export async function acceptInvite(_prev: FormState, formData: FormData): Promise<FormState> {
+  const teamId = id(formData, "team_id");
+  if (!teamId) return { status: "error", message: "That team doesn't exist." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("accept_team_invite", { p_team: teamId });
+  if (error) return { status: "error", message: "We couldn't accept the invite. Try again." };
+  if (data !== "ok") return { status: "error", message: ACCEPT_ERRORS[data as string] ?? "We couldn't accept the invite." };
+  revalidatePath("/teams/people");
+  return done(teamId);
+}
+
+export async function declineInvite(_prev: FormState, formData: FormData): Promise<FormState> {
+  const teamId = id(formData, "team_id");
+  if (!teamId) return { status: "error", message: "That team doesn't exist." };
+  const viewer = await getViewer();
+  if (!viewer.signedIn) return { status: "error", message: "Your session expired. Log in again." };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("teams_invites")
+    .update({ status: "declined", responded_at: new Date().toISOString() })
+    .eq("team_id", teamId)
+    .eq("profile_id", viewer.profile.id)
+    .eq("status", "pending")
+    .select("profile_id");
+  if (error || !data?.length) return { status: "error", message: "That didn't work. Reload the page and try again." };
+  return done(teamId);
+}

@@ -1,7 +1,16 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { acceptApplicant, applyToTeam, declineApplicant, leaveTeam, removeMember } from "../actions";
+import {
+  acceptApplicant,
+  acceptInvite,
+  applyToTeam,
+  cancelInvite,
+  declineApplicant,
+  declineInvite,
+  leaveTeam,
+  removeMember,
+} from "../actions";
 import { ActionButton } from "../_components/action-button";
 import { BalanceBadges } from "../_components/badges";
 import { DeadlineBanner } from "../_components/deadline-banner";
@@ -20,6 +29,8 @@ type Team = {
   applicants: Applicant[];
   myStatus: string | null; // the viewer's own row on this team, if any
   iLead: boolean;
+  invited: Person[]; // open invites, for the leader
+  invitedMe: boolean; // the viewer has an open invite to this team
 };
 
 // Logged-in with full access: the tables, with links, approval badges, and every
@@ -53,6 +64,20 @@ async function loadFullTeam(id: string, viewerId: string): Promise<Team | null> 
     for (const row of data ?? []) elsewhere.add(row.profile_id);
   }
 
+  // Open invites: the leader sees all of them, an invitee only their own (RLS: teams_invites_read).
+  const { data: inviteRows } = await supabase
+    .from("teams_invites")
+    .select("profile_id")
+    .eq("team_id", id)
+    .eq("status", "pending");
+  const inviteIds = (inviteRows ?? []).map((r) => r.profile_id as string);
+  const iLead = team.leader_id === viewerId;
+  let invited: Person[] = [];
+  if (iLead && inviteIds.length) {
+    const { data } = await supabase.from("profiles").select(PERSON_COLUMNS).in("id", inviteIds);
+    invited = ((data ?? []) as unknown as ProfileRow[]).map(person);
+  }
+
   return {
     name: team.name,
     concept: team.concept,
@@ -60,7 +85,9 @@ async function loadFullTeam(id: string, viewerId: string): Promise<Team | null> 
     members: rows.filter((r) => r.status === "member").map((r) => person(r.profiles!)),
     applicants: applied.map((p) => ({ ...person(p), onOtherTeam: elsewhere.has(p.id) })),
     myStatus: rows.find((r) => r.profiles!.id === viewerId)?.status ?? null,
-    iLead: team.leader_id === viewerId,
+    iLead,
+    invited,
+    invitedMe: inviteIds.includes(viewerId),
   };
 }
 
@@ -97,6 +124,8 @@ async function loadPublicTeam(id: string): Promise<Team | null> {
     applicants: [],
     myStatus: null,
     iLead: false,
+    invited: [],
+    invitedMe: false,
   };
 }
 
@@ -157,6 +186,29 @@ export default async function TeamPage({ params }: PageProps<"/teams/[id]">) {
                     <ActionButton action={declineApplicant} fields={{ ...fields, profile_id: a.id! }} label="Decline" pendingLabel="Declining…" variant="ghost" />
                   </div>
                 )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {team.iLead && team.invited.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">
+            Invited <span className="font-normal text-fg-muted">({team.invited.length})</span>
+          </h2>
+          <p className="text-sm text-fg-muted">They see the invite on this page and on Teams, and can accept or decline.</p>
+          <ul className="divide-y divide-line rounded-lg border border-line bg-bg-raised">
+            {team.invited.map((p) => (
+              <li key={p.id} className="space-y-2 px-4 py-3">
+                <PersonDetails person={p} />
+                <ActionButton
+                  action={cancelInvite}
+                  fields={{ team_id: id, profile_id: p.id! }}
+                  label="Cancel invite"
+                  pendingLabel="Cancelling…"
+                  variant="link"
+                />
               </li>
             ))}
           </ul>
@@ -229,6 +281,23 @@ function ViewerPanel({ viewer, team, teamId, full }: { viewer: Viewer; team: Tea
           <Link href={`/teams/${teamId}/edit`} className="text-sm text-fg-muted underline">
             Edit name, concept, or who you&apos;re looking for
           </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (team.myStatus !== "member" && team.invitedMe) {
+    return (
+      <div className={`${box} border-accent`}>
+        <p className="text-sm">
+          <strong>You&apos;re invited to join {team.name}.</strong>{" "}
+          {viewer.myTeamId ? "You're on another team, so leave it first to accept." : "Accept to join the team."}
+        </p>
+        <div className="flex flex-wrap items-start gap-2">
+          {!viewer.myTeamId && (
+            <ActionButton action={acceptInvite} fields={fields} label="Accept invite" pendingLabel="Joining…" />
+          )}
+          <ActionButton action={declineInvite} fields={fields} label="Decline" pendingLabel="Declining…" variant="ghost" />
         </div>
       </div>
     );

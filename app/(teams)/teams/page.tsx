@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { BalanceBadges, Pill } from "./_components/badges";
 import { DeadlineBanner } from "./_components/deadline-banner";
 import { TeamsTabs } from "./_components/teams-tabs";
-import { getViewer, listTeams, sortTeams, TEAM_MAX, type TeamSummary } from "./_lib/teams";
+import { getMyInvites, getViewer, listTeams, sortTeams, TEAM_MAX, type TeamSummary } from "./_lib/teams";
 
 export default async function TeamsPage({ searchParams }: PageProps<"/teams">) {
   const viewer = await getViewer();
@@ -16,6 +16,7 @@ export default async function TeamsPage({ searchParams }: PageProps<"/teams">) {
   const teams = query ? all.filter((t) => t.name.toLowerCase().includes(query.toLowerCase())) : all;
   const myTeamId = viewer.signedIn ? viewer.myTeamId : null;
   const myTeam = myTeamId ? all.find((t) => t.id === myTeamId) : undefined;
+  const invites = viewer.signedIn ? await getMyInvites(viewer.profile.id) : [];
 
   return (
     <div className="space-y-6">
@@ -24,6 +25,19 @@ export default async function TeamsPage({ searchParams }: PageProps<"/teams">) {
         <DeadlineBanner />
       </div>
       {viewer.signedIn && <TeamsTabs active="teams" />}
+
+      {invites.length > 0 && (
+        <ul className="space-y-2" aria-label="Your invites">
+          {invites.map((invite) => (
+            <li key={invite.teamId} className="rounded-lg border border-accent bg-accent-soft px-4 py-3 text-sm">
+              <strong>You&apos;re invited to join {invite.teamName}.</strong>{" "}
+              <Link href={`/teams/${invite.teamId}`} className="underline">
+                See the team and accept or decline
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {!viewer.signedIn ? (
         <p className="text-sm">
