@@ -15,6 +15,7 @@ import { ActionButton } from "../_components/action-button";
 import { AdminPanel } from "../_components/admin-panel";
 import { BalanceBadges } from "../_components/badges";
 import { DeadlineBanner } from "../_components/deadline-banner";
+import { SharePanel } from "../_components/share-panel";
 import { PERSON_COLUMNS, PersonDetails, personFromProfile, titleAtCompany, type Person, type ProfileRow } from "../_components/person";
 import { balanceOf, getViewer, IDEAL_MAX, IDEAL_MIN, TEAM_MAX, TEAM_MIN, type Viewer } from "../_lib/teams";
 
@@ -119,6 +120,7 @@ async function loadPublicTeam(id: string): Promise<Team | null> {
       is_mentor: m.is_mentor,
       is_leader: m.is_leader,
       approved: null,
+      checked_in: false, // not in the public view
       bio: null,
       looking_for: null,
     })),
@@ -163,6 +165,8 @@ export default async function TeamPage({ params }: PageProps<"/teams/[id]">) {
       )}
 
       <ViewerPanel viewer={viewer} team={team} teamId={id} full={size >= TEAM_MAX} />
+
+      {(team.iLead || team.myStatus === "member") && <SharePanel teamId={id} teamName={team.name} />}
 
       {team.iLead && team.applicants.length > 0 && (
         <section className="space-y-3">
