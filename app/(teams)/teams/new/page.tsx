@@ -10,6 +10,8 @@ export default async function NewTeamPage() {
   if (!viewer.signedIn) redirect("/login");
   if (viewer.access === "blocked") redirect("/declined");
   if (viewer.access !== "full") redirect("/pending");
+  // Teams need to know who you are: confirm the Luma-filled profile first (sign-in does this too).
+  if (!viewer.profile.profile_confirmed) redirect("/profile");
   if (viewer.myTeamId) redirect(`/teams/${viewer.myTeamId}`);
 
   return (

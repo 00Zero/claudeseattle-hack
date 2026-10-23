@@ -1,5 +1,6 @@
 import "server-only";
 import { getCurrentAccess, type Access } from "@/lib/access";
+import { getMatchingProfiles } from "@/lib/matching";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 
@@ -52,6 +53,7 @@ function joinBlockedReason(profile: Profile, access: Access | null) {
   if (access !== "full") return "Your registration is awaiting approval, so you can't join a team yet.";
   if (profile.platform_role === "volunteer") return "Volunteers help run the event, so they don't join teams.";
   if (profile.platform_role === "judge") return "Judges score the entries, so they don't join teams.";
+  if (!profile.profile_confirmed) return "Confirm your profile first, so teams can see who you are.";
   return null;
 }
 
@@ -170,4 +172,23 @@ export async function getMyInvites(profileId: string) {
     teamId: row.team_id as string,
     teamName: (row.teams as unknown as { name: string } | null)?.name ?? "A team",
   }));
+}
+
+// Who can be listed, invited, or added: people with full access (ticket rules in access_rules,
+// so Luma approval, an admin's approval override, and admins all count) in the viewer's own
+// world (real or test), as participants or mentors. Comes from matching_profiles, which
+// computes access the same way the database does. Null if matching is unavailable.
+export async function joinableIds(profileIds?: string[]): Promise<Set<string> | null> {
+  try {
+    const rows = await getMatchingProfiles(profileIds);
+    return new Set(rows.filter((r) => r.platform_role === "participant" || r.platform_role === "mentor").map((r) => r.profile_id));
+  } catch (error) {
+    console.error("Couldn't read who can join teams", error);
+    return null;
+  }
+}
+
+// The shared_member_cap trigger's error, raised when a 7th member would join a team.
+export function isTeamFull(error: { message?: string } | null | undefined) {
+  return Boolean(error?.message?.includes("team_full"));
 }

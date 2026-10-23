@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getViewer, TEAM_MAX } from "./_lib/teams";
+import { getViewer, isTeamFull, joinableIds, TEAM_MAX, TEAM_MIN } from "./_lib/teams";
 
 export type FormState = { status: "idle" | "ok" | "error"; message?: string };
 
@@ -106,6 +106,16 @@ export async function leaveTeam(_prev: FormState, formData: FormData): Promise<F
   if (team?.leader_id === viewer.profile.id) {
     return { status: "error", message: "Leaders can't leave their team. Ask an organizer to hand it over." };
   }
+  // Members (not applicants) can't take the team below 2.
+  const { data: mine } = await supabase
+    .from("team_members")
+    .select("status")
+    .eq("team_id", teamId)
+    .eq("profile_id", viewer.profile.id)
+    .maybeSingle();
+  if (mine?.status === "member" && (await memberCount(supabase, teamId)) <= TEAM_MIN) {
+    return { status: "error", message: `A team needs at least ${TEAM_MIN} people, so you can't leave right now. Ask an organizer.` };
+  }
   const { data, error } = await supabase
     .from("team_members")
     .update({ status: "left" })
@@ -133,6 +143,9 @@ async function leaderUpdate(
   if (profileId === viewer.profile.id) return { status: "error", message: "You can't do that to yourself." };
 
   const supabase = await createClient();
+  if (to === "removed" && (await memberCount(supabase, teamId)) <= TEAM_MIN) {
+    return { status: "error", message: `A team needs at least ${TEAM_MIN} people. Add someone first, or ask an organizer.` };
+  }
   if (to === "member" && (await memberCount(supabase, teamId)) >= TEAM_MAX) {
     return { status: "error", message: `Your team is full (${TEAM_MAX} people). Remove someone first.` };
   }
@@ -143,6 +156,7 @@ async function leaderUpdate(
     .eq("profile_id", profileId)
     .eq("status", from)
     .select("profile_id");
+  if (isTeamFull(error)) return { status: "error", message: `Your team is full (${TEAM_MAX} people). Remove someone first.` };
   if (error?.code === "23505") return { status: "error", message: "They've already joined another team." };
   if (error || !data?.length) return { status: "error", message: "That didn't work. Reload the page and try again." };
   return done(teamId);
@@ -207,9 +221,11 @@ export async function inviteToTeam(_prev: FormState, formData: FormData): Promis
     supabase.from("teams_invites").select("status").eq("team_id", teamId).eq("profile_id", profileId).maybeSingle(),
   ]);
   if (team?.leader_id !== viewer.profile.id) return { status: "error", message: "Only the team leader can invite people." };
-  if (!person || person.luma_status !== "approved" || !["participant", "mentor", "admin"].includes(person.platform_role)) {
-    return { status: "error", message: "They can't join a team." };
-  }
+  const eligible = await joinableIds([profileId]);
+  const canJoin = eligible
+    ? eligible.has(profileId)
+    : person?.luma_status === "approved" && ["participant", "mentor"].includes(person.platform_role);
+  if (!person || !canJoin) return { status: "error", message: "They can't join a team." };
   if (theirTeam) return { status: "error", message: `${person.first_name} is already on a team.` };
   if ((await memberCount(supabase, teamId)) >= TEAM_MAX) {
     return { status: "error", message: `Your team is full (${TEAM_MAX} people).` };
@@ -259,6 +275,7 @@ export async function acceptInvite(_prev: FormState, formData: FormData): Promis
   if (!teamId) return { status: "error", message: "That team doesn't exist." };
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("accept_team_invite", { p_team: teamId });
+  if (isTeamFull(error)) return { status: "error", message: ACCEPT_ERRORS.team_full };
   if (error) return { status: "error", message: "We couldn't accept the invite. Try again." };
   if (data !== "ok") return { status: "error", message: ACCEPT_ERRORS[data as string] ?? "We couldn't accept the invite." };
   revalidatePath("/teams/people");

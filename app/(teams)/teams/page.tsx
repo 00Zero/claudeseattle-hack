@@ -9,6 +9,8 @@ export default async function TeamsPage({ searchParams }: PageProps<"/teams">) {
   const viewer = await getViewer();
   if (viewer.signedIn && viewer.access === "blocked") redirect("/declined");
   if (viewer.signedIn && viewer.access !== "full") redirect("/pending");
+  // Teams need to know who you are: confirm the Luma-filled profile first (sign-in does this too).
+  if (viewer.signedIn && !viewer.profile.profile_confirmed) redirect("/profile");
 
   const { q } = await searchParams;
   const query = (typeof q === "string" ? q : "").trim();
