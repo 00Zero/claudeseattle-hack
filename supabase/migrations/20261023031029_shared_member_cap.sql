@@ -1,5 +1,7 @@
--- teams_member_cap: at most 6 members per team, enforced in the database. Owned by Dev A
--- (Teams). docs/REQUIREMENTS.md, Teams: "Team size 2–6 enforced".
+-- shared_member_cap: at most 6 members per team, enforced in the database. Written by Dev A
+-- (Teams); shared because it adds a trigger to team_members (a shared table), so every write
+-- path is covered, admin and service-role writes included. docs/REQUIREMENTS.md, Teams:
+-- "Team size 2–6 enforced".
 --
 -- The app checks the size before accepting, inviting, moving, or adding, but two of those at
 -- the same moment could both see 5 and make 7. This trigger takes a row lock on the team
@@ -7,6 +9,8 @@
 -- with 'team_full', which the app turns into "This team is full".
 --
 -- Adds a trigger to team_members; the table's columns, data, and policies are unchanged.
+-- accept_team_invite() keeps its own size check for a friendly result code; this trigger is
+-- the backstop for every path.
 
 create or replace function teams_enforce_member_cap() returns trigger
 language plpgsql security definer set search_path = public as $$

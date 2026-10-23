@@ -188,7 +188,7 @@ export async function joinableIds(profileIds?: string[]): Promise<Set<string> | 
   }
 }
 
-// The teams_member_cap trigger's error, raised when a 7th member would join a team.
+// The shared_member_cap trigger's error, raised when a 7th member would join a team.
 export function isTeamFull(error: { message?: string } | null | undefined) {
   return Boolean(error?.message?.includes("team_full"));
 }
