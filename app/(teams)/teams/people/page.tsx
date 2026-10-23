@@ -8,7 +8,7 @@ import { DeadlineBanner } from "../_components/deadline-banner";
 import { TeamsTabs } from "../_components/teams-tabs";
 import { PERSON_COLUMNS, PersonDetails, personFromProfile, type ProfileRow } from "../_components/person";
 import { fitFor, type Fit } from "../_lib/fit";
-import { balanceOf, getViewer, TEAM_MAX, type RoleBucket } from "../_lib/teams";
+import { balanceOf, getViewer, joinableIds, TEAM_MAX, type RoleBucket } from "../_lib/teams";
 
 const ROLES = [
   ["", "Any role"],
@@ -20,16 +20,19 @@ const ROLES = [
 
 type Row = ProfileRow & { profile_confirmed: boolean };
 
-// People who can join a team and haven't: approved participants and mentors with no
-// 'member' row. Volunteers, judges, and admins aren't listed. RLS: profiles_browse.
+// People who can join a team and haven't: participants and mentors with full access (see
+// joinableIds) and no 'member' row. Volunteers, judges, and admins aren't listed. RLS:
+// profiles_browse. If matching is unavailable, falls back to Luma approval.
 async function listUnmatched(viewerId: string) {
   const supabase = await createClient();
+  const eligible = await joinableIds();
+  if (eligible && eligible.size === 0) return [];
+  let peopleQuery = supabase.from("profiles").select(`${PERSON_COLUMNS}, profile_confirmed`);
+  peopleQuery = eligible
+    ? peopleQuery.in("id", [...eligible])
+    : peopleQuery.eq("luma_status", "approved").in("platform_role", ["participant", "mentor"]);
   const [people, members] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select(`${PERSON_COLUMNS}, profile_confirmed`)
-      .eq("luma_status", "approved")
-      .in("platform_role", ["participant", "mentor"]),
+    peopleQuery,
     supabase.from("team_members").select("profile_id").eq("status", "member"),
   ]);
   if (people.error) throw people.error;
@@ -93,6 +96,8 @@ export default async function PeoplePage({ searchParams }: PageProps<"/teams/peo
   if (!viewer.signedIn) redirect("/login");
   if (viewer.access === "blocked") redirect("/declined");
   if (viewer.access !== "full") redirect("/pending");
+  // Teams need to know who you are: confirm the Luma-filled profile first (sign-in does this too).
+  if (!viewer.profile.profile_confirmed) redirect("/profile");
 
   const params = await searchParams;
   const pick = (key: string) => (typeof params[key] === "string" ? (params[key] as string) : "");

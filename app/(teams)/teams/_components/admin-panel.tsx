@@ -1,7 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { adminAddMember, adminDeleteTeam, adminMakeLeader, adminMoveMember, adminRemoveMember } from "../admin-actions";
-import { TEAM_MAX } from "../_lib/teams";
+import { joinableIds, TEAM_MAX } from "../_lib/teams";
 import { ActionButton } from "./action-button";
 import { NO_NAME, type Person } from "./person";
 import { SelectAction } from "./select-action";
@@ -11,13 +11,14 @@ const fullName = (p: { first_name: string; last_name: string }) => `${p.first_na
 // Other teams (to move someone to) and people without a team (to add), for the dropdowns.
 async function loadChoices(teamId: string) {
   const supabase = await createClient();
+  const eligible = await joinableIds();
+  let peopleQuery = supabase.from("profiles").select("id, first_name, last_name");
+  peopleQuery = eligible
+    ? peopleQuery.in("id", [...eligible])
+    : peopleQuery.eq("luma_status", "approved").in("platform_role", ["participant", "mentor"]);
   const [teams, people, members] = await Promise.all([
     supabase.from("teams").select("id, name, team_members(status)").neq("id", teamId).order("name"),
-    supabase
-      .from("profiles")
-      .select("id, first_name, last_name")
-      .eq("luma_status", "approved")
-      .in("platform_role", ["participant", "mentor"]),
+    peopleQuery,
     supabase.from("team_members").select("profile_id").eq("status", "member"),
   ]);
   const onTeam = new Set((members.data ?? []).map((m) => m.profile_id));

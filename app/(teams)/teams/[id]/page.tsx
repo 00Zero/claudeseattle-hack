@@ -139,6 +139,8 @@ export default async function TeamPage({ params }: PageProps<"/teams/[id]">) {
   const viewer = await getViewer();
   if (viewer.signedIn && viewer.access === "blocked") redirect("/declined");
   if (viewer.signedIn && viewer.access !== "full") redirect("/pending");
+  // Teams need to know who you are: confirm the Luma-filled profile first (sign-in does this too).
+  if (viewer.signedIn && !viewer.profile.profile_confirmed) redirect("/profile");
 
   const team = viewer.signedIn ? await loadFullTeam(id, viewer.profile.id) : await loadPublicTeam(id);
   if (!team) notFound();
@@ -164,7 +166,7 @@ export default async function TeamPage({ params }: PageProps<"/teams/[id]">) {
         </p>
       )}
 
-      <ViewerPanel viewer={viewer} team={team} teamId={id} full={size >= TEAM_MAX} />
+      <ViewerPanel viewer={viewer} team={team} teamId={id} size={size} />
 
       {(team.iLead || team.myStatus === "member") && <SharePanel teamId={id} teamName={team.name} />}
 
@@ -236,11 +238,16 @@ export default async function TeamPage({ params }: PageProps<"/teams/[id]">) {
           )}
         </div>
         <BalanceBadges balance={balanceOf(members)} />
+        {team.iLead && size === TEAM_MIN && (
+          <p className="text-sm text-fg-muted">
+            With {TEAM_MIN} people you can&apos;t remove anyone; accept someone first, or ask an organizer.
+          </p>
+        )}
         <ul className="divide-y divide-line rounded-lg border border-line bg-bg-raised">
           {members.map((m, i) => (
             <li key={m.id ?? i} className="space-y-2 px-4 py-3">
               <PersonDetails person={m} />
-              {team.iLead && !m.is_leader && m.id && (
+              {team.iLead && !m.is_leader && m.id && size > TEAM_MIN && (
                 <ActionButton
                   action={removeMember}
                   fields={{ ...fields, profile_id: m.id }}
@@ -263,7 +270,8 @@ export default async function TeamPage({ params }: PageProps<"/teams/[id]">) {
 }
 
 // What the viewer can do here: apply, withdraw, leave, or why they can't.
-function ViewerPanel({ viewer, team, teamId, full }: { viewer: Viewer; team: Team; teamId: string; full: boolean }) {
+function ViewerPanel({ viewer, team, teamId, size }: { viewer: Viewer; team: Team; teamId: string; size: number }) {
+  const full = size >= TEAM_MAX;
   const fields = { team_id: teamId };
   const box = "space-y-2 rounded-lg border border-line px-4 py-3";
 
@@ -317,14 +325,20 @@ function ViewerPanel({ viewer, team, teamId, full }: { viewer: Viewer; team: Tea
       return (
         <div className={box}>
           <p className="text-sm">You&apos;re on this team.</p>
-          <ActionButton
-            action={leaveTeam}
-            fields={fields}
-            label="Leave team"
-            pendingLabel="Leaving…"
-            confirm={`Leave ${team.name}? You'd need to apply again to rejoin.`}
-            variant="link"
-          />
+          {size <= TEAM_MIN ? (
+            <p className="text-sm text-fg-muted">
+              A team needs at least {TEAM_MIN} people, so you can&apos;t leave right now. Ask an organizer if you need to.
+            </p>
+          ) : (
+            <ActionButton
+              action={leaveTeam}
+              fields={fields}
+              label="Leave team"
+              pendingLabel="Leaving…"
+              confirm={`Leave ${team.name}? You'd need to apply again to rejoin.`}
+              variant="link"
+            />
+          )}
         </div>
       );
     case "applied":

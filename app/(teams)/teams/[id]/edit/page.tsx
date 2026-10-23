@@ -16,6 +16,8 @@ export default async function EditTeamPage({ params }: PageProps<"/teams/[id]/ed
   if (!viewer.signedIn) redirect("/login");
   if (viewer.access === "blocked") redirect("/declined");
   if (viewer.access !== "full") redirect("/pending");
+  // Teams need to know who you are: confirm the Luma-filled profile first (sign-in does this too).
+  if (!viewer.profile.profile_confirmed) redirect("/profile");
 
   const supabase = await createClient();
   const { data: team } = await supabase
