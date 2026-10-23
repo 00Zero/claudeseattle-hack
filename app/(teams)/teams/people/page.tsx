@@ -1,10 +1,13 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getMatchingProfiles } from "@/lib/matching";
 import { createClient } from "@/lib/supabase/server";
 import { cancelInvite, inviteToTeam } from "../actions";
 import { ActionButton } from "../_components/action-button";
 import { DeadlineBanner } from "../_components/deadline-banner";
+import { TopPicks, TopPicksLoading } from "../_components/top-picks";
+import type { TeamContext } from "../_lib/ai";
 import { TeamsTabs } from "../_components/teams-tabs";
 import { PERSON_COLUMNS, PersonDetails, personFromProfile, type ProfileRow } from "../_components/person";
 import { fitFor, type Fit } from "../_lib/fit";
@@ -57,24 +60,33 @@ async function loadMyTeam(teamId: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("teams")
-    .select("name, concept, looking_for, leader_id, team_members(status, profiles(role_bucket, is_technical, platform_role))")
+    .select("id, name, concept, looking_for, leader_id, team_members(status, profiles(role_bucket, is_technical, platform_role, job_title, company, bio))")
     .eq("id", teamId)
     .maybeSingle();
   if (!data) return null;
   const rows = data.team_members as unknown as {
     status: string;
-    profiles: { role_bucket: RoleBucket | null; is_technical: boolean | null; platform_role: string } | null;
+    profiles: {
+      role_bucket: RoleBucket | null;
+      is_technical: boolean | null;
+      platform_role: string;
+      job_title: string | null;
+      company: string | null;
+      bio: string | null;
+    } | null;
   }[];
   const members = rows
     .filter((r) => r.status === "member" && r.profiles)
     .map((r) => ({ ...r.profiles!, is_mentor: r.profiles!.platform_role === "mentor" }));
   return {
+    id: data.id as string,
     name: data.name,
     concept: data.concept,
     looking_for: data.looking_for,
     leaderId: data.leader_id as string,
     full: members.length >= TEAM_MAX,
     balance: balanceOf(members),
+    members,
   };
 }
 
@@ -120,7 +132,7 @@ export default async function PeoplePage({ searchParams }: PageProps<"/teams/peo
 
   // "Best fit for <team>" is the default order for people on a team; "name" is the other.
   const myTeam = viewer.myTeamId ? await loadMyTeam(viewer.myTeamId) : null;
-  const fits = myTeam && pick("sort") !== "name" ? await scoreFits(myTeam, people.map((p) => p.id)) : new Map<string, Fit>();
+  const fits = myTeam && pick("sort") !== "name" ? await scoreFits(myTeam, everyone.map((p) => p.id)) : new Map<string, Fit>();
   const byFit = fits.size > 0;
 
   // Leaders can invite from here; people they've already invited show as invited.
@@ -135,6 +147,28 @@ export default async function PeoplePage({ searchParams }: PageProps<"/teams/peo
       .eq("status", "pending");
     for (const row of data ?? []) invited.add(row.profile_id);
   }
+
+  // Claude's top picks: the 15 best by the scoring rule, re-ranked with reasons. Only on the
+  // unfiltered fit view of a team with room.
+  const shortlist = byFit
+    ? [...everyone].sort((a, b) => (fits.get(b.id)?.score ?? 0) - (fits.get(a.id)?.score ?? 0)).slice(0, 15).map((p) => p.id)
+    : [];
+  const aiTeam: TeamContext | null =
+    myTeam && !myTeam.full && byFit && !filtered
+      ? {
+          id: myTeam.id,
+          name: myTeam.name,
+          concept: myTeam.concept,
+          looking_for: myTeam.looking_for,
+          balance: myTeam.balance,
+          members: myTeam.members.map((m) => ({
+            role: m.is_mentor ? "mentor" : (m.role_bucket ?? "unknown"),
+            technical: m.is_technical === true,
+            title: [m.job_title, m.company].filter(Boolean).join(" at ") || null,
+            bio: m.bio,
+          })),
+        }
+      : null;
   if (byFit) people.sort((a, b) => (fits.get(b.id)?.score ?? 0) - (fits.get(a.id)?.score ?? 0));
   const control = "rounded border border-line-strong bg-bg-raised px-3 py-2";
 
@@ -167,6 +201,12 @@ export default async function PeoplePage({ searchParams }: PageProps<"/teams/peo
           </p>
         )}
       </div>
+
+      {aiTeam && (
+        <Suspense fallback={<TopPicksLoading teamName={aiTeam.name} />}>
+          <TopPicks team={aiTeam} shortlist={shortlist} canInvite={iLead} invited={invited} />
+        </Suspense>
+      )}
 
       <form className="flex flex-wrap gap-2" role="search">
         <input

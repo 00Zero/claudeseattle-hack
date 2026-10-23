@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -16,6 +17,7 @@ import { AdminPanel } from "../_components/admin-panel";
 import { BalanceBadges } from "../_components/badges";
 import { DeadlineBanner } from "../_components/deadline-banner";
 import { SharePanel } from "../_components/share-panel";
+import { WhyYouFit, WhyYouFitLoading } from "../_components/why-you-fit";
 import { PERSON_COLUMNS, PersonDetails, personFromProfile, titleAtCompany, type Person, type ProfileRow } from "../_components/person";
 import { balanceOf, getViewer, IDEAL_MAX, IDEAL_MIN, TEAM_MAX, TEAM_MIN, type Viewer } from "../_lib/teams";
 
@@ -167,6 +169,27 @@ export default async function TeamPage({ params }: PageProps<"/teams/[id]">) {
       )}
 
       <ViewerPanel viewer={viewer} team={team} teamId={id} size={size} />
+
+      {viewer.signedIn && !viewer.joinBlockedReason && !viewer.myTeamId && !team.iLead && size < TEAM_MAX && (
+        <Suspense fallback={<WhyYouFitLoading />}>
+          <WhyYouFit
+            viewerId={viewer.profile.id}
+            team={{
+              id,
+              name: team.name,
+              concept: team.concept,
+              looking_for: team.looking_for,
+              balance: balanceOf(members),
+              members: members.map((m) => ({
+                role: m.is_mentor ? "mentor" : (m.role_bucket ?? "unknown"),
+                technical: m.is_technical === true,
+                title: m.subtitle,
+                bio: m.bio,
+              })),
+            }}
+          />
+        </Suspense>
+      )}
 
       {(team.iLead || team.myStatus === "member") && <SharePanel teamId={id} teamName={team.name} />}
 
