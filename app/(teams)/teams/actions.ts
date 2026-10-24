@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getViewer, isTeamFull, joinableIds, TEAM_MAX, TEAM_MIN } from "./_lib/teams";
+import { getViewer, isTeamFull, isTooManyApplications, joinableIds, MAX_APPLICATIONS, TEAM_MAX, TEAM_MIN } from "./_lib/teams";
 
 export type FormState = { status: "idle" | "ok" | "error"; message?: string };
 
@@ -71,6 +71,8 @@ function done(teamId: string): FormState {
   return { status: "ok" };
 }
 
+const TOO_MANY = `You can apply to ${MAX_APPLICATIONS} teams at a time. Withdraw one in your Inbox to apply here.`;
+
 // Apply: insert your own row as 'applied' (RLS: members_apply needs can_join_teams()).
 // One application per team, ever (the row's primary key), so someone who left or was
 // declined can't re-apply to the same team; they can apply elsewhere.
@@ -81,6 +83,7 @@ export async function applyToTeam(_prev: FormState, formData: FormData): Promise
   if (!viewer.signedIn) return { status: "error", message: "Your session expired. Log in again." };
   if (viewer.joinBlockedReason) return { status: "error", message: viewer.joinBlockedReason };
   if (viewer.myTeamId) return { status: "error", message: "You're already on a team. Leave it first to apply here." };
+  if (viewer.openApplications >= MAX_APPLICATIONS) return { status: "error", message: TOO_MANY };
 
   const supabase = await createClient();
   if ((await memberCount(supabase, teamId)) >= TEAM_MAX) {
@@ -89,6 +92,7 @@ export async function applyToTeam(_prev: FormState, formData: FormData): Promise
   const { error } = await supabase
     .from("team_members")
     .insert({ team_id: teamId, profile_id: viewer.profile.id, status: "applied" });
+  if (isTooManyApplications(error)) return { status: "error", message: TOO_MANY };
   if (error?.code === "23505") return { status: "error", message: "You've already applied to this team." };
   if (error) return { status: "error", message: "We couldn't send your application. Try again." };
   return done(teamId);

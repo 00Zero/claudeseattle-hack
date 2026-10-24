@@ -19,7 +19,7 @@ import { DeadlineBanner } from "../_components/deadline-banner";
 import { SharePanel } from "../_components/share-panel";
 import { WhyYouFit, WhyYouFitLoading } from "../_components/why-you-fit";
 import { PERSON_COLUMNS, PersonDetails, personFromProfile, titleAtCompany, type Person, type ProfileRow } from "../_components/person";
-import { balanceOf, getViewer, IDEAL_MAX, IDEAL_MIN, TEAM_MAX, TEAM_MIN, type Viewer } from "../_lib/teams";
+import { balanceOf, getViewer, IDEAL_MAX, IDEAL_MIN, MAX_APPLICATIONS, TEAM_MAX, TEAM_MIN, type Viewer } from "../_lib/teams";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -401,11 +401,25 @@ function ViewerPanel({ viewer, team, teamId, size }: { viewer: Viewer; team: Tea
     );
   }
   if (full) return <p className={`${box} text-sm text-fg-muted`}>This team is full ({TEAM_MAX} people).</p>;
+  if (viewer.openApplications >= MAX_APPLICATIONS) {
+    return (
+      <p className={`${box} text-sm`}>
+        You&apos;ve applied to {MAX_APPLICATIONS} teams, the most at once.{" "}
+        <Link href="/teams/inbox" className="underline">
+          Withdraw one in your Inbox
+        </Link>{" "}
+        to apply here.
+      </p>
+    );
+  }
 
   return (
     <div className="space-y-1">
       <ActionButton action={applyToTeam} fields={fields} label="Apply to join" pendingLabel="Applying…" />
-      <p className="text-sm text-fg-muted">The leader sees your profile and accepts or declines.</p>
+      <p className="text-sm text-fg-muted">
+        The leader sees your profile and accepts or declines. You can apply to {MAX_APPLICATIONS} teams at a time
+        {viewer.openApplications ? ` (you've applied to ${viewer.openApplications})` : ""}.
+      </p>
     </div>
   );
 }
