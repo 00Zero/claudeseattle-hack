@@ -197,9 +197,13 @@ export function ProfileForm({
       </Field>
       <label className="flex items-start gap-2">
         <input type="checkbox" name="public_profile" defaultChecked={profile.public_profile} className="mt-1" />
-        <span className="text-sm">
-          Show my full name, title, company, and LinkedIn on public team pages. If you leave this off, people who
-          aren&apos;t logged in see only your first name and last initial.
+        <span className="space-y-1 text-sm">
+          <span className="block font-medium">Show my details to the public (anyone, without logging in)</span>
+          <span className="block text-foreground/70">
+            Off (default): people who aren&apos;t logged in see only your first name and last initial on public team
+            pages. On: they also see your full name, title, company and LinkedIn. Either way, attendees who are logged
+            in can see your full profile so teams can find you.
+          </span>
         </span>
       </label>
       <Status state={state} />
