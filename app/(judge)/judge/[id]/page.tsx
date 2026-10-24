@@ -47,9 +47,19 @@ export default async function JudgeEntryPage({ params, searchParams }: PageProps
 
       <EntryDetails entry={entry} roster={roster} />
 
-      {notes && (
-        <details className="rounded border border-line px-3 py-2">
-          <summary className="cursor-pointer text-sm font-medium">AI notes: what to dig into</summary>
+      {notes ? (
+        // Collapsed by default (docs/REQUIREMENTS.md), so the summary has to look clickable.
+        <details className="group rounded border border-accent bg-accent-soft/40 px-3 py-2">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm [&::-webkit-details-marker]:hidden">
+            <span>
+              <span className="font-medium">AI notes: what to focus on</span>
+              <span className="block text-fg-muted">What to check first, a note per criterion, and what the AI couldn&apos;t tell.</span>
+            </span>
+            <span className="shrink-0 rounded border border-line-strong px-2 py-0.5 text-xs font-medium">
+              <span className="group-open:hidden">Show</span>
+              <span className="hidden group-open:inline">Hide</span>
+            </span>
+          </summary>
           <div className="mt-2 space-y-2 text-sm">
             <p className="text-fg-faint">
               Written by {notes.model} from the team&apos;s entry and README only: it didn&apos;t watch the video, read the code,
@@ -83,6 +93,10 @@ export default async function JudgeEntryPage({ params, searchParams }: PageProps
             )}
           </div>
         </details>
+      ) : (
+        <p className="rounded border border-line px-3 py-2 text-sm text-fg-muted">
+          No AI notes for this entry yet. Organizers write them after submissions close.
+        </p>
       )}
 
       <section className="space-y-3 border-t border-line pt-6" aria-labelledby="score-heading">

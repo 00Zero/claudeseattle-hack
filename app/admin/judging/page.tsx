@@ -5,7 +5,7 @@ import { formatPacific } from "@/lib/time";
 import { formatScore } from "@/app/(judge)/_lib/scoring";
 import { SubmitButton } from "../submit-button";
 import { decideLateSave, setPublish } from "./actions";
-import { aiNotesConfigured } from "@/app/(judge)/_lib/ai-notes";
+import { aiNotesConfigured, type AiNotesBody } from "@/app/(judge)/_lib/ai-notes";
 import { AiNotesForm, AutoAssignForm, FallbackEntryForm, FinalistForm, JudgeForm, type JudgeOption } from "./row-forms";
 
 // Admin judging: one row per entry with its judge, scores, finalist, and place; late saves to
@@ -77,7 +77,7 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
       .eq("decision", "pending")
       .order("saved_at"),
     admin.from("event_settings").select("submissions_close_at, publish_finalists, publish_winners").eq("id", 1).single(),
-    admin.from("judge_ai_notes").select("entry_id"),
+    admin.from("judge_ai_notes").select("entry_id, notes"),
   ]);
   const ratings = showAi ? await admin.from("judge_ai_ratings").select("entry_id, rating") : { data: [] };
   const aiRating = new Map((ratings.data ?? []).map((r) => [r.entry_id as string, r.rating as number]));
@@ -117,7 +117,8 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
   const withoutSubmission = Math.max(0, (teams.count ?? 0) - rows.filter((r) => r.submitted && r.team_id).length);
   const unassigned = rows.filter((r) => r.submitted && !judgeOf.has(r.entry_id)).length;
   const finalists = rows.filter((r) => r.is_finalist);
-  const withNotes = new Set((aiNotes.data ?? []).map((n) => n.entry_id as string));
+  const notesBy = new Map((aiNotes.data ?? []).map((n) => [n.entry_id as string, n.notes as Partial<AiNotesBody> | null]));
+  const withNotes = new Set(notesBy.keys());
   const notedCount = rows.filter((r) => r.submitted && withNotes.has(r.entry_id)).length;
   const s = settings.data;
 
@@ -221,7 +222,7 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
                       <span className="font-medium">{r.team_name}</span>
                       <span className="block text-xs text-foreground/60">{r.title || "Untitled"}</span>
                       {!r.team_id && <span className="text-xs text-foreground/60">fallback entry</span>}
-                      {withNotes.has(r.entry_id) && <span className="ml-1 text-xs text-foreground/50">· AI notes</span>}
+                      {withNotes.has(r.entry_id) && <AdminNotes notes={notesBy.get(r.entry_id) ?? null} />}
                     </td>
                     <td className={td}>
                       {r.last_saved_at ? formatPacific(r.last_saved_at) : <span className="text-foreground/50">not yet</span>}
@@ -324,5 +325,39 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
         </section>
       )}
     </div>
+  );
+}
+
+// The AI notes judges see for an entry, readable here so admins can check them in either world
+// (test entries are hidden from real accounts on /judge). Never shows the tie-break rating.
+function AdminNotes({ notes }: { notes: Partial<AiNotesBody> | null }) {
+  const list = <T,>(v: T[] | undefined) => (Array.isArray(v) ? v : []);
+  const focus = list(notes?.focus);
+  const criteria = list(notes?.criteria);
+  const unknowns = list(notes?.unknowns);
+  return (
+    <details className="mt-1 text-xs">
+      <summary className="cursor-pointer text-foreground/70 underline underline-offset-2">AI notes: view</summary>
+      <div className="mt-1 max-w-md space-y-2 rounded border border-foreground/15 p-2 text-foreground/80">
+        {focus.length > 0 && (
+          <div>
+            <p className="font-medium">Focus on</p>
+            <ul className="list-disc pl-4">{focus.map((f, i) => <li key={i}>{f}</li>)}</ul>
+          </div>
+        )}
+        {criteria.map((c, i) => (
+          <div key={i}>
+            <p className="font-medium">{c.criterion}</p>
+            <p>{c.note}</p>
+          </div>
+        ))}
+        {unknowns.length > 0 && (
+          <div>
+            <p className="font-medium">AI couldn&apos;t tell</p>
+            <ul className="list-disc pl-4">{unknowns.map((u, i) => <li key={i}>{u}</li>)}</ul>
+          </div>
+        )}
+      </div>
+    </details>
   );
 }
