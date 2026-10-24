@@ -96,3 +96,19 @@ export function fitFor(team: FitTeam, person: FitPerson): Fit {
 
   return { score, reasons };
 }
+
+// The same fit, from the person's side ("Best fit for me" on /teams): same score, reasons
+// phrased for them. Still only roles and words from their own public profile, never the
+// private signals behind the score.
+export function fitForViewer(team: FitTeam, person: FitPerson): Fit {
+  const { score, reasons } = fitFor(team, person);
+  return {
+    score,
+    reasons: reasons.map((reason) => {
+      if (reason.startsWith("Your team needs ")) return `They need ${reason.slice("Your team needs ".length)}, like you`;
+      if (reason.startsWith("Also mentions ")) return `You both mention ${reason.slice("Also mentions ".length)}`;
+      if (reason === "Background fits your concept") return "Your background fits their idea";
+      return reason;
+    }),
+  };
+}
