@@ -5,7 +5,7 @@ import { formatPacific } from "@/lib/time";
 import { formatScore } from "@/app/(judge)/_lib/scoring";
 import { SubmitButton } from "../submit-button";
 import { autoAssign, decideLateSave, setPublish } from "./actions";
-import { FinalistForm, JudgeForm, type JudgeOption } from "./row-forms";
+import { FallbackEntryForm, FinalistForm, JudgeForm, type JudgeOption } from "./row-forms";
 
 // Admin judging: one row per entry with its judge, scores, finalist, and place; late saves to
 // accept or reject; publish toggles. docs/REQUIREMENTS.md, "Judging app (Dev B)", admin table.
@@ -174,6 +174,7 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
           judge adjusts a score). Override with the finalist column. Judges and their load:{" "}
           {judgeOptions.length ? judgeOptions.map((j) => `${j.name} ${j.load}`).join(", ") : "nobody has the judge role yet"}.
         </p>
+        {!isTest && <FallbackEntryForm />}
         {rows.length === 0 ? (
           <p className="text-sm">No entries yet.</p>
         ) : (

@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { assertAdmin } from "@/lib/admin";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { checkEntry } from "@/app/(judge)/submit/_lib/checklist";
+import { LIMITS } from "@/app/(judge)/submit/_lib/entry";
 
 // Admin judging actions. Each re-checks the caller is an admin, then writes with the
 // service-role client (the admin layout's check is not enough on its own).
@@ -157,4 +159,66 @@ export async function setPublish(formData: FormData) {
   if (error) throw new Error(error.message);
   revalidatePath("/results");
   done();
+}
+
+const EMAIL = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/;
+
+function fieldText(formData: FormData, key: string, max: number) {
+  const value = formData.get(key);
+  return typeof value === "string" ? value.trim().slice(0, max) : "";
+}
+
+function isWebUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+// Fallback (docs/REQUIREMENTS.md, "Working agreement"): an entry for a team that isn't on the
+// Teams app, with a free-text team name and member emails. Real world only (no team, so not
+// test). Members can't edit it; an admin enters it for them. Emails stay admin-only.
+export async function createFallbackEntry(_prev: RowState, formData: FormData): Promise<RowState> {
+  const me = await assertAdmin();
+  const teamName = fieldText(formData, "team_name", 60);
+  const emails = [...new Set(fieldText(formData, "member_emails", 1000).toLowerCase().split(/[\s,;]+/).filter(Boolean))];
+  const values = {
+    title: fieldText(formData, "title", LIMITS.title),
+    tagline: fieldText(formData, "tagline", LIMITS.tagline),
+    description_short: fieldText(formData, "description_short", LIMITS.description_short),
+    description_long: fieldText(formData, "description_long", LIMITS.description_long),
+    video_url: fieldText(formData, "video_url", LIMITS.url),
+    repo_url: fieldText(formData, "repo_url", LIMITS.url),
+    links: [],
+  };
+
+  if (teamName.length < 2) return { status: "error", message: "Add the team's name." };
+  if (!emails.length || emails.length > 6) return { status: "error", message: "Add 1 to 6 member emails." };
+  const bad = emails.find((e) => !EMAIL.test(e));
+  if (bad) return { status: "error", message: `“${bad}” isn't an email address.` };
+  if (!values.title) return { status: "error", message: "Add the project title." };
+  if (!isWebUrl(values.video_url) || !isWebUrl(values.repo_url)) {
+    return { status: "error", message: "The demo video and repo links are required and start with https://." };
+  }
+
+  const checklist = await checkEntry(values);
+  const { error } = await createAdminClient()
+    .from("judge_entries")
+    .insert({
+      fallback_team_name: teamName,
+      fallback_member_emails: emails,
+      title: values.title,
+      tagline: values.tagline || null,
+      description_short: values.description_short || null,
+      description_long: values.description_long || null,
+      video_url: values.video_url,
+      repo_url: values.repo_url,
+      checklist,
+      last_saved_at: new Date().toISOString(),
+      last_saved_by: me.id,
+    });
+  if (error) return { status: "error", message: error.message };
+  return { ...done(), message: `Added ${teamName}.` };
 }
