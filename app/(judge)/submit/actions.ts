@@ -68,7 +68,7 @@ export async function saveEntry(_prev: SaveState, formData: FormData): Promise<S
     }
   }
 
-  const checklist = await checkEntry(values);
+  const checklist = await checkEntry(values, ctx.entry);
   const supabase = await createClient();
 
   // After the deadline, keep the save for an organizer instead of losing it.
