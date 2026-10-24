@@ -28,7 +28,7 @@ export default async function SubmitPage() {
     );
   }
 
-  const { team, entry, lateSave, closesAt, isPast } = ctx;
+  const { team, entry, lateSave, closesAt, isPast, teamwork } = ctx;
   const values: EntryValues = entry
     ? {
         title: entry.title,
@@ -38,6 +38,7 @@ export default async function SubmitPage() {
         video_url: entry.video_url,
         repo_url: entry.repo_url,
         links: entry.links,
+        contributions: entry.contributions,
       }
     : {
     title: team.name,
@@ -47,6 +48,7 @@ export default async function SubmitPage() {
     video_url: "",
     repo_url: "",
     links: [],
+    contributions: "",
   };
 
   return (
@@ -70,7 +72,7 @@ export default async function SubmitPage() {
 
       {isPast ? (
         entry ? (
-          <ReadOnlyEntry entry={entry} />
+          <ReadOnlyEntry entry={entry} teamwork={teamwork} />
         ) : (
           <p className="text-fg-muted">Your team didn&apos;t submit an entry before the deadline. Find an organizer.</p>
         )
@@ -81,6 +83,7 @@ export default async function SubmitPage() {
           saved={{ values, savedAt: entry?.last_saved_at ?? null, savedBy: entry?.last_saved_by_name ?? null }}
           limits={LIMITS}
           videoHint={VIDEO_HOSTS_HINT}
+          teamwork={teamwork}
         />
       )}
     </div>
@@ -154,7 +157,7 @@ function ChecklistView({ checklist }: { checklist: Checklist }) {
   );
 }
 
-function ReadOnlyEntry({ entry }: { entry: Entry }) {
+function ReadOnlyEntry({ entry, teamwork }: { entry: Entry; teamwork: boolean }) {
   const rows: [string, React.ReactNode][] = [
     ["Title", entry.title],
     ["Tagline", entry.tagline],
@@ -162,6 +165,7 @@ function ReadOnlyEntry({ entry }: { entry: Entry }) {
     ["Long description", entry.description_long],
     ["Demo video", entry.video_url && <ExternalLink href={entry.video_url} />],
     ["GitHub repo", entry.repo_url && <ExternalLink href={entry.repo_url} />],
+    ...(teamwork || entry.contributions ? ([["Who did what", entry.contributions]] as [string, React.ReactNode][]) : []),
   ];
   return (
     <dl className="space-y-4">

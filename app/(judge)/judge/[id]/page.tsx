@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { EntryDetails } from "../../_components/entry-details";
 import { PageHeader, Sig } from "../../_components/ui";
-import { CRITERIA } from "../../_lib/scoring";
+import { scoresByKey } from "../../_lib/scoring";
 import { saveScore } from "../actions";
 import { ScoreForm } from "../_components/score-form";
 import { getEntryForJudge, getJudgeViewer, type Round } from "../_lib/judge";
@@ -23,7 +23,8 @@ export default async function JudgeEntryPage({ params, searchParams }: PageProps
 
   const data = await getEntryForJudge(viewer.id, id, round);
   if (!data) notFound();
-  const { entry, roster, canScore, isAssigned, isFinalist, myScore, notes } = data;
+  const { entry, roster, canScore, isAssigned, isFinalist, myScore, notes, criteria } = data;
+  const initial = myScore ? { byKey: Object.fromEntries(scoresByKey(myScore)), comment: myScore.comment } : null;
 
   return (
     <div className="space-y-10">
@@ -102,7 +103,7 @@ export default async function JudgeEntryPage({ params, searchParams }: PageProps
       <section className="space-y-4 border-t border-line pt-8" aria-labelledby="score-heading">
         <Sig call={`Score(${round})`} title={`Your ${round === "final" ? "final-round" : "prelim"} score`} id="score-heading" />
         {canScore ? (
-          <ScoreForm key={round} action={saveScore} entryId={entry.id} round={round} initial={myScore} />
+          <ScoreForm key={round} action={saveScore} entryId={entry.id} round={round} criteria={criteria} initial={initial} />
         ) : (
           <p className="text-fg-muted">
             {round === "final"
@@ -125,9 +126,12 @@ export default async function JudgeEntryPage({ params, searchParams }: PageProps
               </tr>
             </thead>
             <tbody>
-              {CRITERIA.map((c) => (
-                <tr key={c.name} className="border-t border-line align-top">
-                  <td className="py-1 pr-2 font-medium">{c.name}</td>
+              {criteria.map((c) => (
+                <tr key={c.key} className="border-t border-line align-top">
+                  <td className="py-1 pr-2 font-medium">
+                    {c.name}
+                    {c.note && <span className="block font-normal text-fg-muted">{c.note}</span>}
+                  </td>
                   {c.anchors.map((a) => (
                     <td key={a} className="py-1 pr-2 text-fg-muted">
                       {a}

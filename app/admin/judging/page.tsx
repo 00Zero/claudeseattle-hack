@@ -2,11 +2,12 @@ import Link from "next/link";
 import { requireAdminPage } from "@/lib/admin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPacific } from "@/lib/time";
-import { formatScore } from "@/app/(judge)/_lib/scoring";
+import { criteriaLocked, getEnabledCriteria } from "@/app/(judge)/_lib/criteria";
+import { ALL_CRITERIA, DEFAULT_CRITERIA, formatScore, sameCriteria } from "@/app/(judge)/_lib/scoring";
 import { SubmitButton } from "../submit-button";
 import { decideLateSave, setPublish } from "./actions";
 import { aiNotesConfigured, type AiNotesBody } from "@/app/(judge)/_lib/ai-notes";
-import { AiNotesForm, AutoAssignForm, FallbackEntryForm, FinalistForm, JudgeForm, type JudgeOption } from "./row-forms";
+import { AiNotesForm, AutoAssignForm, CriteriaForm, FallbackEntryForm, FinalistForm, JudgeForm, type JudgeOption } from "./row-forms";
 
 // Admin judging: one row per entry with its judge, scores, finalist, and place; late saves to
 // accept or reject; publish toggles. docs/REQUIREMENTS.md, "Judging app (Dev B)", admin table.
@@ -60,7 +61,7 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
   const aiParam = showAi ? "&ai=1" : "";
 
   const admin = createAdminClient();
-  const [results, entries, assignments, judges, teams, lateSaves, settings, aiNotes] = await Promise.all([
+  const [results, entries, assignments, judges, teams, lateSaves, settings, aiNotes, enabled, lock] = await Promise.all([
     admin.from("judge_entry_results").select("*"),
     admin.from("judge_entries").select("id, finalist_override"),
     admin.from("judge_assignments").select("entry_id, judge_id"),
@@ -78,9 +79,14 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
       .order("saved_at"),
     admin.from("event_settings").select("submissions_close_at, publish_finalists, publish_winners").eq("id", 1).single(),
     admin.from("judge_ai_notes").select("entry_id, notes"),
+    getEnabledCriteria(admin),
+    criteriaLocked(admin),
   ]);
-  const ratings = showAi ? await admin.from("judge_ai_ratings").select("entry_id, rating") : { data: [] };
-  const aiRating = new Map((ratings.data ?? []).map((r) => [r.entry_id as string, r.rating as number]));
+  const ratings = showAi ? await admin.from("judge_ai_ratings").select("entry_id, rating, criteria") : { data: [] };
+  // A rating made with other criteria than the enabled ones is flagged until notes are rewritten.
+  const aiRating = new Map(
+    (ratings.data ?? []).map((r) => [r.entry_id as string, { rating: r.rating as number, stale: !sameCriteria(r.criteria as string[] | null, enabled.keys) }]),
+  );
 
   if (results.error) {
     return (
@@ -188,13 +194,39 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
       </div>
 
       <section className="space-y-3">
+        <h2 className="text-lg font-semibold">Criteria</h2>
+        <p className="text-sm text-foreground/70">
+          What judges score, each 1–8 with equal weight; an entry&apos;s score is the mean of the criteria on. Applies to
+          both worlds: the score form, anchors, AI notes and the AI tie-break follow it.
+        </p>
+        {lock.locked ? (
+          <p className="rounded bg-accent-soft px-2 py-1 text-sm">
+            {lock.failed
+              ? "Locked: couldn't check for scores, so the criteria can't change right now. Reload to try again."
+              : `Locked: judges have saved ${lock.scores} real score${lock.scores === 1 ? "" : "s"}, and every score in a round must use the same criteria. Test-world scores don't lock it.`}
+          </p>
+        ) : (
+          <p className="text-xs text-foreground/60">
+            Choose before judging starts: this locks once a judge saves a real score (test-world scores don&apos;t count). After a
+            change, click &ldquo;Write AI notes&rdquo; again so notes and tie-break ratings cover the new criteria.
+          </p>
+        )}
+        <CriteriaForm
+          criteria={ALL_CRITERIA.map((c) => ({ key: c.key, name: c.name, note: c.note, isDefault: DEFAULT_CRITERIA.includes(c.key) }))}
+          enabled={enabled.keys}
+          locked={lock.locked}
+        />
+      </section>
+
+      <section className="space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <h2 className="text-lg font-semibold">Entries</h2>
           <AutoAssignForm world={isTest ? "test" : "real"} />
         </div>
         <p className="text-sm text-foreground/70">
           Prelim: one judge per entry; each judge&apos;s top-scored entry becomes a finalist (an exact tie makes none until the
-          judge adjusts a score). Override with the finalist column. Judges and their load:{" "}
+          judge adjusts a score). Scores are the mean of {enabled.criteria.map((c) => c.name).join(", ")}. Override with the
+          finalist column. Judges and their load:{" "}
           {judgeOptions.length ? judgeOptions.map((j) => `${j.name} ${j.load}`).join(", ") : "nobody has the judge role yet"}.
         </p>
         {!isTest && <FallbackEntryForm />}
@@ -245,7 +277,8 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
                     <td className={td}>{r.place ?? "—"}</td>
                     {showAi && (
                       <td className={td} title="Admin-only AI rating of the entry text and README. Never shown to judges, never added to scores.">
-                        {formatScore(aiRating.get(r.entry_id) ?? null)}
+                        {formatScore(aiRating.get(r.entry_id)?.rating ?? null)}
+                        {aiRating.get(r.entry_id)?.stale && <span className="block text-xs text-foreground/60">old criteria</span>}
                       </td>
                     )}
                   </tr>
