@@ -22,11 +22,13 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 export function EntryForm({
   action,
   values,
+  lastSavedAt,
   limits,
   videoHint,
 }: {
   action: (prev: SaveState, formData: FormData) => Promise<SaveState>;
   values: EntryValues;
+  lastSavedAt: string;
   limits: Limits;
   videoHint: string;
 }) {
@@ -45,6 +47,8 @@ export function EntryForm({
       }}
       className="space-y-5"
     >
+      {/* The version this form was loaded from; the save refuses if a teammate saved since. */}
+      <input type="hidden" name="last_saved_at" value={lastSavedAt} />
       <Field label="Title">
         <input name="title" required maxLength={limits.title} defaultValue={values.title} className={input} />
       </Field>
