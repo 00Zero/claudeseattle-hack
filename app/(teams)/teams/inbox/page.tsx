@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { acceptApplicant, acceptInvite, cancelInvite, declineApplicant, declineInvite, leaveTeam } from "../actions";
 import { ActionButton } from "../_components/action-button";
+import { ApplicantFitLine, ApplicantFitLoading, applicantFits } from "../_components/applicant-fit";
 import { BalanceBadges } from "../_components/badges";
 import { DeadlineBanner } from "../_components/deadline-banner";
 import { PersonDetails, personFromProfile } from "../_components/person";
@@ -24,6 +26,11 @@ export default async function InboxPage() {
   const pastInvites = inbox.invitesToMe.filter((i) => i.status !== "pending");
   const openApplications = inbox.myApplications.filter((a) => a.status === "applied");
   const pastApplications = inbox.myApplications.filter((a) => a.status !== "applied");
+  // AI read on each applicant for the leader; one call per team, streamed per card.
+  const fits =
+    inbox.myTeam?.iLead && inbox.applicationsToMyTeam.length
+      ? applicantFits(inbox.myTeam.id, inbox.applicationsToMyTeam.map((p) => p.id))
+      : null;
   const nothing =
     !openInvites.length &&
     !inbox.applicationsToMyTeam.length &&
@@ -58,6 +65,11 @@ export default async function InboxPage() {
             {inbox.applicationsToMyTeam.map((p) => (
               <li key={p.id} className="space-y-2 px-4 py-3">
                 <PersonDetails person={personFromProfile(p)} showAbout />
+                {fits && (
+                  <Suspense fallback={<ApplicantFitLoading />}>
+                    <ApplicantFitLine fits={fits} profileId={p.id} />
+                  </Suspense>
+                )}
                 <div className="flex flex-wrap items-start gap-2">
                   <ActionButton
                     action={acceptApplicant}

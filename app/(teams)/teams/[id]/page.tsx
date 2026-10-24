@@ -14,6 +14,7 @@ import {
 } from "../actions";
 import { ActionButton } from "../_components/action-button";
 import { AdminPanel } from "../_components/admin-panel";
+import { ApplicantFitLine, ApplicantFitLoading, applicantFits } from "../_components/applicant-fit";
 import { BalanceBadges } from "../_components/badges";
 import { DeadlineBanner } from "../_components/deadline-banner";
 import { SharePanel } from "../_components/share-panel";
@@ -150,6 +151,8 @@ export default async function TeamPage({ params }: PageProps<"/teams/[id]">) {
   const members = [...team.members].sort((a, b) => Number(b.is_leader) - Number(a.is_leader) || a.name.localeCompare(b.name));
   const size = members.length;
   const fields = { team_id: id };
+  // Leaders get an AI read on each applicant; one call for all of them, streamed per card.
+  const fits = team.iLead && team.applicants.length ? applicantFits(id, team.applicants.map((a) => a.id!)) : null;
 
   return (
     <div className="space-y-6">
@@ -205,6 +208,11 @@ export default async function TeamPage({ params }: PageProps<"/teams/[id]">) {
             {team.applicants.map((a) => (
               <li key={a.id} className="space-y-2 px-4 py-3">
                 <PersonDetails person={a} showAbout />
+                {fits && (
+                  <Suspense fallback={<ApplicantFitLoading />}>
+                    <ApplicantFitLine fits={fits} profileId={a.id!} />
+                  </Suspense>
+                )}
                 {a.onOtherTeam ? (
                   <div className="flex flex-wrap items-center gap-3">
                     <span className="text-sm text-fg-muted">They&apos;ve joined another team.</span>
