@@ -72,7 +72,13 @@ export default async function SubmitPage() {
           <p className="text-fg-muted">Your team didn&apos;t submit an entry before the deadline. Find an organizer.</p>
         )
       ) : (
-        <EntryForm action={saveEntry} values={values} lastSavedAt={entry?.last_saved_at ?? ""} limits={LIMITS} videoHint={VIDEO_HOSTS_HINT} />
+        <EntryForm
+          action={saveEntry}
+          teamId={team.id}
+          saved={{ values, savedAt: entry?.last_saved_at ?? null, savedBy: entry?.last_saved_by_name ?? null }}
+          limits={LIMITS}
+          videoHint={VIDEO_HOSTS_HINT}
+        />
       )}
     </div>
   );
