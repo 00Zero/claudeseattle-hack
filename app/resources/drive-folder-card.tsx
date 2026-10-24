@@ -7,10 +7,6 @@ import type { Resource } from "@/lib/resources";
 // claude.com/connectors/google-drive.
 const DRIVE_CONNECTOR_URL = "https://claude.ai/directory/b89f7865-a755-4f86-8062-c3bd651740ce";
 
-export function isDriveFolder(url: string) {
-  return /^https:\/\/drive\.google\.com\/drive\/(u\/\d+\/)?folders\//.test(url);
-}
-
 function CopyIcon() {
   return (
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

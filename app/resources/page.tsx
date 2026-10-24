@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import { getCurrentAccess } from "@/lib/access";
-import { RESOURCE_SECTIONS, type Resource } from "@/lib/resources";
+import { isDriveFolder, RESOURCE_SECTIONS, type Resource } from "@/lib/resources";
 import { createClient } from "@/lib/supabase/server";
-import { DriveFolderCard, isDriveFolder } from "./drive-folder-card";
+import { DriveFolderCard } from "./drive-folder-card";
 
 // Links for approved attendees: credits, the name tag form, the small business data folder.
 // A Google Drive folder gets its own card with buttons to open it and add Claude's Drive connector.
