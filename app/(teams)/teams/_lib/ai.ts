@@ -168,23 +168,41 @@ ${PRIVACY}
 
 For each candidate write one reason to the team leader: a single sentence of at most 20 words.`;
 
+// For a leader reviewing people who applied: an absolute judgment per applicant, not a
+// relative ranking, so a single applicant isn't "strong" just because they're the only one.
+const APPLICANT_SYSTEM = `You help a hackathon team leader decide on people who applied to join their team.
+
+${EVENT}
+
+For each applicant, score from 0 to 100 how well they fit this team on an absolute scale, not relative to the other applicants: 70 or more means a strong fit, 40 to 69 some fit, below 40 not an obvious fit. Look at who is already on the team: an applicant who fills a missing role or adds skills the members lack fits better than one who duplicates what the team already has.
+
+${PRIVACY}
+
+For each applicant write one reason to the team leader saying why they are or aren't a good fit, mentioning the current members' roles or skills where it helps: a single sentence of at most 25 words.`;
+
+export type FitMode = "picks" | "applicants";
+
 // Ranks up to ~15 candidates. Returns picks sorted by score, or null if the model is
 // unavailable. Cached by a fingerprint of everything sent, so it only reruns when the team
 // or the candidates change.
-export async function rankForTeam(team: TeamContext, candidates: MatchingProfile[]): Promise<AiPick[] | null> {
+export async function rankForTeam(
+  team: TeamContext,
+  candidates: MatchingProfile[],
+  mode: FitMode = "picks",
+): Promise<AiPick[] | null> {
   if (!candidates.length) return [];
   const aliases = candidates.map((p, i) => ({ alias: `c${i + 1}`, profile: p }));
   const payload = {
     team: teamPayload(team),
     candidates: aliases.map(({ alias, profile }) => ({ id: alias, PUBLIC: publicFields(profile), PRIVATE: privateFields(profile) })),
   };
-  const key = hashOf({ v: 5, payload });
+  const key = hashOf({ v: 5, mode, payload });
 
   // Failures throw inside the cached function (not cached) and become null out here.
   const cached = unstable_cache(
     async () => {
       const result = await callJson<{ picks: { id: string; score: number; reason: string }[] }>(
-        RANK_SYSTEM,
+        mode === "applicants" ? APPLICANT_SYSTEM : RANK_SYSTEM,
         JSON.stringify(payload),
         RANK_SCHEMA,
         4000,
