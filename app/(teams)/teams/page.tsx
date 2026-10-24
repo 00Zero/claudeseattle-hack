@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { BalanceBadges, Pill } from "./_components/badges";
 import { DeadlineBanner } from "./_components/deadline-banner";
 import { TeamsTabs } from "./_components/teams-tabs";
-import { getMyInvites, getViewer, listTeams, sortTeams, TEAM_MAX, type TeamSummary } from "./_lib/teams";
+import { inboxCount } from "./_lib/inbox";
+import { getViewer, listTeams, sortTeams, TEAM_MAX, type TeamSummary } from "./_lib/teams";
 
 export default async function TeamsPage({ searchParams }: PageProps<"/teams">) {
   const viewer = await getViewer();
@@ -18,7 +19,7 @@ export default async function TeamsPage({ searchParams }: PageProps<"/teams">) {
   const teams = query ? all.filter((t) => t.name.toLowerCase().includes(query.toLowerCase())) : all;
   const myTeamId = viewer.signedIn ? viewer.myTeamId : null;
   const myTeam = myTeamId ? all.find((t) => t.id === myTeamId) : undefined;
-  const invites = viewer.signedIn ? await getMyInvites(viewer.profile.id) : [];
+  const waiting = await inboxCount(viewer);
 
   return (
     <div className="space-y-6">
@@ -26,19 +27,17 @@ export default async function TeamsPage({ searchParams }: PageProps<"/teams">) {
         <h1 className="text-2xl font-semibold">Teams</h1>
         <DeadlineBanner />
       </div>
-      {viewer.signedIn && <TeamsTabs active="teams" />}
+      {viewer.signedIn && <TeamsTabs active="teams" inboxCount={waiting} />}
 
-      {invites.length > 0 && (
-        <ul className="space-y-2" aria-label="Your invites">
-          {invites.map((invite) => (
-            <li key={invite.teamId} className="rounded-lg border border-accent bg-accent-soft px-4 py-3 text-sm">
-              <strong>You&apos;re invited to join {invite.teamName}.</strong>{" "}
-              <Link href={`/teams/${invite.teamId}`} className="underline">
-                See the team and accept or decline
-              </Link>
-            </li>
-          ))}
-        </ul>
+      {waiting > 0 && (
+        <p className="rounded-lg border border-accent bg-accent-soft px-4 py-3 text-sm">
+          <strong>
+            {waiting} {waiting === 1 ? "thing needs" : "things need"} your answer.
+          </strong>{" "}
+          <Link href="/teams/inbox" className="underline">
+            Open your inbox
+          </Link>
+        </p>
       )}
 
       {!viewer.signedIn ? (

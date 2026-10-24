@@ -9,6 +9,7 @@ import { DeadlineBanner } from "../_components/deadline-banner";
 import { TopPicks, TopPicksLoading } from "../_components/top-picks";
 import type { TeamContext } from "../_lib/ai";
 import { TeamsTabs } from "../_components/teams-tabs";
+import { inboxCount } from "../_lib/inbox";
 import { PERSON_COLUMNS, PersonDetails, personFromProfile, type ProfileRow } from "../_components/person";
 import { fitFor, type Fit } from "../_lib/fit";
 import { balanceOf, getViewer, joinableIds, TEAM_MAX, type RoleBucket } from "../_lib/teams";
@@ -178,7 +179,7 @@ export default async function PeoplePage({ searchParams }: PageProps<"/teams/peo
         <h1 className="text-2xl font-semibold">Teams</h1>
         <DeadlineBanner />
       </div>
-      <TeamsTabs active="people" />
+      <TeamsTabs active="people" inboxCount={await inboxCount(viewer)} />
       <div className="space-y-3">
         <p className="text-sm text-fg-muted">
           {everyone.length} {everyone.length === 1 ? "person is" : "people are"} still looking. Find someone your team

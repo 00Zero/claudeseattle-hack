@@ -378,7 +378,14 @@ function ViewerPanel({ viewer, team, teamId, size }: { viewer: Viewer; team: Tea
     case "removed":
       return <p className={`${box} text-sm`}>You were removed from this team. You can apply to another team.</p>;
     case "left":
-      return <p className={`${box} text-sm`}>You left this team. You can apply to another team.</p>;
+      // Applications are withdrawn automatically when you join another team (shared_expire_on_join).
+      return (
+        <p className={`${box} text-sm`}>
+          {viewer.myTeamId && viewer.myTeamId !== teamId
+            ? "Your application here was withdrawn when you joined another team."
+            : "You left this team. You can apply to another team."}
+        </p>
+      );
   }
 
   if (viewer.joinBlockedReason) return <p className={`${box} text-sm text-fg-muted`}>{viewer.joinBlockedReason}</p>;
