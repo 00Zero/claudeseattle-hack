@@ -124,7 +124,7 @@ export async function saveEntry(formData: FormData): Promise<SaveState> {
       };
     }
 
-    const checklist = await checkEntry(values);
+    const checklist = await checkEntry(values, ctx.entry);
     if (ctx.isPast) return saveLate(values, checklist);
 
     const { saved, error } = await writeEntry(supabase, teamId, current, {

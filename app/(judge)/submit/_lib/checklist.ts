@@ -1,4 +1,5 @@
 import "server-only";
+import { githubFetch, parseGitHubRepo } from "../../_lib/github";
 import { parseVideo, VIDEO_HOSTS_HINT } from "../../_lib/video";
 import type { EntryValues } from "./entry";
 
@@ -10,7 +11,8 @@ import type { EntryValues } from "./entry";
 // can't make the server fetch an arbitrary or internal address.
 
 export type CheckStatus = "ok" | "fail" | "warn";
-export type CheckItem = { key: string; label: string; required: boolean; status: CheckStatus; detail?: string };
+// checkedAt is set only on a passing repo check (see recentRepoPass).
+export type CheckItem = { key: string; label: string; required: boolean; status: CheckStatus; detail?: string; checkedAt?: string };
 export type Checklist = { checkedAt: string; items: CheckItem[] };
 
 const TIMEOUT_MS = 4000;
@@ -24,20 +26,36 @@ async function get(url: string, headers: Record<string, string> = {}) {
   }
 }
 
-const GITHUB_PART = /^[A-Za-z0-9_.-]{1,100}$/;
-
-export function parseGitHubRepo(raw: string) {
-  let url: URL;
+async function getRepo(owner: string, repo: string) {
   try {
-    url = new URL(raw.trim());
+    const res = await githubFetch(`/repos/${owner}/${repo}`, "application/vnd.github+json", TIMEOUT_MS);
+    return { status: res.status, json: res.ok ? await res.json().catch(() => null) : null };
   } catch {
-    return null;
+    return { status: 0, json: null };
   }
-  if (url.protocol !== "https:" || url.hostname.replace(/^www\./, "") !== "github.com") return null;
-  const [owner, repo] = url.pathname.split("/").filter(Boolean);
-  const name = repo?.replace(/\.git$/, "");
-  if (!owner || !name || !GITHUB_PART.test(owner) || !GITHUB_PART.test(name)) return null;
-  return { owner, repo: name };
+}
+
+// A passing repo check is reused for a while when the link hasn't changed, so a team saving every
+// few minutes before 5:30 doesn't spend GitHub's rate limit on the same answer. It's read from the
+// entry's stored checklist rather than an in-memory cache: the save already loads it, and Vercel
+// instances don't share memory. The repo item keeps the time of its own GitHub call, so reuse
+// can't extend itself save after save. Failures and warnings are never reused, so a team that just
+// made its repo public is rechecked on the next save.
+const REPO_RECHECK_MS = 10 * 60 * 1000;
+export type PreviousCheck = { repo_url: string; checklist: Checklist | null } | null;
+
+function repoKey(raw: string) {
+  const parsed = parseGitHubRepo(raw);
+  return parsed && `${parsed.owner}/${parsed.repo}`.toLowerCase();
+}
+
+function recentRepoPass(raw: string, previous: PreviousCheck): CheckItem | null {
+  const item = previous?.checklist?.items.find((i) => i.key === "repo");
+  if (!previous || item?.status !== "ok" || !item.checkedAt) return null;
+  const key = repoKey(raw);
+  if (!key || key !== repoKey(previous.repo_url)) return null;
+  const age = Date.now() - Date.parse(item.checkedAt);
+  return age >= 0 && age < REPO_RECHECK_MS ? item : null;
 }
 
 async function checkRepo(raw: string): Promise<CheckItem> {
@@ -46,15 +64,12 @@ async function checkRepo(raw: string): Promise<CheckItem> {
   const parsed = parseGitHubRepo(raw);
   if (!parsed) return { ...base, status: "fail", detail: "Use a link like https://github.com/your-org/your-repo." };
 
-  const { status, json } = await get(`https://api.github.com/repos/${parsed.owner}/${parsed.repo}`, {
-    Accept: "application/vnd.github+json",
-    "User-Agent": "hack.claudeseattle.org",
-  });
+  const { status, json } = await getRepo(parsed.owner, parsed.repo);
   if (status === 200 && json?.private === false) {
     const empty = json?.size === 0;
     return empty
       ? { ...base, status: "warn", detail: "The repo is public but empty. Push your code before 5:30." }
-      : { ...base, status: "ok" };
+      : { ...base, status: "ok", checkedAt: new Date().toISOString() };
   }
   if (status === 404) return { ...base, status: "fail", detail: "GitHub can't find it. Check the link and make the repo public." };
   if (status === 200) return { ...base, status: "fail", detail: "The repo is private. Make it public so judges can open it." };
@@ -92,8 +107,12 @@ function filled(key: string, label: string, value: string, required: boolean, hi
   return value ? { key, label, required, status: "ok" } : { key, label, required, status: required ? "fail" : "warn", detail: hint };
 }
 
-export async function checkEntry(values: EntryValues): Promise<Checklist> {
-  const [repo, video] = await Promise.all([checkRepo(values.repo_url), checkVideo(values.video_url)]);
+// previous: the entry as last saved, to reuse a recent passing repo check.
+export async function checkEntry(values: EntryValues, previous: PreviousCheck = null): Promise<Checklist> {
+  const [repo, video] = await Promise.all([
+    recentRepoPass(values.repo_url, previous) ?? checkRepo(values.repo_url),
+    checkVideo(values.video_url),
+  ]);
   return {
     checkedAt: new Date().toISOString(),
     items: [
