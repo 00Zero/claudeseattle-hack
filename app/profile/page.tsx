@@ -38,7 +38,7 @@ export default async function ProfilePage() {
               [profile.first_name, profile.last_name].filter(Boolean).join(" "),
               profile.job_title,
               profile.company,
-              nameTagRole(profile),
+              await nameTagRole(profile),
             ]
               .filter(Boolean)
               .join(" · ")}
