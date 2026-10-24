@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { normalizeGithubUsername, normalizeLinkedinUrl } from "../_lib/links";
 import { ROLE_SHORT } from "@/lib/roles";
 import type { RoleBucket } from "../_lib/teams";
@@ -70,11 +71,28 @@ export function personFromProfile(p: ProfileRow, leaderId: string | null = null)
   };
 }
 
-export function PersonDetails({ person: p, showAbout = false }: { person: Person; showAbout?: boolean }) {
+// Names link to the person's profile (/teams/people/[id]) wherever we know who they are; the
+// public team page has no ids, so names there stay plain text.
+export function PersonDetails({
+  person: p,
+  showAbout = false,
+  linkName = true,
+}: {
+  person: Person;
+  showAbout?: boolean;
+  linkName?: boolean;
+}) {
+  const nameClass = p.name === NO_NAME ? "font-medium italic text-fg-muted" : "font-medium";
   return (
     <div className="space-y-1">
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className={p.name === NO_NAME ? "font-medium italic text-fg-muted" : "font-medium"}>{p.name}</span>
+        {linkName && p.id ? (
+          <Link href={`/teams/people/${p.id}`} className={`${nameClass} underline decoration-line-strong underline-offset-2 hover:decoration-fg`}>
+            {p.name}
+          </Link>
+        ) : (
+          <span className={nameClass}>{p.name}</span>
+        )}
         {p.is_leader && <Pill tone="accent">Leader</Pill>}
         {p.is_mentor && <Pill>Mentor</Pill>}
         {p.role_bucket && !p.is_mentor && <Pill>{ROLE_SHORT[p.role_bucket]}</Pill>}
