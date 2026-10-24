@@ -52,7 +52,17 @@ export default async function JudgeEntryPage({ params, searchParams }: PageProps
           <summary className="cursor-pointer text-sm font-medium">AI notes: what to dig into</summary>
           <div className="mt-2 space-y-2 text-sm">
             <p className="text-fg-faint">Written by {notes.model}. A starting point only; never added to your score.</p>
-            {notes.notes.map((n, i) => (
+            {notes.focus.length > 0 && (
+              <div className="rounded bg-accent-soft px-3 py-2">
+                <p className="font-medium">Focus on</p>
+                <ul className="list-disc pl-5">
+                  {notes.focus.map((f, i) => (
+                    <li key={i}>{f}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {notes.criteria.map((n, i) => (
               <div key={i}>
                 <p className="font-medium">
                   {n.criterion}

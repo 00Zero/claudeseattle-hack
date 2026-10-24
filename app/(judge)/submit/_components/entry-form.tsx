@@ -61,10 +61,10 @@ export function EntryForm({
         <textarea name="description_long" rows={10} maxLength={limits.description_long} defaultValue={values.description_long} className={input} />
       </Field>
       <Field label="Demo video link (required)" hint={`${videoHint}. Show the problem, the solution, and a walkthrough.`}>
-        <input name="video_url" type="url" inputMode="url" placeholder="https://www.youtube.com/watch?v=…" maxLength={limits.url} defaultValue={values.video_url} className={input} />
+        <input name="video_url" type="url" required inputMode="url" placeholder="https://www.youtube.com/watch?v=…" maxLength={limits.url} defaultValue={values.video_url} className={input} />
       </Field>
       <Field label="GitHub repo link (required)" hint="Public, with a README a small business could follow. It's shared with other businesses after the event.">
-        <input name="repo_url" type="url" inputMode="url" placeholder="https://github.com/your-org/your-repo" maxLength={limits.url} defaultValue={values.repo_url} className={input} />
+        <input name="repo_url" type="url" required inputMode="url" placeholder="https://github.com/your-org/your-repo" maxLength={limits.url} defaultValue={values.repo_url} className={input} />
       </Field>
 
       <fieldset className="space-y-2">

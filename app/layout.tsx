@@ -47,7 +47,7 @@ export default async function RootLayout({
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} ${newsreader.variable} antialiased`}>
         {profile?.is_test && <TestAccountBanner name={`${profile.first_name} ${profile.last_name}`} />}
-        <TitleBar signedIn={Boolean(profile)} isAdmin={isAdmin} />
+        <TitleBar signedIn={Boolean(profile)} isAdmin={isAdmin} isJudge={profile?.platform_role === "judge"} />
         <ThemeSync />
         <main className="mx-auto max-w-4xl px-4 py-8">{children}</main>
       </body>

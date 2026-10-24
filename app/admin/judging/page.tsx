@@ -5,11 +5,15 @@ import { formatPacific } from "@/lib/time";
 import { formatScore } from "@/app/(judge)/_lib/scoring";
 import { SubmitButton } from "../submit-button";
 import { autoAssign, decideLateSave, setPublish } from "./actions";
-import { FinalistForm, JudgeForm, type JudgeOption } from "./row-forms";
+import { aiNotesConfigured } from "@/app/(judge)/_lib/ai-notes";
+import { AiNotesForm, FallbackEntryForm, FinalistForm, JudgeForm, type JudgeOption } from "./row-forms";
 
 // Admin judging: one row per entry with its judge, scores, finalist, and place; late saves to
 // accept or reject; publish toggles. docs/REQUIREMENTS.md, "Judging app (Dev B)", admin table.
 // Reads judge_entry_results with the service role, after the admin check.
+
+// "Write AI notes" runs a batch of model calls in one server action.
+export const maxDuration = 300;
 
 type Result = {
   entry_id: string;
@@ -53,7 +57,7 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
   const worldParam = isTest ? "&world=test" : "";
 
   const admin = createAdminClient();
-  const [results, entries, assignments, judges, teams, lateSaves, settings] = await Promise.all([
+  const [results, entries, assignments, judges, teams, lateSaves, settings, aiNotes] = await Promise.all([
     admin.from("judge_entry_results").select("*"),
     admin.from("judge_entries").select("id, finalist_override"),
     admin.from("judge_assignments").select("entry_id, judge_id"),
@@ -70,6 +74,7 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
       .eq("decision", "pending")
       .order("saved_at"),
     admin.from("event_settings").select("submissions_close_at, publish_finalists, publish_winners").eq("id", 1).single(),
+    admin.from("judge_ai_notes").select("entry_id"),
   ]);
 
   if (results.error) {
@@ -107,6 +112,8 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
   const withoutSubmission = Math.max(0, (teams.count ?? 0) - rows.filter((r) => r.submitted && r.team_id).length);
   const unassigned = rows.filter((r) => r.submitted && !judgeOf.has(r.entry_id)).length;
   const finalists = rows.filter((r) => r.is_finalist);
+  const withNotes = new Set((aiNotes.data ?? []).map((n) => n.entry_id as string));
+  const notedCount = rows.filter((r) => r.submitted && withNotes.has(r.entry_id)).length;
   const s = settings.data;
 
   const header = (key: SortKey, label: string) => (
@@ -155,6 +162,17 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
           </span>
           <span className="rounded bg-foreground/5 px-2 py-1">{unassigned} submitted entries without a judge</span>
           <span className="rounded bg-foreground/5 px-2 py-1">{finalists.length} finalists</span>
+          <span className="rounded bg-foreground/5 px-2 py-1">
+            AI notes: {notedCount}/{submittedCount}
+          </span>
+        </div>
+        <div className="space-y-1">
+          <AiNotesForm world={isTest ? "test" : "real"} disabled={!aiNotesConfigured()} />
+          <p className="text-xs text-foreground/60">
+            Claude reads each submitted entry and its README and writes 2–3 sentences per criterion plus a draft score. Judges
+            see them collapsed on the entry page; never public, never added to scores. Run it after submissions close, and
+            again for entries that changed.
+          </p>
         </div>
         {s && <p className="text-sm text-foreground/70">Submissions close {formatPacific(s.submissions_close_at)}. Change it on the Settings tab.</p>}
       </div>
@@ -174,6 +192,7 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
           judge adjusts a score). Override with the finalist column. Judges and their load:{" "}
           {judgeOptions.length ? judgeOptions.map((j) => `${j.name} ${j.load}`).join(", ") : "nobody has the judge role yet"}.
         </p>
+        {!isTest && <FallbackEntryForm />}
         {rows.length === 0 ? (
           <p className="text-sm">No entries yet.</p>
         ) : (
@@ -197,6 +216,7 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
                       <span className="font-medium">{r.team_name}</span>
                       <span className="block text-xs text-foreground/60">{r.title || "Untitled"}</span>
                       {!r.team_id && <span className="text-xs text-foreground/60">fallback entry</span>}
+                      {withNotes.has(r.entry_id) && <span className="ml-1 text-xs text-foreground/50">· AI notes</span>}
                     </td>
                     <td className={td}>
                       {r.last_saved_at ? formatPacific(r.last_saved_at) : <span className="text-foreground/50">not yet</span>}

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { checkEntry } from "./_lib/checklist";
-import { getSubmitContext, LIMITS, type EntryLink, type EntryValues } from "./_lib/entry";
+import { getSubmissionDeadline, getSubmitContext, LIMITS, type EntryLink, type EntryValues } from "./_lib/entry";
 
 export type SaveState = { status: "idle" | "ok" | "late" | "error"; message?: string };
 
@@ -58,8 +58,11 @@ export async function saveEntry(_prev: SaveState, formData: FormData): Promise<S
     links,
   };
   if (!values.title) return { status: "error", message: "Give your project a title." };
+  // docs/REQUIREMENTS.md: demo video and repo are required. Whether they load is the checklist's job.
+  if (!values.video_url) return { status: "error", message: "Add a link to your demo video. You can update it any time before the deadline." };
+  if (!values.repo_url) return { status: "error", message: "Add your GitHub repo link. You can update it any time before the deadline." };
   for (const key of ["video_url", "repo_url"] as const) {
-    if (values[key] && !isWebUrl(values[key])) {
+    if (!isWebUrl(values[key])) {
       return { status: "error", message: `The ${key === "video_url" ? "demo video" : "repo"} link should start with https://.` };
     }
   }
@@ -67,10 +70,12 @@ export async function saveEntry(_prev: SaveState, formData: FormData): Promise<S
   const checklist = await checkEntry(values);
   const supabase = await createClient();
 
-  if (ctx.isPast) {
+  // After the deadline, keep the save for an organizer instead of losing it.
+  const teamId = ctx.team.id;
+  async function saveLate(): Promise<SaveState> {
     const { error } = await supabase
       .from("judge_late_saves")
-      .insert({ team_id: ctx.team.id, payload: { ...values, checklist } });
+      .insert({ team_id: teamId, payload: { ...values, checklist } });
     if (error) return { status: "error", message: "We couldn't save your changes. Find an organizer." };
     revalidatePath("/submit");
     return {
@@ -78,6 +83,8 @@ export async function saveEntry(_prev: SaveState, formData: FormData): Promise<S
       message: "Submissions closed, so this save is marked late. An organizer will accept or reject it.",
     };
   }
+
+  if (ctx.isPast) return saveLate();
 
   const row = {
     title: values.title,
@@ -89,13 +96,14 @@ export async function saveEntry(_prev: SaveState, formData: FormData): Promise<S
     links: values.links,
     checklist,
   };
-  const { error } = ctx.entry
-    ? await supabase.from("judge_entries").update(row).eq("id", ctx.entry.id)
-    : await supabase.from("judge_entries").insert({ ...row, team_id: ctx.team.id });
-  if (error) {
-    // Raced the deadline, or a teammate created the entry a moment ago.
-    if (error.code === "42501") return { status: "error", message: "Submissions just closed. Reload the page." };
-    if (error.code === "23505") return { status: "error", message: "A teammate just saved. Reload the page and try again." };
+  const { data: saved, error } = ctx.entry
+    ? await supabase.from("judge_entries").update(row).eq("id", ctx.entry.id).select("id")
+    : await supabase.from("judge_entries").insert({ ...row, team_id: ctx.team.id }).select("id");
+  if (error || !saved?.length) {
+    // The deadline passed while this save was running (the link checks take a few seconds), so
+    // RLS refused it: store it as a late save rather than dropping it.
+    if ((await getSubmissionDeadline()).isPast) return saveLate();
+    if (error?.code === "23505") return { status: "error", message: "A teammate just saved. Reload the page and try again." };
     return { status: "error", message: "We couldn't save your entry. Try again." };
   }
 
@@ -103,6 +111,6 @@ export async function saveEntry(_prev: SaveState, formData: FormData): Promise<S
   const missing = checklist.items.filter((item) => item.required && item.status !== "ok").length;
   return {
     status: "ok",
-    message: missing ? `Saved. ${missing} required item${missing === 1 ? "" : "s"} still need fixing.` : "Saved. Everything judges need is there.",
+    message: missing ? `Saved. ${missing} required item${missing === 1 ? " still needs" : "s still need"} fixing.` : "Saved. Everything judges need is there.",
   };
 }
