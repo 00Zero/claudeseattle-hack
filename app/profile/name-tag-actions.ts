@@ -22,7 +22,8 @@ export async function requestNameTag(): Promise<NameTagState> {
   if (!nameTagsStatus(await getNameTagSettings()).open) {
     return { status: "error", message: "Name tag printing is turned off right now." };
   }
-  const retryAt = await nameTagRetryAt(profile.id);
+  // Admins can reprint any time, for when a tag comes out wrong.
+  const retryAt = profile.platform_role === "admin" ? null : await nameTagRetryAt(profile.id);
   if (retryAt) return { status: "wait", retryAt };
 
   const { error } = await createAdminClient()

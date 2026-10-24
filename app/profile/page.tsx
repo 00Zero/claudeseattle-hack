@@ -34,6 +34,7 @@ export default async function ProfilePage() {
         )}
         {nameTagsOpen && (
           <NameTagButton
+            isAdmin={profile.platform_role === "admin"}
             preview={[
               [profile.first_name, profile.last_name].filter(Boolean).join(" "),
               profile.job_title,
