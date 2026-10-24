@@ -70,7 +70,7 @@ criteria names and anchors can change without a migration.
 - [x] `/entries` and `/entries/[id]`: public entry pages after the deadline
 
 ### 6. Nice-to-haves, in order — Fri, only if must-haves are done
-1. AI notes at the deadline through the Vercel AI Gateway (`AI_GATEWAY_API_KEY`, `anthropic/*` first): 2–3 sentences per criterion plus a draft score; collapsed for judges, never public, never added to scores
+1. (built: "Write AI notes" on `/admin/judging`) AI notes at the deadline through the Vercel AI Gateway (`AI_GATEWAY_API_KEY`, `anthropic/*` first): 2–3 sentences per criterion plus a draft score; collapsed for judges, never public, never added to scores
 2. ~~Auto-distribute entries evenly across judges, manual override~~ (done: "Auto-assign" on `/admin/judging`)
 3. Hide chosen entry fields from judges
 

@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/supabase/profile";
+import type { AiNotesBody } from "../../_lib/ai-notes";
 import { mean, rankByScore } from "../../_lib/scoring";
 
 // Data for /judge. Everything reads as the logged-in judge, so RLS limits it to their own
@@ -109,6 +110,13 @@ export async function getEntryForJudge(judgeId: string, entryId: string, round: 
     isAssigned: Boolean(assigned.data),
     isFinalist,
     myScore: scores.get(entryId) ?? null,
-    notes: notes.data as { notes: { criterion: string; note: string }[]; draft_scores: number[] | null; model: string } | null,
+    notes: notes.data ? { ...normalizeNotes(notes.data.notes), draft_scores: (notes.data.draft_scores as number[] | null) ?? null, model: notes.data.model as string } : null,
   };
+}
+
+// judge_ai_notes.notes is { focus, criteria }; tolerate a bare criteria array too.
+function normalizeNotes(raw: unknown): AiNotesBody {
+  if (Array.isArray(raw)) return { focus: [], criteria: raw as AiNotesBody["criteria"] };
+  const body = (raw ?? {}) as Partial<AiNotesBody>;
+  return { focus: Array.isArray(body.focus) ? body.focus : [], criteria: Array.isArray(body.criteria) ? body.criteria : [] };
 }

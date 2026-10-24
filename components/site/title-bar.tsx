@@ -13,9 +13,15 @@ const pages = [
 // Signed-in people only; /resources itself checks approval.
 const signedInPages = [{ href: "/resources", label: "resources" }];
 
+// Judges and admins: where they score. /judge itself checks the role.
+const judgePages = [{ href: "/judge", label: "judge" }];
+
+// Everyone: /results shows only what the admin has published.
+const publicPages = [{ href: "/results", label: "results" }];
+
 // The site header, styled as a Claude Code title bar: thinking dots, a path, slash-command nav.
-export function TitleBar({ signedIn, isAdmin }: { signedIn: boolean; isAdmin: boolean }) {
-  const visible = signedIn ? [...pages, ...signedInPages] : pages;
+export function TitleBar({ signedIn, isAdmin, isJudge = false }: { signedIn: boolean; isAdmin: boolean; isJudge?: boolean }) {
+  const visible = [...pages, ...(signedIn ? signedInPages : []), ...(isJudge || isAdmin ? judgePages : []), ...publicPages];
   return (
     <header className="sticky top-0 z-20 border-b border-line bg-bg/90 backdrop-blur">
       <div className="mx-auto flex max-w-4xl items-center gap-4 px-4 py-3 font-mono text-sm">
