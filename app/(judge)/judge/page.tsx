@@ -1,10 +1,14 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { Mark, PageHeader, Sig, StatusPanel } from "../_components/ui";
 import { formatScore, mean } from "../_lib/scoring";
 import { getFinalRound, getJudgeViewer, getMyGroup } from "./_lib/judge";
 
 // /judge: my assigned entries ranked by my mean score (the top one is my finalist), then the
 // final round, where every judge scores every finalist. Built for a phone.
+
+const row = "flex items-center gap-4 border-t border-line px-1 py-4 no-underline transition-colors hover:bg-fg/5";
+
 export default async function JudgePage() {
   const viewer = await getJudgeViewer();
   if (viewer.kind === "signed_out") redirect("/login");
@@ -13,32 +17,44 @@ export default async function JudgePage() {
   const [group, final] = await Promise.all([getMyGroup(viewer.id), getFinalRound(viewer.id)]);
   if (!group.ok || !final.ok) {
     return (
-      <div className="space-y-3">
-        <h1 className="text-2xl font-semibold">Judging</h1>
-        <p className="text-fg-muted">Judging isn&apos;t set up yet. Check back once entries are assigned.</p>
-      </div>
+      <PageHeader eyebrow="Judging" title="Not set up" italic="yet">
+        <p>Check back once entries are assigned.</p>
+      </PageHeader>
     );
   }
 
   const top = group.ranked[0];
   const tiedAtTop = top?.tied && top.rank === 1;
+  const finalScored = final.finalists.filter((f) => f.myScore).length;
 
   return (
-    <div className="space-y-8">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold">Judging</h1>
-        <p className="text-sm text-fg-muted">Score each entry on the four criteria, 1–8 each. Your entry score is the mean.</p>
+    <div className="space-y-12">
+      <div className="grid gap-8 md:grid-cols-[1fr_minmax(0,18rem)] md:items-end">
+        <PageHeader eyebrow={`Judging · ${viewer.name}`} title="Your" italic="judging">
+          <p>Score each entry on four criteria, 1–8 each. Your entry score is the mean; your highest-scored entry goes to the final.</p>
+        </PageHeader>
+        <StatusPanel
+          label="Where you are"
+          rows={[
+            {
+              k: "prelim",
+              v: `${group.scoredCount}/${group.ranked.length} scored`,
+              tone: group.ranked.length && group.scoredCount === group.ranked.length ? "ok" : "accent",
+            },
+            {
+              k: "final round",
+              v: final.finalists.length ? `${finalScored}/${final.finalists.length} scored` : "no finalists yet",
+              tone: final.finalists.length ? (final.allScored ? "ok" : "accent") : "muted",
+            },
+            { k: "standings", v: final.allScored ? "unlocked" : "locked", tone: final.allScored ? "ok" : "muted" },
+          ]}
+        />
       </div>
 
-      <section className="space-y-3" aria-labelledby="prelim-heading">
-        <div className="space-y-1">
-          <h2 id="prelim-heading" className="text-lg font-semibold">
-            Prelim: your entries ({group.scoredCount}/{group.ranked.length} scored)
-          </h2>
-          <p className="text-sm text-fg-muted">Your highest-scored entry goes to the final.</p>
-        </div>
+      <section className="space-y-4" aria-labelledby="prelim-heading">
+        <Sig call="Read(prelim.md)" title="Your entries" id="prelim-heading" />
         {tiedAtTop && (
-          <p className="rounded border border-accent bg-accent-soft px-3 py-2 text-sm" role="status">
+          <p className="rounded-lg border border-accent bg-accent-soft px-4 py-3 text-sm" role="status">
             <strong>Tie at the top.</strong> Two entries have the same score, so neither goes to the final yet. Adjust a score to
             break the tie.
           </p>
@@ -46,23 +62,29 @@ export default async function JudgePage() {
         {group.ranked.length === 0 ? (
           <p className="text-fg-muted">No entries assigned to you yet.</p>
         ) : (
-          <ol className="space-y-2">
+          <ol className="border-b border-line">
             {group.ranked.map((e) => (
               <li key={e.id}>
-                <Link
-                  href={`/judge/${e.id}`}
-                  className="flex items-center gap-3 rounded border border-line px-3 py-3 no-underline hover:border-line-strong"
-                >
-                  <span className="w-6 text-center text-fg-muted">{e.rank ?? "–"}</span>
-                  <span className="grow">
-                    <span className="block font-medium">{e.title || "Untitled"}</span>
+                <Link href={`/judge/${e.id}`} className={row}>
+                  <span className="w-6 text-center font-mono text-sm text-fg-faint">{e.rank ?? "–"}</span>
+                  <span className="min-w-0 grow">
+                    <span className="flex items-center gap-2 font-display text-xl font-light leading-snug">
+                      {e.title || "Untitled"}
+                      {e.id === group.finalistId && <Mark label="Your finalist" />}
+                    </span>
                     <span className="block text-sm text-fg-muted">{e.team}</span>
                   </span>
                   <span className="text-right">
-                    <span className="block text-lg font-semibold">{formatScore(e.score)}</span>
-                    {e.id === group.finalistId && <span className="block text-xs font-medium text-evergreen">your finalist</span>}
-                    {e.tied && <span className="block text-xs text-clay">tied</span>}
-                    {!e.myScore && <span className="block text-xs text-fg-muted">not scored</span>}
+                    <span className="block font-display text-3xl font-light leading-none">{formatScore(e.score)}</span>
+                    <span className="mt-1 block font-mono text-xs">
+                      {e.id === group.finalistId ? (
+                        <span className="text-accent">your finalist</span>
+                      ) : e.tied ? (
+                        <span className="text-clay">tied</span>
+                      ) : !e.myScore ? (
+                        <span className="text-fg-faint">not scored</span>
+                      ) : null}
+                    </span>
                   </span>
                 </Link>
               </li>
@@ -71,46 +93,39 @@ export default async function JudgePage() {
         )}
       </section>
 
-      <section className="space-y-3" aria-labelledby="final-heading">
-        <div className="space-y-1">
-          <h2 id="final-heading" className="text-lg font-semibold">Final round</h2>
-          <p className="text-sm text-fg-muted">Every judge scores every finalist during the live demos.</p>
-        </div>
+      <section className="space-y-4" aria-labelledby="final-heading">
+        <Sig call="Read(finals.md)" title="Final round" id="final-heading" />
+        <p className="text-sm text-fg-muted">Every judge scores every finalist during the live demos.</p>
         {final.finalists.length === 0 ? (
           <p className="text-fg-muted">No finalists yet. Each judge&apos;s top prelim entry appears here once they&apos;ve scored their group.</p>
         ) : (
           <>
-            <ul className="space-y-2">
+            <ul className="border-b border-line">
               {final.finalists.map((f) => (
                 <li key={f.id}>
-                  <Link
-                    href={`/judge/${f.id}?round=final`}
-                    className="flex items-center gap-3 rounded border border-line px-3 py-3 no-underline hover:border-line-strong"
-                  >
-                    <span className="grow">
-                      <span className="block font-medium">{f.title || "Untitled"}</span>
+                  <Link href={`/judge/${f.id}?round=final`} className={row}>
+                    <span className="min-w-0 grow">
+                      <span className="block font-display text-xl font-light leading-snug">{f.title || "Untitled"}</span>
                       <span className="block text-sm text-fg-muted">{f.team}</span>
                     </span>
                     <span className="text-right">
                       {f.myScore ? (
-                        <span className="text-lg font-semibold">{formatScore(mean(f.myScore.scores))}</span>
+                        <span className="font-display text-3xl font-light leading-none">{formatScore(mean(f.myScore.scores))}</span>
                       ) : (
-                        <span className="text-sm text-fg-muted">not scored</span>
+                        <span className="font-mono text-xs text-accent">score it</span>
                       )}
                     </span>
                   </Link>
                 </li>
               ))}
             </ul>
-            <p className="text-sm">
-              {final.allScored ? (
-                <Link href="/judge/results" className="underline">
-                  See the final standings
-                </Link>
-              ) : (
-                <span className="text-fg-muted">Standings unlock once you&apos;ve scored every finalist.</span>
-              )}
-            </p>
+            {final.allScored ? (
+              <Link href="/judge/results" className="btn">
+                See the final standings
+              </Link>
+            ) : (
+              <p className="font-mono text-xs text-fg-faint">Standings unlock once you&apos;ve scored every finalist.</p>
+            )}
           </>
         )}
       </section>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { EntryDetails } from "../../_components/entry-details";
+import { PageHeader, Sig } from "../../_components/ui";
 import { CRITERIA } from "../../_lib/scoring";
 import { saveScore } from "../actions";
 import { ScoreForm } from "../_components/score-form";
@@ -25,27 +26,26 @@ export default async function JudgeEntryPage({ params, searchParams }: PageProps
   const { entry, roster, canScore, isAssigned, isFinalist, myScore, notes } = data;
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-1">
-        <Link href="/judge" className="text-sm text-fg-muted underline">
-          ← All my entries
+    <div className="space-y-10">
+      <div className="space-y-4">
+        <Link href="/judge" className="font-mono text-xs text-fg-muted no-underline hover:text-fg">
+          ← all my entries
         </Link>
-        <h1 className="text-2xl font-semibold">{entry.title || "Untitled"}</h1>
-        <p className="text-sm text-fg-muted">
-          {entry.team} · {round === "final" ? "Final round" : "Prelim"}
+        <PageHeader eyebrow={`${entry.team} · ${round === "final" ? "Final round" : "Prelim"}`} title={entry.title || "Untitled"}>
           {round === "prelim" && isFinalist && (
-            <>
-              {" "}
-              ·{" "}
+            <p>
               <Link href={`/judge/${entry.id}?round=final`} className="underline">
-                score the final round
+                This is a finalist: score the final round
               </Link>
-            </>
+            </p>
           )}
-        </p>
+        </PageHeader>
       </div>
 
-      <EntryDetails entry={entry} roster={roster} />
+      <section className="space-y-4">
+        <Sig call="Read(entry.md)" title="The entry" />
+        <EntryDetails entry={entry} roster={roster} />
+      </section>
 
       {notes ? (
         // Collapsed by default (docs/REQUIREMENTS.md), so the summary has to look clickable.
@@ -99,10 +99,8 @@ export default async function JudgeEntryPage({ params, searchParams }: PageProps
         </p>
       )}
 
-      <section className="space-y-3 border-t border-line pt-6" aria-labelledby="score-heading">
-        <h2 id="score-heading" className="text-lg font-semibold">
-          Your {round === "final" ? "final-round" : "prelim"} score
-        </h2>
+      <section className="space-y-4 border-t border-line pt-8" aria-labelledby="score-heading">
+        <Sig call={`Score(${round})`} title={`Your ${round === "final" ? "final-round" : "prelim"} score`} id="score-heading" />
         {canScore ? (
           <ScoreForm key={round} action={saveScore} entryId={entry.id} round={round} initial={myScore} />
         ) : (

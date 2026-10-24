@@ -30,7 +30,7 @@ function safeHref(url: string | null | undefined) {
 
 function ExternalLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer nofollow" className="break-all underline">
+    <a href={href} target="_blank" rel="noopener noreferrer nofollow" className="inline-block break-all rounded-full border border-line-strong px-3 py-1 no-underline hover:border-accent">
       {children}
     </a>
   );
@@ -68,15 +68,15 @@ export function EntryDetails({ entry, roster }: { entry: EntryDetailsData; roste
         </p>
       )}
 
-      {entry.tagline && <p className="text-lg">{entry.tagline}</p>}
+      {entry.tagline && <p className="max-w-[40ch] font-display text-2xl font-light leading-snug">{entry.tagline}</p>}
 
-      <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+      <ul className="flex flex-wrap gap-2 font-mono text-xs">
         {repoHref ? (
           <li>
             <ExternalLink href={repoHref}>GitHub repo</ExternalLink>
           </li>
         ) : (
-          <li className="text-fg-muted">No repo link</li>
+          <li className="rounded-full border border-dashed border-line px-3 py-1 text-fg-faint">No repo link</li>
         )}
         {videoHref && video && (
           <li>
@@ -93,14 +93,14 @@ export function EntryDetails({ entry, roster }: { entry: EntryDetailsData; roste
       {entry.description_short && <p className="whitespace-pre-wrap">{entry.description_short}</p>}
       {entry.description_long && (
         <div className="space-y-1">
-          <h3 className="text-sm font-medium">More detail</h3>
+          <h3 className="eyebrow">More detail</h3>
           <p className="whitespace-pre-wrap text-fg-muted">{entry.description_long}</p>
         </div>
       )}
 
       {roster && roster.length > 0 && (
         <div className="space-y-1">
-          <h3 className="text-sm font-medium">Team</h3>
+          <h3 className="eyebrow">Team</h3>
           <ul className="text-sm text-fg-muted">
             {roster.map((m, i) => (
               <li key={i}>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { eventName, prizes } from "@/lib/event";
+import { PageHeader, Sig } from "../_components/ui";
 
 // /results: public. Shows only what event_settings allows: finalists once "publish finalists"
 // is on, places once "publish winners" is on. Never scores (public_judge_results has none).
@@ -16,27 +17,31 @@ export default async function ResultsPage() {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold">Results</h1>
-        <p className="text-sm text-fg-muted">{eventName}</p>
-      </div>
+    <div className="space-y-12">
+      <PageHeader eyebrow={eventName} title="The" italic="results">
+        {rows.length === 0 && <p>Finalists are announced after prelim judging, winners at 7:30 pm.</p>}
+      </PageHeader>
 
-      {rows.length === 0 ? (
-        <p className="text-fg-muted">Results aren&apos;t out yet. Finalists are announced after prelim judging, winners at 7:30 pm.</p>
-      ) : (
-        <section className="space-y-3">
-          <h2 className="text-lg font-semibold">{winners ? "Winners" : "Finalists"}</h2>
-          <ol className="space-y-2">
+      {rows.length > 0 && (
+        <section className="space-y-4">
+          <Sig call={winners ? "Read(winners.md)" : "Read(finalists.md)"} title={winners ? "Winners" : "Finalists"} />
+          <ol className="border-b border-line">
             {rows.map((r) => (
               <li key={r.entry_id}>
-                <Link href={`/entries/${r.entry_id}`} className="flex items-center gap-3 rounded border border-line px-3 py-3 no-underline hover:border-line-strong">
-                  {winners && <span className="w-8 text-center text-lg font-semibold">{r.place ?? "–"}</span>}
-                  <span className="grow">
-                    <span className="block font-medium">{r.title || r.team_name}</span>
+                <Link
+                  href={`/entries/${r.entry_id}`}
+                  className="flex items-center gap-4 border-t border-line px-1 py-5 no-underline transition-colors hover:bg-fg/5"
+                >
+                  {winners && (
+                    <span className={`w-10 text-center font-display text-4xl font-light leading-none ${r.place === 1 ? "text-accent" : "text-fg-muted"}`}>
+                      {r.place ?? "–"}
+                    </span>
+                  )}
+                  <span className="min-w-0 grow">
+                    <span className="block font-display text-2xl font-light leading-snug">{r.title || r.team_name}</span>
                     <span className="block text-sm text-fg-muted">{r.team_name}</span>
                   </span>
-                  {winners && r.place === 1 && <span className="text-sm font-medium text-evergreen">Winner</span>}
+                  {winners && r.place === 1 && <span className="eyebrow text-accent">Winner</span>}
                 </Link>
               </li>
             ))}
@@ -44,14 +49,23 @@ export default async function ResultsPage() {
         </section>
       )}
 
-      <section className="space-y-1 text-sm text-fg-muted">
-        <p>{prizes.everyone}</p>
-        <p>The winning team gets: {prizes.winners.join("; ")}.</p>
-        <p>
-          <Link href="/entries" className="underline">
-            Browse every entry
-          </Link>
-        </p>
+      <section className="space-y-4">
+        <Sig call="Read(prizes.md)" title="Prizes" />
+        <div className="border-y border-line">
+          <div className="flex flex-wrap items-baseline justify-between gap-2 py-4">
+            <span className="font-display text-2xl font-light">{prizes.everyone.replace("Every participant gets ", "").replace(".", "")}</span>
+            <span className="eyebrow">Every participant</span>
+          </div>
+          {prizes.winners.map((prize) => (
+            <div key={prize} className="flex flex-wrap items-baseline justify-between gap-2 border-t border-line py-4">
+              <span className="font-display text-xl font-light">{prize}</span>
+              <span className="eyebrow">Winning team</span>
+            </div>
+          ))}
+        </div>
+        <Link href="/entries" className="btn btn-ghost">
+          Browse every entry
+        </Link>
       </section>
     </div>
   );
