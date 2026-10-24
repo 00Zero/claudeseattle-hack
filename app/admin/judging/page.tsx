@@ -4,9 +4,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPacific } from "@/lib/time";
 import { formatScore } from "@/app/(judge)/_lib/scoring";
 import { SubmitButton } from "../submit-button";
-import { autoAssign, decideLateSave, setPublish } from "./actions";
+import { decideLateSave, setPublish } from "./actions";
 import { aiNotesConfigured } from "@/app/(judge)/_lib/ai-notes";
-import { AiNotesForm, FallbackEntryForm, FinalistForm, JudgeForm, type JudgeOption } from "./row-forms";
+import { AiNotesForm, AutoAssignForm, FallbackEntryForm, FinalistForm, JudgeForm, type JudgeOption } from "./row-forms";
 
 // Admin judging: one row per entry with its judge, scores, finalist, and place; late saves to
 // accept or reject; publish toggles. docs/REQUIREMENTS.md, "Judging app (Dev B)", admin table.
@@ -189,12 +189,7 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
       <section className="space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <h2 className="text-lg font-semibold">Entries</h2>
-          <form action={autoAssign}>
-            <input type="hidden" name="world" value={isTest ? "test" : "real"} />
-            <SubmitButton className={small} pendingText="Assigning…">
-              Auto-assign entries without a judge
-            </SubmitButton>
-          </form>
+          <AutoAssignForm world={isTest ? "test" : "real"} />
         </div>
         <p className="text-sm text-foreground/70">
           Prelim: one judge per entry; each judge&apos;s top-scored entry becomes a finalist (an exact tie makes none until the

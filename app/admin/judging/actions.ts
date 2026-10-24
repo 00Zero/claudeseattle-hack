@@ -61,13 +61,19 @@ export async function assignJudge(_prev: RowState, formData: FormData): Promise<
 // Spread submitted entries that have no judge across people with the judge role, filling
 // whoever has the fewest first. Existing assignments are kept, so it's safe to run again.
 // One world at a time (the page's "world" field): real entries to real judges, test to test.
-export async function autoAssign(formData: FormData): Promise<void> {
+// Returns a message for the button instead of throwing, so "no judges yet" isn't an error page.
+export async function autoAssign(_prev: RowState, formData: FormData): Promise<RowState> {
   await assertAdmin();
   const isTest = formData.get("world") === "test";
   const admin = createAdminClient();
   const judges = await judgeIds(admin, ["judge"], isTest);
   if (!judges.length) {
-    throw new Error(isTest ? "No test account has the judge role yet." : "No one has the judge role yet. Set roles on the People tab.");
+    return {
+      status: "error",
+      message: isTest
+        ? "No test account has the judge role yet. Set one on Test accounts."
+        : "No real account has the judge role yet. Set roles on the People tab, or switch to Test entries.",
+    };
   }
 
   const [{ data: entries }, { data: assignments }] = await Promise.all([
@@ -92,9 +98,13 @@ export async function autoAssign(formData: FormData): Promise<void> {
   }
   if (rows.length) {
     const { error } = await admin.from("judge_assignments").insert(rows);
-    if (error) throw new Error(error.message);
+    if (error) return { status: "error", message: error.message };
   }
   done();
+  return {
+    status: "ok",
+    message: rows.length ? `Assigned ${rows.length} entr${rows.length === 1 ? "y" : "ies"}.` : "Every submitted entry already has a judge.",
+  };
 }
 
 // Force an entry into or out of the final, or back to the prelim ranking ("auto").
