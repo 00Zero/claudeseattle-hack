@@ -12,7 +12,18 @@ function formatWait(ms: number) {
 
 // "Print my name tag": one click queues the tag, then the button stays grayed out and the note
 // under it counts down until the 5-minute wait is over (the server enforces the same wait).
-export function NameTagButton({ preview, initialRetryAt }: { preview: string; initialRetryAt: number | null }) {
+// Admins see the same grayed-out button but can still click it to reprint.
+export function NameTagButton({
+  preview,
+  initialRetryAt,
+  isAdmin,
+  printingOff,
+}: {
+  preview: string;
+  initialRetryAt: number | null;
+  isAdmin: boolean;
+  printingOff: boolean;
+}) {
   const [state, action, pending] = useActionState(async () => requestNameTag(), idle);
   const retryAt = state.status === "printing" || state.status === "wait" ? state.retryAt : initialRetryAt;
 
@@ -38,13 +49,17 @@ export function NameTagButton({ preview, initialRetryAt }: { preview: string; in
         <p className="text-sm text-foreground/70">
           Your tag will show: <span className="text-foreground">{preview}</span>. Edit your profile below to change it.
         </p>
+        {printingOff && (
+          <p className="text-sm text-amber-700">Printing is off for attendees. As an admin, you can still print.</p>
+        )}
       </div>
 
       <form action={action}>
         <button
           type="submit"
-          disabled={pending || waiting}
-          className="rounded bg-foreground px-4 py-2 text-background disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={pending || (waiting && !isAdmin)}
+          title={waiting && isAdmin ? "Admins can print again any time" : undefined}
+          className={`rounded bg-foreground px-4 py-2 text-background disabled:cursor-not-allowed disabled:opacity-40 ${waiting ? "opacity-40" : ""}`}
         >
           {pending ? "Sending…" : "Print my name tag"}
         </button>

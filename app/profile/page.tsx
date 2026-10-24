@@ -13,6 +13,8 @@ export default async function ProfilePage() {
   if ((await getCurrentAccess()) === "blocked") redirect("/declined");
 
   const nameTagsOpen = nameTagsStatus(await getNameTagSettings()).open;
+  // Admins see the name tag card even while printing is off for everyone else.
+  const isAdmin = profile.platform_role === "admin";
   const supabase = await createClient();
   const { data: emails } = await supabase
     .from("profile_emails")
@@ -32,8 +34,10 @@ export default async function ProfilePage() {
               : "Tell us about yourself so teams can find you, then confirm."}
           </p>
         )}
-        {nameTagsOpen && (
+        {(nameTagsOpen || isAdmin) && (
           <NameTagButton
+            isAdmin={isAdmin}
+            printingOff={!nameTagsOpen}
             preview={[
               [profile.first_name, profile.last_name].filter(Boolean).join(" "),
               profile.job_title,
