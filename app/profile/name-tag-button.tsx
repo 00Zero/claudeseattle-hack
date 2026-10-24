@@ -10,8 +10,8 @@ function formatWait(ms: number) {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-// "Print my name tag": one click queues the tag, then the button stays grayed out with a
-// countdown until the 5-minute wait is over (the server enforces the same wait).
+// "Print my name tag": one click queues the tag, then the button stays grayed out and the note
+// under it counts down until the 5-minute wait is over (the server enforces the same wait).
 export function NameTagButton({ preview, initialRetryAt }: { preview: string; initialRetryAt: number | null }) {
   const [state, action, pending] = useActionState(async () => requestNameTag(), idle);
   const retryAt = state.status === "printing" || state.status === "wait" ? state.retryAt : initialRetryAt;
@@ -46,7 +46,7 @@ export function NameTagButton({ preview, initialRetryAt }: { preview: string; in
           disabled={pending || waiting}
           className="rounded bg-foreground px-4 py-2 text-background disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {pending ? "Sending…" : waiting ? `Print again in ${left ?? "5:00"}` : "Print my name tag"}
+          {pending ? "Sending…" : "Print my name tag"}
         </button>
       </form>
 
@@ -62,7 +62,10 @@ export function NameTagButton({ preview, initialRetryAt }: { preview: string; in
               ? "Your name tag is printing. Go pick it up at the name tag printer."
               : "Your name tag was sent to the printer. Pick it up at the name tag printer."}
           </p>
-          <p className="text-foreground/70">If your name tag doesn&apos;t print, you can try again in 5 minutes.</p>
+          <p className="text-foreground/70">
+            If your name tag doesn&apos;t print, you can try again in{" "}
+            <span className="tabular-nums">{left ?? "5:00"}</span>.
+          </p>
         </div>
       )}
     </div>
