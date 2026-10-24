@@ -66,6 +66,7 @@ async function memberCount(supabase: Awaited<ReturnType<typeof createClient>>, t
 
 function done(teamId: string): FormState {
   revalidatePath("/teams");
+  revalidatePath("/teams/inbox");
   revalidatePath(`/teams/${teamId}`);
   return { status: "ok" };
 }

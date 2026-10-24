@@ -67,6 +67,7 @@ async function makeMember(supabase: Supabase, teamId: string, profileId: string)
 
 function done(...teamIds: string[]): FormState {
   revalidatePath("/teams");
+  revalidatePath("/teams/inbox");
   revalidatePath("/teams/people");
   for (const teamId of teamIds) revalidatePath(`/teams/${teamId}`);
   return { status: "ok" };
