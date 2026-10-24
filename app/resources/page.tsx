@@ -2,8 +2,10 @@ import { redirect } from "next/navigation";
 import { getCurrentAccess } from "@/lib/access";
 import { RESOURCE_SECTIONS, type Resource } from "@/lib/resources";
 import { createClient } from "@/lib/supabase/server";
+import { DriveFolderCard, isDriveFolder } from "./drive-folder-card";
 
 // Links for approved attendees: credits, the name tag form, the small business data folder.
+// A Google Drive folder gets its own card with buttons to open it and add Claude's Drive connector.
 // RLS (resources_read) returns only visible rows, and only to people with full access.
 // Admins edit the list in /admin/settings.
 export default async function ResourcesPage() {
@@ -42,19 +44,25 @@ export default async function ResourcesPage() {
           <section key={section.key} className="space-y-3">
             <h2 className="text-lg font-semibold">{section.label}</h2>
             <ul className="grid gap-3 sm:grid-cols-2">
-              {items.map((r) => (
-                <li key={r.id}>
-                  <a
-                    href={r.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block h-full rounded border border-line p-4 no-underline hover:border-line-strong hover:bg-fg/5"
-                  >
-                    <span className="font-medium text-fg">{r.title} ↗</span>
-                    {r.description && <span className="mt-1 block text-sm text-fg-muted">{r.description}</span>}
-                  </a>
-                </li>
-              ))}
+              {items.map((r) =>
+                isDriveFolder(r.url) ? (
+                  <li key={r.id} className="sm:col-span-2">
+                    <DriveFolderCard resource={r} />
+                  </li>
+                ) : (
+                  <li key={r.id}>
+                    <a
+                      href={r.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block h-full rounded border border-line p-4 no-underline hover:border-line-strong hover:bg-fg/5"
+                    >
+                      <span className="font-medium text-fg">{r.title} ↗</span>
+                      {r.description && <span className="mt-1 block text-sm text-fg-muted">{r.description}</span>}
+                    </a>
+                  </li>
+                ),
+              )}
             </ul>
           </section>
         );
