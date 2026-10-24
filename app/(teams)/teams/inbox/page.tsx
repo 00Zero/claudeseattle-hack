@@ -7,7 +7,7 @@ import { DeadlineBanner } from "../_components/deadline-banner";
 import { PersonDetails, personFromProfile } from "../_components/person";
 import { TeamsTabs } from "../_components/teams-tabs";
 import { inboxCount, loadInbox, type InviteToMe, type MyApplication } from "../_lib/inbox";
-import { getViewer, TEAM_MAX } from "../_lib/teams";
+import { getViewer, MAX_APPLICATIONS, TEAM_MAX } from "../_lib/teams";
 
 const card = "rounded-lg border border-line bg-bg-raised";
 
@@ -110,7 +110,7 @@ export default async function InboxPage() {
       )}
 
       {openApplications.length > 0 && (
-        <Section title="Your applications" count={openApplications.length}>
+        <Section title={`Your applications (${openApplications.length} of ${MAX_APPLICATIONS})`}>
           <ul className={`divide-y divide-line ${card}`}>
             {openApplications.map((a) => (
               <li key={a.teamId} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">

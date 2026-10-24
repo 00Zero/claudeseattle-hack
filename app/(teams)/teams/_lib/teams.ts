@@ -9,6 +9,8 @@ export const TEAM_MIN = 2;
 export const TEAM_MAX = 6;
 export const IDEAL_MIN = 3;
 export const IDEAL_MAX = 5;
+// Open applications per person (status 'applied'); shared_application_limit enforces it too.
+export const MAX_APPLICATIONS = 3;
 
 export type { RoleBucket } from "@/lib/roles";
 import type { RoleBucket } from "@/lib/roles";
@@ -47,6 +49,8 @@ export type Viewer =
       joinBlockedReason: string | null;
       // The team they're a member of, if any.
       myTeamId: string | null;
+      // How many teams they've applied to and are still waiting on.
+      openApplications: number;
     };
 
 function joinBlockedReason(profile: Profile, access: Access | null) {
@@ -62,9 +66,14 @@ export async function getViewer(): Promise<Viewer> {
   if (!profile) return { signedIn: false };
 
   const supabase = await createClient();
-  const [access, { data: membership }] = await Promise.all([
+  const [access, { data: membership }, { count: openApplications }] = await Promise.all([
     getCurrentAccess(),
     supabase.from("team_members").select("team_id").eq("profile_id", profile.id).eq("status", "member").maybeSingle(),
+    supabase
+      .from("team_members")
+      .select("team_id", { count: "exact", head: true })
+      .eq("profile_id", profile.id)
+      .eq("status", "applied"),
   ]);
   return {
     signedIn: true,
@@ -72,6 +81,7 @@ export async function getViewer(): Promise<Viewer> {
     access,
     joinBlockedReason: joinBlockedReason(profile, access),
     myTeamId: membership?.team_id ?? null,
+    openApplications: openApplications ?? 0,
   };
 }
 
@@ -176,4 +186,9 @@ export async function joinableIds(profileIds?: string[]): Promise<Set<string> | 
 // The shared_member_cap trigger's error, raised when a 7th member would join a team.
 export function isTeamFull(error: { message?: string } | null | undefined) {
   return Boolean(error?.message?.includes("team_full"));
+}
+
+// The shared_application_limit trigger's error, raised on a 4th open application.
+export function isTooManyApplications(error: { message?: string } | null | undefined) {
+  return Boolean(error?.message?.includes("too_many_applications"));
 }
