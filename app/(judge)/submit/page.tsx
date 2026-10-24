@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { formatPacific } from "@/lib/time";
+import { PageHeader } from "../_components/ui";
 import { VIDEO_HOSTS_HINT } from "../_lib/video";
 import { saveEntry } from "./actions";
 import { EntryForm } from "./_components/entry-form";
@@ -16,10 +17,11 @@ export default async function SubmitPage() {
 
   if (ctx.kind === "blocked") {
     return (
-      <div className="space-y-4">
-        <h1 className="text-2xl font-semibold">Submit your project</h1>
-        <p className="rounded border border-line px-3 py-2 text-sm text-fg-muted">{ctx.reason}</p>
-        <Link href="/teams" className="text-sm underline">
+      <div className="space-y-6">
+        <PageHeader eyebrow="Submission" title="Submit your" italic="project">
+          <p>{ctx.reason}</p>
+        </PageHeader>
+        <Link href="/teams" className="btn btn-ghost">
           Go to teams
         </Link>
       </div>
@@ -48,16 +50,17 @@ export default async function SubmitPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-3">
-        <h1 className="text-2xl font-semibold">Submit your project</h1>
-        <p className="text-sm text-fg-muted">
-          Entry for{" "}
-          <Link href={`/teams/${team.id}`} className="font-semibold text-fg underline">
-            {team.name}
-          </Link>
-          . Anyone on the team can edit it. Judges review it without talking to you, so give them everything they need.
-        </p>
+    <div className="space-y-10">
+      <div className="space-y-4">
+        <PageHeader eyebrow={`Submission · ${team.name}`} title="Submit your" italic="project">
+          <p>
+            Entry for{" "}
+            <Link href={`/teams/${team.id}`} className="text-fg underline">
+              {team.name}
+            </Link>
+            . Anyone on the team can edit it. Judges review it without talking to you, so give them everything they need.
+          </p>
+        </PageHeader>
         <Deadline closesAt={closesAt} isPast={isPast} />
         <LastSaved entry={entry} />
         {lateSave && <LateSaveStatus lateSave={lateSave} />}
@@ -98,12 +101,9 @@ function Deadline({ closesAt, isPast }: { closesAt: string; isPast: boolean }) {
 
 function LastSaved({ entry }: { entry: Entry | null }) {
   if (!entry?.last_saved_at) return <p className="text-sm text-fg-muted">Not saved yet.</p>;
-  return (
-    <p className="text-sm text-fg-muted">
-      Last saved {formatPacific(entry.last_saved_at)}
-      {entry.last_saved_by_name ? ` by ${entry.last_saved_by_name}` : ""}.
-    </p>
-  );
+  // Display names end in an initial ("Ada T."), so don't add a second period after one.
+  const text = `Last saved ${formatPacific(entry.last_saved_at)}${entry.last_saved_by_name ? ` by ${entry.last_saved_by_name}` : ""}`;
+  return <p className="text-sm text-fg-muted">{text.endsWith(".") ? text : `${text}.`}</p>;
 }
 
 function LateSaveStatus({ lateSave }: { lateSave: LateSave }) {
@@ -128,11 +128,11 @@ const statusIcon: Record<CheckItem["status"], { icon: string; label: string; cla
 function ChecklistView({ checklist }: { checklist: Checklist }) {
   const open = checklist.items.filter((item) => item.required && item.status !== "ok").length;
   return (
-    <section className="space-y-2 rounded border border-line p-4" aria-labelledby="checklist-heading">
-      <h2 id="checklist-heading" className="font-semibold">
-        {open ? `Before judging: ${open} required item${open === 1 ? "" : "s"} to fix` : "Ready for judges"}
+    <section className="space-y-2 rounded-lg border border-line bg-bg-raised p-4 font-mono text-xs" aria-labelledby="checklist-heading">
+      <h2 id="checklist-heading" className={open ? "text-accent" : "text-evergreen"}>
+        ✻ {open ? `Before judging: ${open} required item${open === 1 ? "" : "s"} to fix` : "Ready for judges"}
       </h2>
-      <ul className="space-y-1 text-sm">
+      <ul className="grid gap-1 border-t border-dashed border-line pt-2 text-fg">
         {checklist.items.map((item) => {
           const s = statusIcon[item.status];
           return (
@@ -149,7 +149,7 @@ function ChecklistView({ checklist }: { checklist: Checklist }) {
           );
         })}
       </ul>
-      <p className="text-xs text-fg-faint">Checked {formatPacific(checklist.checkedAt)}, when the entry was last saved.</p>
+      <p className="border-t border-dashed border-line pt-2 text-fg-faint">checked {formatPacific(checklist.checkedAt)}, when the entry was last saved</p>
     </section>
   );
 }
@@ -167,13 +167,13 @@ function ReadOnlyEntry({ entry }: { entry: Entry }) {
     <dl className="space-y-4">
       {rows.map(([label, value]) => (
         <div key={label}>
-          <dt className="text-sm font-medium">{label}</dt>
+          <dt className="eyebrow">{label}</dt>
           <dd className="whitespace-pre-wrap text-fg-muted">{value || "—"}</dd>
         </div>
       ))}
       {entry.links.length > 0 && (
         <div>
-          <dt className="text-sm font-medium">Other links</dt>
+          <dt className="eyebrow">Other links</dt>
           <dd>
             <ul className="space-y-1">
               {entry.links.map((link) => (

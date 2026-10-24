@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { EntryDetails, type EntryDetailsData } from "../../_components/entry-details";
+import { PageHeader } from "../../_components/ui";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -24,13 +25,12 @@ export default async function PublicEntryPage({ params }: PageProps<"/entries/[i
   }));
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-1">
-        <Link href="/entries" className="text-sm text-fg-muted underline">
-          ← All entries
+    <div className="space-y-10">
+      <div className="space-y-4">
+        <Link href="/entries" className="font-mono text-xs text-fg-muted no-underline hover:text-fg">
+          ← all entries
         </Link>
-        <h1 className="text-2xl font-semibold">{entry.title || entry.team_name}</h1>
-        <p className="text-sm text-fg-muted">{entry.team_name}</p>
+        <PageHeader eyebrow={entry.team_name} title={entry.title || entry.team_name} />
       </div>
       <EntryDetails entry={{ ...(entry as EntryDetailsData), links: Array.isArray(entry.links) ? entry.links : [] }} roster={roster} />
     </div>

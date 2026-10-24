@@ -25,13 +25,14 @@ export function TitleBar({ signedIn, isAdmin, isJudge = false }: { signedIn: boo
   return (
     <header className="sticky top-0 z-20 border-b border-line bg-bg/90 backdrop-blur">
       <div className="mx-auto flex max-w-4xl items-center gap-4 px-4 py-3 font-mono text-sm">
-        <Link href="/" className="flex items-center gap-2.5 text-fg-muted no-underline">
+        <Link href="/" className="flex shrink-0 items-center gap-2.5 whitespace-nowrap text-fg-muted no-underline">
           <ThinkingDots />
           <span>
-            <b className="font-medium text-fg">claude seattle</b> <span className="hidden sm:inline">~/impact-lab</span>
+            {/* The path only on wide screens: judges and admins have more links in the nav. */}
+            <b className="font-medium text-fg">claude seattle</b> <span className="hidden xl:inline">~/impact-lab</span>
           </span>
         </Link>
-        <nav aria-label="Pages" className="ml-auto flex items-center gap-1 sm:gap-2">
+        <nav aria-label="Pages" className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-1 gap-y-1 sm:gap-x-2">
           {visible.map((page) => (
             <Link key={page.href} href={page.href} className="hidden rounded px-2 py-1 text-fg-muted hover:bg-fg/5 hover:text-fg sm:inline">
               <span className="text-accent">/</span>

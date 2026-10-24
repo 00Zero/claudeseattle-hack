@@ -61,13 +61,19 @@ export async function assignJudge(_prev: RowState, formData: FormData): Promise<
 // Spread submitted entries that have no judge across people with the judge role, filling
 // whoever has the fewest first. Existing assignments are kept, so it's safe to run again.
 // One world at a time (the page's "world" field): real entries to real judges, test to test.
-export async function autoAssign(formData: FormData): Promise<void> {
+// Returns a message for the button instead of throwing, so "no judges yet" isn't an error page.
+export async function autoAssign(_prev: RowState, formData: FormData): Promise<RowState> {
   await assertAdmin();
   const isTest = formData.get("world") === "test";
   const admin = createAdminClient();
   const judges = await judgeIds(admin, ["judge"], isTest);
   if (!judges.length) {
-    throw new Error(isTest ? "No test account has the judge role yet." : "No one has the judge role yet. Set roles on the People tab.");
+    return {
+      status: "error",
+      message: isTest
+        ? "No test account has the judge role yet. Set one on Test accounts."
+        : "No real account has the judge role yet. Set roles on the People tab, or switch to Test entries.",
+    };
   }
 
   const [{ data: entries }, { data: assignments }] = await Promise.all([
@@ -92,9 +98,13 @@ export async function autoAssign(formData: FormData): Promise<void> {
   }
   if (rows.length) {
     const { error } = await admin.from("judge_assignments").insert(rows);
-    if (error) throw new Error(error.message);
+    if (error) return { status: "error", message: error.message };
   }
   done();
+  return {
+    status: "ok",
+    message: rows.length ? `Assigned ${rows.length} entr${rows.length === 1 ? "y" : "ies"}.` : "Every submitted entry already has a judge.",
+  };
 }
 
 // Force an entry into or out of the final, or back to the prelim ranking ("auto").
@@ -204,8 +214,20 @@ export async function createFallbackEntry(_prev: RowState, formData: FormData): 
     return { status: "error", message: "The demo video and repo links are required and start with https://." };
   }
 
+  // No two entries may share a team name (ignoring case and spacing): judges, the admin table,
+  // and the public results would show two indistinguishable teams.
+  const admin = createAdminClient();
+  const [{ data: teams }, { data: fallbacks }] = await Promise.all([
+    admin.from("teams").select("name"),
+    admin.from("judge_entries").select("fallback_team_name").not("fallback_team_name", "is", null),
+  ]);
+  const key = (name: string) => name.trim().replace(/\s+/g, " ").toLowerCase();
+  const taken = [...(teams ?? []).map((t) => t.name as string), ...(fallbacks ?? []).map((f) => f.fallback_team_name as string)];
+  const clash = taken.find((name) => key(name) === key(teamName));
+  if (clash) return { status: "error", message: `A team called “${clash}” already exists. Use a different name.` };
+
   const checklist = await checkEntry(values);
-  const { error } = await createAdminClient()
+  const { error } = await admin
     .from("judge_entries")
     .insert({
       fallback_team_name: teamName,
@@ -227,8 +249,9 @@ export async function createFallbackEntry(_prev: RowState, formData: FormData): 
 const NOTES_BATCH = 10;
 const NOTES_PARALLEL = 4;
 
-// AI notes for judges (app/(judge)/_lib/ai-notes.ts). One world at a time; writes notes for
-// submitted entries that have none, or whose entry changed after its notes were written.
+// AI notes for judges (app/(judge)/_lib/ai-notes.ts). One world at a time; writes notes, plus the
+// admin-only tie-break rating (judge_ai_ratings), for submitted entries missing either one or
+// whose entry changed after they were written.
 // A batch per click keeps each request well under the function time limit.
 export async function generateNotes(_prev: RowState, formData: FormData): Promise<RowState> {
   await assertAdmin();
@@ -236,14 +259,19 @@ export async function generateNotes(_prev: RowState, formData: FormData): Promis
   const isTest = formData.get("world") === "test";
   const admin = createAdminClient();
 
-  const [{ data: results }, { data: entries }, { data: notes }] = await Promise.all([
+  const [{ data: results }, { data: entries }, { data: notes }, { data: ratings }] = await Promise.all([
     admin.from("judge_entry_results").select("entry_id").eq("submitted", true).eq("is_test", isTest),
     admin.from("judge_entries").select("id, title, tagline, description_short, description_long, video_url, repo_url, links, updated_at"),
     admin.from("judge_ai_notes").select("entry_id, created_at"),
+    admin.from("judge_ai_ratings").select("entry_id, created_at"),
   ]);
   const inWorld = new Set((results ?? []).map((r) => r.entry_id as string));
   const notedAt = new Map((notes ?? []).map((n) => [n.entry_id as string, n.created_at as string]));
-  const todo = (entries ?? []).filter((e) => inWorld.has(e.id) && !(notedAt.get(e.id) && notedAt.get(e.id)! >= e.updated_at));
+  const ratedAt = new Map((ratings ?? []).map((r) => [r.entry_id as string, r.created_at as string]));
+  const fresh = (at: string | undefined, updated: string) => Boolean(at && at >= updated);
+  const todo = (entries ?? []).filter(
+    (e) => inWorld.has(e.id) && !(fresh(notedAt.get(e.id), e.updated_at) && fresh(ratedAt.get(e.id), e.updated_at)),
+  );
   if (!todo.length) return { status: "ok", message: "Every submitted entry has up-to-date notes." };
 
   const batch = todo.slice(0, NOTES_BATCH);
@@ -258,10 +286,15 @@ export async function generateNotes(_prev: RowState, formData: FormData): Promis
             failed++;
             return;
           }
-          const { error } = await admin
-            .from("judge_ai_notes")
-            .upsert({ entry_id: entry.id, model: NOTES_MODEL, notes: result.notes, draft_scores: result.draft_scores, created_at: new Date().toISOString() });
-          if (error) failed++;
+          const now = new Date().toISOString();
+          // Notes for judges carry no scores; the rating goes only to the admin-only table.
+          const [{ error: notesError }, { error: ratingError }] = await Promise.all([
+            admin.from("judge_ai_notes").upsert({ entry_id: entry.id, model: NOTES_MODEL, notes: result.notes, draft_scores: null, created_at: now }),
+            admin
+              .from("judge_ai_ratings")
+              .upsert({ entry_id: entry.id, model: NOTES_MODEL, scores: result.rating.scores, rating: result.rating.mean, created_at: now }),
+          ]);
+          if (notesError || ratingError) failed++;
           else written++;
         } catch (error) {
           console.error("Judge AI notes failed:", error instanceof Error ? error.message : error);

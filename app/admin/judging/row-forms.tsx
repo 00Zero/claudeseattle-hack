@@ -1,7 +1,7 @@
 "use client";
 
 import { startTransition, useActionState } from "react";
-import { assignJudge, createFallbackEntry, generateNotes, setFinalist, type RowState } from "./actions";
+import { assignJudge, autoAssign, createFallbackEntry, generateNotes, setFinalist, type RowState } from "./actions";
 
 const select = "rounded border border-foreground/20 bg-background text-xs disabled:opacity-60";
 const button = "rounded border border-foreground/20 px-2 py-0.5 text-xs hover:bg-foreground/5 disabled:cursor-wait disabled:opacity-50";
@@ -130,6 +130,24 @@ export function AiNotesForm({ world, disabled }: { world: "real" | "test"; disab
           {state.message}
         </span>
       )}
+    </form>
+  );
+}
+
+// Spreads entries without a judge across the current world's judges; shows the result inline.
+export function AutoAssignForm({ world }: { world: "real" | "test" }) {
+  const [state, formAction, pending] = useActionState(autoAssign, idle);
+  return (
+    <form action={formAction} className="flex flex-wrap items-center justify-end gap-2">
+      <input type="hidden" name="world" value={world} />
+      {state.message && (
+        <span className={`text-xs ${state.status === "error" ? "text-red-600" : "text-foreground/70"}`} role="status">
+          {state.message}
+        </span>
+      )}
+      <button type="submit" disabled={pending} className={button}>
+        {pending ? "Assigning…" : "Auto-assign entries without a judge"}
+      </button>
     </form>
   );
 }

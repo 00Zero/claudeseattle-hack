@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { EntryDetails } from "../../_components/entry-details";
+import { PageHeader, Sig } from "../../_components/ui";
 import { CRITERIA } from "../../_lib/scoring";
 import { saveScore } from "../actions";
 import { ScoreForm } from "../_components/score-form";
@@ -25,33 +26,45 @@ export default async function JudgeEntryPage({ params, searchParams }: PageProps
   const { entry, roster, canScore, isAssigned, isFinalist, myScore, notes } = data;
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-1">
-        <Link href="/judge" className="text-sm text-fg-muted underline">
-          ← All my entries
+    <div className="space-y-10">
+      <div className="space-y-4">
+        <Link href="/judge" className="font-mono text-xs text-fg-muted no-underline hover:text-fg">
+          ← all my entries
         </Link>
-        <h1 className="text-2xl font-semibold">{entry.title || "Untitled"}</h1>
-        <p className="text-sm text-fg-muted">
-          {entry.team} · {round === "final" ? "Final round" : "Prelim"}
+        <PageHeader eyebrow={`${entry.team} · ${round === "final" ? "Final round" : "Prelim"}`} title={entry.title || "Untitled"}>
           {round === "prelim" && isFinalist && (
-            <>
-              {" "}
-              ·{" "}
+            <p>
               <Link href={`/judge/${entry.id}?round=final`} className="underline">
-                score the final round
+                This is a finalist: score the final round
               </Link>
-            </>
+            </p>
           )}
-        </p>
+        </PageHeader>
       </div>
 
-      <EntryDetails entry={entry} roster={roster} />
+      <section className="space-y-4">
+        <Sig call="Read(entry.md)" title="The entry" />
+        <EntryDetails entry={entry} roster={roster} />
+      </section>
 
-      {notes && (
-        <details className="rounded border border-line px-3 py-2">
-          <summary className="cursor-pointer text-sm font-medium">AI notes: what to dig into</summary>
+      {notes ? (
+        // Collapsed by default (docs/REQUIREMENTS.md), so the summary has to look clickable.
+        <details className="group rounded border border-accent bg-accent-soft/40 px-3 py-2">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm [&::-webkit-details-marker]:hidden">
+            <span>
+              <span className="font-medium">AI notes: what to focus on</span>
+              <span className="block text-fg-muted">What to check first, a note per criterion, and what the AI couldn&apos;t tell.</span>
+            </span>
+            <span className="shrink-0 rounded border border-line-strong px-2 py-0.5 text-xs font-medium">
+              <span className="group-open:hidden">Show</span>
+              <span className="hidden group-open:inline">Hide</span>
+            </span>
+          </summary>
           <div className="mt-2 space-y-2 text-sm">
-            <p className="text-fg-faint">Written by {notes.model}. A starting point only; never added to your score.</p>
+            <p className="text-fg-faint">
+              Written by {notes.model} from the team&apos;s entry and README only: it didn&apos;t watch the video, read the code,
+              or try the app. A starting point; you do the scoring.
+            </p>
             {notes.focus.length > 0 && (
               <div className="rounded bg-accent-soft px-3 py-2">
                 <p className="font-medium">Focus on</p>
@@ -64,21 +77,30 @@ export default async function JudgeEntryPage({ params, searchParams }: PageProps
             )}
             {notes.criteria.map((n, i) => (
               <div key={i}>
-                <p className="font-medium">
-                  {n.criterion}
-                  {notes.draft_scores?.[i] ? <span className="font-normal text-fg-muted"> (draft {notes.draft_scores[i]})</span> : null}
-                </p>
+                <p className="font-medium">{n.criterion}</p>
                 <p className="text-fg-muted">{n.note}</p>
               </div>
             ))}
+            {notes.unknowns.length > 0 && (
+              <div className="rounded border border-line px-3 py-2">
+                <p className="font-medium">AI couldn&apos;t tell; check these yourself</p>
+                <ul className="list-disc pl-5 text-fg-muted">
+                  {notes.unknowns.map((u, i) => (
+                    <li key={i}>{u}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </details>
+      ) : (
+        <p className="rounded border border-line px-3 py-2 text-sm text-fg-muted">
+          No AI notes for this entry yet. Organizers write them after submissions close.
+        </p>
       )}
 
-      <section className="space-y-3 border-t border-line pt-6" aria-labelledby="score-heading">
-        <h2 id="score-heading" className="text-lg font-semibold">
-          Your {round === "final" ? "final-round" : "prelim"} score
-        </h2>
+      <section className="space-y-4 border-t border-line pt-8" aria-labelledby="score-heading">
+        <Sig call={`Score(${round})`} title={`Your ${round === "final" ? "final-round" : "prelim"} score`} id="score-heading" />
         {canScore ? (
           <ScoreForm key={round} action={saveScore} entryId={entry.id} round={round} initial={myScore} />
         ) : (

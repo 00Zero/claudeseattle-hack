@@ -39,7 +39,7 @@ export function ScoreForm({
       <input type="hidden" name="round" value={round} />
       {CRITERIA.map((criterion, i) => (
         <fieldset key={criterion.name} className="space-y-2">
-          <legend className="font-medium">{criterion.name}</legend>
+          <legend className="font-display text-xl font-light">{criterion.name}</legend>
           <div className="grid grid-cols-8 gap-1">
             {VALUES.map((v) => (
               <label key={v} className="relative">
@@ -52,7 +52,7 @@ export function ScoreForm({
                   className="peer sr-only"
                   required
                 />
-                <span className="flex h-11 items-center justify-center rounded border border-line-strong text-base peer-checked:border-fg peer-checked:bg-fg peer-checked:text-bg peer-focus-visible:ring-2">
+                <span className="flex h-11 items-center justify-center rounded border border-line-strong text-base font-mono transition-colors hover:border-accent peer-checked:border-accent peer-checked:bg-accent peer-checked:text-accent-fg peer-focus-visible:ring-2">
                   {v}
                 </span>
               </label>
@@ -73,7 +73,10 @@ export function ScoreForm({
         <button type="submit" disabled={pending || !complete} className="btn disabled:opacity-50">
           {pending ? "Saving…" : initial ? "Update score" : "Save score"}
         </button>
-        <span className="text-sm text-fg-muted">Mean: {formatScore(avg)}</span>
+        <span className="flex items-baseline gap-2">
+          <span className="eyebrow">Mean</span>
+          <span className="font-display text-3xl font-light leading-none">{formatScore(avg)}</span>
+        </span>
       </div>
       {state.message && (
         <p className={`text-sm ${state.status === "error" ? "text-red-600" : "text-fg-muted"}`} role={state.status === "error" ? "alert" : "status"}>
