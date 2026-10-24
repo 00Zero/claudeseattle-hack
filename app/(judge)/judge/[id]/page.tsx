@@ -51,7 +51,10 @@ export default async function JudgeEntryPage({ params, searchParams }: PageProps
         <details className="rounded border border-line px-3 py-2">
           <summary className="cursor-pointer text-sm font-medium">AI notes: what to dig into</summary>
           <div className="mt-2 space-y-2 text-sm">
-            <p className="text-fg-faint">Written by {notes.model}. A starting point only; never added to your score.</p>
+            <p className="text-fg-faint">
+              Written by {notes.model} from the team&apos;s entry and README only: it didn&apos;t watch the video, read the code,
+              or try the app. A starting point; you do the scoring.
+            </p>
             {notes.focus.length > 0 && (
               <div className="rounded bg-accent-soft px-3 py-2">
                 <p className="font-medium">Focus on</p>
@@ -64,13 +67,20 @@ export default async function JudgeEntryPage({ params, searchParams }: PageProps
             )}
             {notes.criteria.map((n, i) => (
               <div key={i}>
-                <p className="font-medium">
-                  {n.criterion}
-                  {notes.draft_scores?.[i] ? <span className="font-normal text-fg-muted"> (draft {notes.draft_scores[i]})</span> : null}
-                </p>
+                <p className="font-medium">{n.criterion}</p>
                 <p className="text-fg-muted">{n.note}</p>
               </div>
             ))}
+            {notes.unknowns.length > 0 && (
+              <div className="rounded border border-line px-3 py-2">
+                <p className="font-medium">AI couldn&apos;t tell; check these yourself</p>
+                <ul className="list-disc pl-5 text-fg-muted">
+                  {notes.unknowns.map((u, i) => (
+                    <li key={i}>{u}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </details>
       )}

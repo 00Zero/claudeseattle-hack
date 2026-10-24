@@ -93,7 +93,7 @@ export async function getEntryForJudge(judgeId: string, entryId: string, round: 
           .eq("team_id", entry.team_id)
           .eq("status", "member")
       : Promise.resolve({ data: [] }),
-    supabase.from("judge_ai_notes").select("notes, draft_scores, model").eq("entry_id", entryId).maybeSingle(),
+    supabase.from("judge_ai_notes").select("notes, model").eq("entry_id", entryId).maybeSingle(),
   ]);
 
   const isFinalist = ((finalists.data ?? []) as { entry_id: string }[]).some((f) => f.entry_id === entryId);
@@ -110,13 +110,15 @@ export async function getEntryForJudge(judgeId: string, entryId: string, round: 
     isAssigned: Boolean(assigned.data),
     isFinalist,
     myScore: scores.get(entryId) ?? null,
-    notes: notes.data ? { ...normalizeNotes(notes.data.notes), draft_scores: (notes.data.draft_scores as number[] | null) ?? null, model: notes.data.model as string } : null,
+    // Never draft_scores: judges don't see AI-suggested scores (decided Oct 24).
+    notes: notes.data ? { ...normalizeNotes(notes.data.notes), model: notes.data.model as string } : null,
   };
 }
 
-// judge_ai_notes.notes is { focus, criteria }; tolerate a bare criteria array too.
+// judge_ai_notes.notes is { focus, criteria, unknowns }; tolerate older shapes too.
 function normalizeNotes(raw: unknown): AiNotesBody {
-  if (Array.isArray(raw)) return { focus: [], criteria: raw as AiNotesBody["criteria"] };
+  if (Array.isArray(raw)) return { focus: [], criteria: raw as AiNotesBody["criteria"], unknowns: [] };
   const body = (raw ?? {}) as Partial<AiNotesBody>;
-  return { focus: Array.isArray(body.focus) ? body.focus : [], criteria: Array.isArray(body.criteria) ? body.criteria : [] };
+  const list = <T,>(v: T[] | undefined) => (Array.isArray(v) ? v : []);
+  return { focus: list(body.focus), criteria: list(body.criteria), unknowns: list(body.unknowns) };
 }

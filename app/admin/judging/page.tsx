@@ -49,12 +49,15 @@ const small = "rounded border border-foreground/20 px-2 py-0.5 text-xs hover:bg-
 
 export default async function JudgingAdminPage({ searchParams }: PageProps<"/admin/judging">) {
   await requireAdminPage();
-  const { sort: sortParam, world } = await searchParams;
+  const { sort: sortParam, world, ai } = await searchParams;
   const sort: SortKey = typeof sortParam === "string" && sortParam in SORTS ? (sortParam as SortKey) : "team";
   // Test accounts' teams, entries and judges (lib/test-accounts.ts) are a separate world:
   // ?world=test shows them instead of the real ones. Nothing mixes across.
   const isTest = world === "test";
   const worldParam = isTest ? "&world=test" : "";
+  // Admin-only AI tie-break rating (judge_ai_ratings): hidden unless asked for with ?ai=1.
+  const showAi = ai === "1";
+  const aiParam = showAi ? "&ai=1" : "";
 
   const admin = createAdminClient();
   const [results, entries, assignments, judges, teams, lateSaves, settings, aiNotes] = await Promise.all([
@@ -76,6 +79,8 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
     admin.from("event_settings").select("submissions_close_at, publish_finalists, publish_winners").eq("id", 1).single(),
     admin.from("judge_ai_notes").select("entry_id"),
   ]);
+  const ratings = showAi ? await admin.from("judge_ai_ratings").select("entry_id, rating") : { data: [] };
+  const aiRating = new Map((ratings.data ?? []).map((r) => [r.entry_id as string, r.rating as number]));
 
   if (results.error) {
     return (
@@ -118,7 +123,7 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
 
   const header = (key: SortKey, label: string) => (
     <th className={th}>
-      <Link href={`/admin/judging?sort=${key}${worldParam}`} className={sort === key ? "font-semibold text-foreground" : "underline-offset-2 hover:underline"}>
+      <Link href={`/admin/judging?sort=${key}${worldParam}${aiParam}`} className={sort === key ? "font-semibold text-foreground" : "underline-offset-2 hover:underline"}>
         {label}
         {sort === key ? " ↓" : ""}
       </Link>
@@ -137,7 +142,7 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
             ].map(([param, label]) => (
               <Link
                 key={label}
-                href={`/admin/judging?sort=${sort}${param}`}
+                href={`/admin/judging?sort=${sort}${param}${aiParam}`}
                 className={`rounded px-2 py-1 ${param === worldParam ? "bg-foreground/10 font-medium" : "hover:bg-foreground/5"}`}
               >
                 {label}
@@ -169,9 +174,13 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
         <div className="space-y-1">
           <AiNotesForm world={isTest ? "test" : "real"} disabled={!aiNotesConfigured()} />
           <p className="text-xs text-foreground/60">
-            Claude reads each submitted entry and its README and writes 2–3 sentences per criterion plus a draft score. Judges
-            see them collapsed on the entry page; never public, never added to scores. Run it after submissions close, and
-            again for entries that changed.
+            Claude reads each submitted entry&apos;s text and its GitHub README (not the video, code, or live app) and writes
+            what to focus on, 2–3 sentences per criterion, and what it couldn&apos;t tell. Judges see the notes collapsed on the
+            entry page, with no scores. It also rates each entry for admins only, as an optional tie-breaker:{" "}
+            <Link href={`/admin/judging?sort=${sort}${worldParam}${showAi ? "" : "&ai=1"}`} className="underline">
+              {showAi ? "hide AI tie-break ratings" : "show AI tie-break ratings"}
+            </Link>
+            . Run it after submissions close, and again for entries that changed.
           </p>
         </div>
         {s && <p className="text-sm text-foreground/70">Submissions close {formatPacific(s.submissions_close_at)}. Change it on the Settings tab.</p>}
@@ -207,6 +216,7 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
                   {header("final", "Final")}
                   <th className={th}>Finalist</th>
                   {header("place", "Place")}
+                  {showAi && <th className={th}>AI tie-break</th>}
                 </tr>
               </thead>
               <tbody>
@@ -237,6 +247,11 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
                       <FinalistForm entryId={r.entry_id} override={overrides.get(r.entry_id) ?? null} isFinalist={r.is_finalist} />
                     </td>
                     <td className={td}>{r.place ?? "—"}</td>
+                    {showAi && (
+                      <td className={td} title="Admin-only AI rating of the entry text and README. Never shown to judges, never added to scores.">
+                        {formatScore(aiRating.get(r.entry_id) ?? null)}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

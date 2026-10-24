@@ -4,8 +4,13 @@ import { githubFetch, parseGitHubRepo } from "./github";
 import { CRITERIA, SCORE_MAX, SCORE_MIN } from "./scoring";
 
 // AI notes for judges (docs/REQUIREMENTS.md, "Judging app", nice-to-have 1): Claude reads an
-// entry and writes two or three sentences per criterion against the rubric anchors, plus a
-// draft score. Shown to judges collapsed; never public, never added to human scores.
+// entry's text and its GitHub README (it doesn't watch the video, read code, or open the live
+// link) and writes what to focus on, two or three sentences per criterion, and what it couldn't
+// determine. Shown to judges collapsed; never public.
+//
+// Decided Oct 24: judges never see AI-suggested scores. The same call also rates each criterion,
+// but that goes only to judge_ai_ratings (admin-only, an optional tie-breaker), never into the
+// notes and never into human scores.
 // Server-side only, through the Vercel AI Gateway (CLAUDE.md, "Models").
 //
 // The entry and its README are written by the team, so they're untrusted input: the prompt
@@ -36,10 +41,11 @@ export type EntryForNotes = {
   links: { label: string; url: string }[] | null;
 };
 
-// Stored in judge_ai_notes.notes: what to focus on first, then one note per criterion in rubric
-// order. draft_scores lines up with criteria.
-export type AiNotesBody = { focus: string[]; criteria: { criterion: string; note: string }[] };
-export type AiNotes = { notes: AiNotesBody; draft_scores: number[] };
+// Stored in judge_ai_notes.notes: what to focus on first, one note per criterion in rubric
+// order, and what the AI couldn't determine from the text and README.
+export type AiNotesBody = { focus: string[]; criteria: { criterion: string; note: string }[]; unknowns: string[] };
+// rating: admin-only (judge_ai_ratings), mean of the four criterion scores.
+export type AiNotes = { notes: AiNotesBody; rating: { scores: number[]; mean: number } };
 
 // The repo README, from the GitHub API only (fixed host, owner/repo parsed from the link),
 // so a submitted link can't make the server fetch anything else.
@@ -64,7 +70,11 @@ const SYSTEM = `You help volunteer judges at a one-day hackathon in Seattle wher
 
 Judges read your notes before reviewing an entry themselves, often with only a few minutes per entry. First, list the two or three things this judge should focus on most: the claims or gaps that will move the score most, each as one short sentence that says what to check and where (the demo video, the README, the live link). Then, for each criterion, write two or three plain sentences: what the submission shows, what it doesn't, and the one thing the judge should check in the demo video or repo to decide the score. Be specific to this entry. Don't praise or pad. If the submission doesn't give enough to judge a criterion, say what's missing.
 
-Then give a draft score from ${SCORE_MIN} to ${SCORE_MAX} per criterion using the anchors below; the judge picks the low or high end of a pair. You can't watch the video or run the code, so base "Does it work" on what the text and README claim and show, and say so.
+You only have the team's written entry and the repo README. You can't watch the demo video, read the code, open the live link, or run anything. Never imply you did. Then list what you couldn't determine from that material and the judge has to check themselves (for example: whether the flow shown in the video actually runs, whether setup really needs no code), each as one short sentence.
+
+The notes must not mention scores, ratings, or numbers on the rubric scale; judges score on their own.
+
+Separately, for the organizers only, rate each criterion from ${SCORE_MIN} to ${SCORE_MAX} using the anchors below, based only on what the material shows. This rating is never shown to judges.
 
 Rubric:
 ${RUBRIC}
@@ -75,6 +85,7 @@ const SCHEMA = {
   type: "object",
   properties: {
     focus: { type: "array", items: { type: "string" } },
+    unknowns: { type: "array", items: { type: "string" } },
     criteria: {
       type: "array",
       items: {
@@ -82,14 +93,14 @@ const SCHEMA = {
         properties: {
           criterion: { type: "string", enum: CRITERIA.map((c) => c.name) },
           note: { type: "string" },
-          draft_score: { type: "integer" },
+          organizer_score: { type: "integer" },
         },
-        required: ["criterion", "note", "draft_score"],
+        required: ["criterion", "note", "organizer_score"],
         additionalProperties: false,
       },
     },
   },
-  required: ["focus", "criteria"],
+  required: ["focus", "unknowns", "criteria"],
   additionalProperties: false,
 };
 
@@ -132,16 +143,23 @@ export async function generateAiNotes(entry: EntryForNotes): Promise<AiNotes | n
   if (!text || text.type !== "text") return null;
   console.info("Judge AI notes usage", { input: response.usage.input_tokens, output: response.usage.output_tokens });
 
-  const parsed = JSON.parse(text.text) as { focus: string[]; criteria: { criterion: string; note: string; draft_score: number }[] };
-  // One note per criterion, in rubric order, scores clamped to the scale.
+  const parsed = JSON.parse(text.text) as {
+    focus: string[];
+    unknowns: string[];
+    criteria: { criterion: string; note: string; organizer_score: number }[];
+  };
+  // One note per criterion, in rubric order; scores clamped to the scale and kept out of the notes.
   const byName = new Map(parsed.criteria.map((c) => [c.criterion, c]));
   if (!CRITERIA.every((c) => byName.has(c.name))) return null;
   const ordered = CRITERIA.map((c) => byName.get(c.name)!);
+  const clean = (list: string[], max: number) => list.map((f) => f.trim()).filter(Boolean).slice(0, max);
+  const scores = ordered.map((c) => Math.min(SCORE_MAX, Math.max(SCORE_MIN, Math.round(c.organizer_score))));
   return {
     notes: {
-      focus: parsed.focus.map((f) => f.trim()).filter(Boolean).slice(0, 3),
+      focus: clean(parsed.focus, 3),
       criteria: ordered.map((c) => ({ criterion: c.criterion, note: c.note.trim() })),
+      unknowns: clean(parsed.unknowns, 4),
     },
-    draft_scores: ordered.map((c) => Math.min(SCORE_MAX, Math.max(SCORE_MIN, Math.round(c.draft_score)))),
+    rating: { scores, mean: Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10 },
   };
 }
