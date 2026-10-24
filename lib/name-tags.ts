@@ -35,8 +35,31 @@ const BUCKET_LABEL: Record<string, string> = {
   student: "Student / recent grad",
   professional: "Professional",
 };
-export function nameTagRole(profile: ProfileForTag) {
+function roleFromProfile(profile: ProfileForTag) {
   return PLATFORM_ROLE_LABEL[profile.platform_role] ?? (profile.role_bucket ? BUCKET_LABEL[profile.role_bucket] : null) ?? null;
+}
+
+// Event hosts get "Host" whatever their profile says. Their emails live in NAME_TAG_HOST_EMAILS
+// (comma-separated, Vercel env) to keep them out of this public repo, and only a verified email
+// on the profile counts, so adding someone else's address doesn't make you a host.
+function hostEmails() {
+  return (process.env.NAME_TAG_HOST_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export async function nameTagRole(profile: ProfileForTag & { id: string }) {
+  const hosts = hostEmails();
+  if (hosts.length) {
+    const { data } = await createAdminClient()
+      .from("profile_emails")
+      .select("email")
+      .eq("profile_id", profile.id)
+      .eq("verified", true);
+    if (data?.some((row) => hosts.includes(row.email.toLowerCase()))) return "Host";
+  }
+  return roleFromProfile(profile);
 }
 
 // When this person may print again (ms since epoch), or null if they may print now.

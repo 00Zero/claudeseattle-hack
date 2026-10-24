@@ -33,7 +33,7 @@ export async function requestNameTag(): Promise<NameTagState> {
       last_name: (profile.last_name ?? "").trim(),
       job_title: profile.job_title?.trim() || null,
       company: profile.company?.trim() || null,
-      role_label: nameTagRole(profile),
+      role_label: await nameTagRole(profile),
     });
   if (error) {
     console.error("Name tag request failed", error.message);
