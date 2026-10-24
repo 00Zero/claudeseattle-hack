@@ -6,6 +6,7 @@ import { ActionButton } from "../_components/action-button";
 import { ApplicantFitLine, ApplicantFitLoading, applicantFits } from "../_components/applicant-fit";
 import { BalanceBadges } from "../_components/badges";
 import { DeadlineBanner } from "../_components/deadline-banner";
+import { NoteQuote } from "../_components/note-quote";
 import { PersonDetails, personFromProfile } from "../_components/person";
 import { TeamsTabs } from "../_components/teams-tabs";
 import { inboxCount, loadInbox, type InviteToMe, type MyApplication } from "../_lib/inbox";
@@ -65,6 +66,9 @@ export default async function InboxPage() {
             {inbox.applicationsToMyTeam.map((p) => (
               <li key={p.id} className="space-y-2 px-4 py-3">
                 <PersonDetails person={personFromProfile(p)} showAbout />
+                {inbox.applicationNotes[p.id] && (
+                  <NoteQuote from={personFromProfile(p).name} note={inbox.applicationNotes[p.id]} />
+                )}
                 {fits && (
                   <Suspense fallback={<ApplicantFitLoading />}>
                     <ApplicantFitLine fits={fits} profileId={p.id} />
@@ -211,6 +215,7 @@ function InviteSummary({ invite }: { invite: InviteToMe }) {
       </p>
       {invite.concept && <p className="line-clamp-2 text-sm text-fg-muted">{invite.concept}</p>}
       <BalanceBadges balance={invite.balance} />
+      {invite.note && <NoteQuote from={invite.invitedBy} note={invite.note} />}
       {invite.lookingFor && (
         <p className="text-sm">
           <span className="font-medium">Looking for:</span> <span className="text-fg-muted">{invite.lookingFor}</span>

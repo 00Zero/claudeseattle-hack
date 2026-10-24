@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getMatchingProfiles } from "@/lib/matching";
 import { createClient } from "@/lib/supabase/server";
 import { cancelInvite, inviteToTeam } from "../actions";
+import { NoteForm } from "../_components/note-form";
 import { ActionButton } from "../_components/action-button";
 import { DeadlineBanner } from "../_components/deadline-banner";
 import { TopPicks, TopPicksLoading } from "../_components/top-picks";
@@ -288,13 +289,16 @@ export default async function PeoplePage({ searchParams }: PageProps<"/teams/peo
                         />
                       </>
                     ) : (
-                      <ActionButton
-                        action={inviteToTeam}
+                      <NoteForm
+                      action={inviteToTeam}
                         fields={{ team_id: viewer.myTeamId!, profile_id: p.id }}
                         label={`Invite to ${myTeam!.name}`}
                         pendingLabel="Inviting…"
                         variant="ghost"
-                      />
+                      submitLabel="Send invite"
+                      placeholder="Why do you want them on your team?"
+                      collapsed
+                    />
                     )}
                   </div>
                 )}

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { inviteToTeam } from "../../actions";
-import { ActionButton } from "../../_components/action-button";
+import { NoteForm } from "../../_components/note-form";
 import { Pill } from "../../_components/badges";
 import { PERSON_COLUMNS, PersonDetails, personFromProfile, type ProfileRow } from "../../_components/person";
 import { getViewer, joinableIds, TEAM_MAX } from "../../_lib/teams";
@@ -97,12 +97,15 @@ export default async function PersonPage({ params }: PageProps<"/teams/people/[i
         (invite.invited ? (
           <p className="text-sm font-medium">✓ Invited to {invite.teamName}</p>
         ) : (
-          <ActionButton
-            action={inviteToTeam}
+          <NoteForm
+                      action={inviteToTeam}
             fields={{ team_id: invite.teamId, profile_id: id }}
             label={`Invite to ${invite.teamName}`}
             pendingLabel="Inviting…"
-          />
+                      submitLabel="Send invite"
+                      placeholder="Why do you want them on your team?"
+                      collapsed
+                    />
         ))}
     </div>
   );
