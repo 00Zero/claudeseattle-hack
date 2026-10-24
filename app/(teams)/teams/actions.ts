@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { cleanNote } from "./_lib/notes";
 import { getViewer, isTeamFull, isTooManyApplications, joinableIds, MAX_APPLICATIONS, TEAM_MAX, TEAM_MIN } from "./_lib/teams";
 
 export type FormState = { status: "idle" | "ok" | "error"; message?: string };
@@ -84,6 +85,12 @@ export async function applyToTeam(_prev: FormState, formData: FormData): Promise
   if (viewer.joinBlockedReason) return { status: "error", message: viewer.joinBlockedReason };
   if (viewer.myTeamId) return { status: "error", message: "You're already on a team. Leave it first to apply here." };
   if (viewer.openApplications >= MAX_APPLICATIONS) return { status: "error", message: TOO_MANY };
+  let note: string | null;
+  try {
+    note = cleanNote(formData.get("note"));
+  } catch (error) {
+    return { status: "error", message: (error as Error).message };
+  }
 
   const supabase = await createClient();
   if ((await memberCount(supabase, teamId)) >= TEAM_MAX) {
@@ -95,6 +102,13 @@ export async function applyToTeam(_prev: FormState, formData: FormData): Promise
   if (isTooManyApplications(error)) return { status: "error", message: TOO_MANY };
   if (error?.code === "23505") return { status: "error", message: "You've already applied to this team." };
   if (error) return { status: "error", message: "We couldn't send your application. Try again." };
+  // Only the applicant and this team's leader can read it (teams_application_notes).
+  if (note) {
+    const { error: noteError } = await supabase
+      .from("teams_application_notes")
+      .insert({ team_id: teamId, profile_id: viewer.profile.id, note });
+    if (noteError) console.error("Teams: couldn't save application note", noteError.code);
+  }
   return done(teamId);
 }
 
@@ -236,14 +250,20 @@ export async function inviteToTeam(_prev: FormState, formData: FormData): Promis
     return { status: "error", message: `Your team is full (${TEAM_MAX} people).` };
   }
   if (existing?.status === "pending") return { status: "error", message: `${person.first_name} is already invited.` };
+  let note: string | null;
+  try {
+    note = cleanNote(formData.get("note"));
+  } catch (error) {
+    return { status: "error", message: (error as Error).message };
+  }
 
   const { error } = existing
     ? await supabase
         .from("teams_invites")
-        .update({ status: "pending", responded_at: null })
+        .update({ status: "pending", responded_at: null, note })
         .eq("team_id", teamId)
         .eq("profile_id", profileId)
-    : await supabase.from("teams_invites").insert({ team_id: teamId, profile_id: profileId, invited_by: viewer.profile.id });
+    : await supabase.from("teams_invites").insert({ team_id: teamId, profile_id: profileId, invited_by: viewer.profile.id, note });
   if (error) return { status: "error", message: "We couldn't send the invite. Try again." };
   revalidatePath("/teams/people");
   return done(teamId);

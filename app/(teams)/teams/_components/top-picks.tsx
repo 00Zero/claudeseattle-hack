@@ -2,8 +2,8 @@ import "server-only";
 import { getMatchingProfiles } from "@/lib/matching";
 import { createClient } from "@/lib/supabase/server";
 import { inviteToTeam } from "../actions";
+import { NoteForm } from "./note-form";
 import { rankForTeam, type TeamContext } from "../_lib/ai";
-import { ActionButton } from "./action-button";
 import { PERSON_COLUMNS, PersonDetails, personFromProfile, type ProfileRow } from "./person";
 
 const SHOWN = 5;
@@ -51,13 +51,16 @@ export async function TopPicks({
                 (invited.has(pick.profileId) ? (
                   <p className="text-sm font-medium">✓ Invited to {team.name}</p>
                 ) : (
-                  <ActionButton
-                    action={inviteToTeam}
+                  <NoteForm
+                      action={inviteToTeam}
                     fields={{ team_id: team.id, profile_id: pick.profileId }}
                     label={`Invite to ${team.name}`}
                     pendingLabel="Inviting…"
                     variant="ghost"
-                  />
+                      submitLabel="Send invite"
+                      placeholder="Why do you want them on your team?"
+                      collapsed
+                    />
                 ))}
             </li>
           );

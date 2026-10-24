@@ -20,6 +20,7 @@ export type InviteToMe = {
   size: number;
   balance: Balance;
   invitedBy: string;
+  note: string | null;
   status: "pending" | "accepted" | "declined" | "cancelled" | "expired";
 };
 
@@ -29,6 +30,7 @@ export type Inbox = {
   myTeam: { id: string; name: string; iLead: boolean } | null;
   invitesToMe: InviteToMe[];
   applicationsToMyTeam: ProfileRow[];
+  applicationNotes: Record<string, string>; // applicant id → note, for the leader
   myApplications: MyApplication[];
   invitesISent: { profileId: string; name: string }[];
 };
@@ -47,7 +49,7 @@ export async function loadInbox(viewer: SignedIn): Promise<Inbox> {
     supabase
       .from("teams_invites")
       .select(
-        "team_id, status, created_at, teams(name, concept, looking_for, team_members(status, profiles(role_bucket, is_technical, platform_role))), inviter:profiles!teams_invites_invited_by_fkey(first_name, last_name)",
+        "team_id, status, note, created_at, teams(name, concept, looking_for, team_members(status, profiles(role_bucket, is_technical, platform_role))), inviter:profiles!teams_invites_invited_by_fkey(first_name, last_name)",
       )
       .eq("profile_id", me)
       .order("created_at", { ascending: false })
@@ -66,6 +68,7 @@ export async function loadInbox(viewer: SignedIn): Promise<Inbox> {
   const myTeam = team.data ? { id: team.data.id as string, name: team.data.name as string, iLead: team.data.leader_id === me } : null;
 
   let applicationsToMyTeam: ProfileRow[] = [];
+  const applicationNotes: Record<string, string> = {};
   let invitesISent: Inbox["invitesISent"] = [];
   if (myTeam?.iLead) {
     const [applicants, sent] = await Promise.all([
@@ -81,6 +84,8 @@ export async function loadInbox(viewer: SignedIn): Promise<Inbox> {
         .eq("team_id", myTeam.id)
         .eq("status", "pending"),
     ]);
+    const { data: notes } = await supabase.from("teams_application_notes").select("profile_id, note").eq("team_id", myTeam.id);
+    for (const row of notes ?? []) applicationNotes[row.profile_id as string] = row.note as string;
     applicationsToMyTeam = ((applicants.data ?? []) as unknown as { profiles: ProfileRow | null }[])
       .map((row) => row.profiles)
       .filter((p): p is ProfileRow => p !== null);
@@ -94,6 +99,7 @@ export async function loadInbox(viewer: SignedIn): Promise<Inbox> {
     invitesToMe: ((invites.data ?? []) as unknown as {
       team_id: string;
       status: InviteToMe["status"];
+      note: string | null;
       teams: {
         name: string;
         concept: string | null;
@@ -117,10 +123,12 @@ export async function loadInbox(viewer: SignedIn): Promise<Inbox> {
         size: members.length,
         balance: balanceOf(members),
         invitedBy: fullName(row.inviter),
+        note: row.note,
         status: row.status,
       };
     }),
     applicationsToMyTeam,
+    applicationNotes,
     myApplications: ((applications.data ?? []) as unknown as { team_id: string; status: MyApplication["status"]; teams: { name: string } | null }[]).map(
       (row) => ({ teamId: row.team_id, teamName: row.teams?.name ?? "A team", status: row.status }),
     ),

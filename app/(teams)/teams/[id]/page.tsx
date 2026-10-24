@@ -13,6 +13,8 @@ import {
   removeMember,
 } from "../actions";
 import { ActionButton } from "../_components/action-button";
+import { NoteForm } from "../_components/note-form";
+import { NoteQuote } from "../_components/note-quote";
 import { AdminPanel } from "../_components/admin-panel";
 import { ApplicantFitLine, ApplicantFitLoading, applicantFits } from "../_components/applicant-fit";
 import { BalanceBadges } from "../_components/badges";
@@ -24,7 +26,7 @@ import { balanceOf, getViewer, IDEAL_MAX, IDEAL_MIN, MAX_APPLICATIONS, TEAM_MAX,
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-type Applicant = Person & { onOtherTeam: boolean };
+type Applicant = Person & { onOtherTeam: boolean; note: string | null };
 
 type Team = {
   name: string;
@@ -36,6 +38,7 @@ type Team = {
   iLead: boolean;
   invited: Person[]; // open invites, for the leader
   invitedMe: boolean; // the viewer has an open invite to this team
+  invitedMeNote: string | null; // the leader's note on that invite
 };
 
 // Logged-in with full access: the tables, with links, approval badges, and every
@@ -72,11 +75,17 @@ async function loadFullTeam(id: string, viewerId: string): Promise<Team | null> 
   // Open invites: the leader sees all of them, an invitee only their own (RLS: teams_invites_read).
   const { data: inviteRows } = await supabase
     .from("teams_invites")
-    .select("profile_id")
+    .select("profile_id, note")
     .eq("team_id", id)
     .eq("status", "pending");
   const inviteIds = (inviteRows ?? []).map((r) => r.profile_id as string);
   const iLead = team.leader_id === viewerId;
+  // Applicants' notes: only the leader can read them (RLS: teams_application_notes_read).
+  const notes = new Map<string, string>();
+  if (iLead && applied.length) {
+    const { data } = await supabase.from("teams_application_notes").select("profile_id, note").eq("team_id", id);
+    for (const row of data ?? []) notes.set(row.profile_id as string, row.note as string);
+  }
   let invited: Person[] = [];
   if (iLead && inviteIds.length) {
     const { data } = await supabase.from("profiles").select(PERSON_COLUMNS).in("id", inviteIds);
@@ -88,11 +97,12 @@ async function loadFullTeam(id: string, viewerId: string): Promise<Team | null> 
     concept: team.concept,
     looking_for: team.looking_for,
     members: rows.filter((r) => r.status === "member").map((r) => person(r.profiles!)),
-    applicants: applied.map((p) => ({ ...person(p), onOtherTeam: elsewhere.has(p.id) })),
+    applicants: applied.map((p) => ({ ...person(p), onOtherTeam: elsewhere.has(p.id), note: notes.get(p.id) ?? null })),
     myStatus: rows.find((r) => r.profiles!.id === viewerId)?.status ?? null,
     iLead,
     invited,
     invitedMe: inviteIds.includes(viewerId),
+    invitedMeNote: ((inviteRows ?? []).find((r) => r.profile_id === viewerId)?.note as string | null) ?? null,
   };
 }
 
@@ -132,6 +142,7 @@ async function loadPublicTeam(id: string): Promise<Team | null> {
     iLead: false,
     invited: [],
     invitedMe: false,
+    invitedMeNote: null,
   };
 }
 
@@ -208,6 +219,7 @@ export default async function TeamPage({ params }: PageProps<"/teams/[id]">) {
             {team.applicants.map((a) => (
               <li key={a.id} className="space-y-2 px-4 py-3">
                 <PersonDetails person={a} showAbout />
+                {a.note && <NoteQuote from={a.name} note={a.note} />}
                 {fits && (
                   <Suspense fallback={<ApplicantFitLoading />}>
                     <ApplicantFitLine fits={fits} profileId={a.id!} />
@@ -341,6 +353,7 @@ function ViewerPanel({ viewer, team, teamId, size }: { viewer: Viewer; team: Tea
           <strong>You&apos;re invited to join {team.name}.</strong>{" "}
           {viewer.myTeamId ? "You're on another team, so leave it first to accept." : "Accept to join the team."}
         </p>
+        {team.invitedMeNote && <NoteQuote from="the team leader" note={team.invitedMeNote} />}
         <div className="flex flex-wrap items-start gap-2">
           {!viewer.myTeamId && (
             <ActionButton action={acceptInvite} fields={fields} label="Accept invite" pendingLabel="Joining…" />
@@ -423,7 +436,13 @@ function ViewerPanel({ viewer, team, teamId, size }: { viewer: Viewer; team: Tea
 
   return (
     <div className="space-y-1">
-      <ActionButton action={applyToTeam} fields={fields} label="Apply to join" pendingLabel="Applying…" />
+      <NoteForm
+        action={applyToTeam}
+        fields={fields}
+        label="Apply to join"
+        pendingLabel="Applying…"
+        placeholder="Why do you want to join this team? What would you bring?"
+      />
       <p className="text-sm text-fg-muted">
         The leader sees your profile and accepts or declines. You can apply to {MAX_APPLICATIONS} teams at a time
         {viewer.openApplications ? ` (you've applied to ${viewer.openApplications})` : ""}.
