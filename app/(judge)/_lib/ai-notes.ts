@@ -1,6 +1,6 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
-import { parseGitHubRepo } from "../submit/_lib/checklist";
+import { githubFetch, parseGitHubRepo } from "./github";
 import { CRITERIA, SCORE_MAX, SCORE_MIN } from "./scoring";
 
 // AI notes for judges (docs/REQUIREMENTS.md, "Judging app", nice-to-have 1): Claude reads an
@@ -47,12 +47,7 @@ async function readme(repoUrl: string | null) {
   const repo = repoUrl ? parseGitHubRepo(repoUrl) : null;
   if (!repo) return null;
   try {
-    const res = await fetch(`https://api.github.com/repos/${repo.owner}/${repo.repo}/readme`, {
-      headers: { Accept: "application/vnd.github.raw", "User-Agent": "hack.claudeseattle.org" },
-      redirect: "error",
-      signal: AbortSignal.timeout(5000),
-      cache: "no-store",
-    });
+    const res = await githubFetch(`/repos/${repo.owner}/${repo.repo}/readme`, "application/vnd.github.raw", 5000);
     if (!res.ok) return null;
     const text = await res.text();
     return text.length > README_CHARS ? `${text.slice(0, README_CHARS)}\n[README truncated]` : text;
