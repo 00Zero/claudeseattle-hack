@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { SubmitButton } from "../submit-button";
 import { approvePerson, clearOverride, declinePerson } from "./actions";
 import { RoleForm } from "./role-form";
+import { TechnicalLevelsSection } from "../technical-levels";
 
 const small = "rounded border border-foreground/20 px-2 py-0.5 text-xs enabled:hover:bg-foreground/5";
 
@@ -238,6 +239,8 @@ export default async function PeoplePage({ searchParams }: PageProps<"/admin/peo
           </table>
         </div>
       </section>
+
+      <TechnicalLevelsSection world="real" />
     </div>
   );
 }
