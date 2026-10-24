@@ -116,6 +116,8 @@ export async function testSignInLink(_prev: LinkState, formData: FormData): Prom
 
 // Signs this browser in as a test account (never a real one), keeping the admin's own refresh
 // token in an httpOnly cookie for returnToAdmin(). The admin's session stays valid meanwhile.
+// The cookie lasts as long as Supabase's own session cookie (400 days): if it expired first,
+// the banner would offer "Sign out" instead of "Back to my account" and the admin's login would be lost.
 export async function viewAsTestAccount(formData: FormData) {
   await assertAdmin();
   const profileId = field(formData, "profile_id");
@@ -134,7 +136,7 @@ export async function viewAsTestAccount(formData: FormData) {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 12,
+    maxAge: 400 * 24 * 60 * 60,
   });
 
   const { error } = await supabase.auth.verifyOtp({ type: "magiclink", token_hash: tokenHash });
@@ -146,6 +148,7 @@ export async function viewAsTestAccount(formData: FormData) {
 }
 
 // From the test-account banner: ends the test session and restores the admin's own.
+// Failures are logged (error code and message only) so Vercel's runtime logs show why.
 export async function returnToAdmin() {
   const cookieStore = await cookies();
   const refreshToken = cookieStore.get(ADMIN_RETURN_COOKIE)?.value;
@@ -153,7 +156,11 @@ export async function returnToAdmin() {
 
   const supabase = await createClient();
   await supabase.auth.signOut({ scope: "local" });
-  if (!refreshToken) redirect("/login");
+  if (!refreshToken) {
+    console.error("back to my account failed: no admin_return cookie");
+    redirect("/login");
+  }
   const { error } = await supabase.auth.refreshSession({ refresh_token: refreshToken });
+  if (error) console.error("back to my account failed:", error.code ?? "", error.message);
   redirect(error ? "/login" : "/admin/test-accounts");
 }
