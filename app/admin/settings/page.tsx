@@ -1,7 +1,9 @@
 import { requireAdminPage } from "@/lib/admin";
 import type { AccessRule } from "@/lib/access";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isoToPacificInput } from "@/lib/time";
+import { formatPacific, isoToPacificInput } from "@/lib/time";
+import { nameTagsStatus } from "@/lib/name-tags";
+import { setNameTagsEnabled } from "./name-tag-actions";
 import { SubmitButton } from "../submit-button";
 import { RESOURCE_SECTIONS, type Resource } from "@/lib/resources";
 import { addTicket, deleteTicket, saveEventSettings, saveTicketRules } from "./actions";
@@ -42,6 +44,12 @@ export default async function SettingsPage() {
     admin.from("resources").select("id, section, title, description, url, sort_order, visible").order("section").order("sort_order"),
   ]);
   const resources = (resourceRows ?? []) as Resource[];
+  const nameTags = nameTagsStatus(settings);
+  const { data: recentTags } = await admin
+    .from("name_tag_prints")
+    .select("id, first_name, last_name, requested_at")
+    .order("requested_at", { ascending: false })
+    .limit(10);
 
   const tickets = [...new Set(((rules ?? []) as AccessRule[]).map((r) => r.ticket_name))].sort((a, b) =>
     a === "" ? 1 : b === "" ? -1 : a.localeCompare(b),
@@ -123,6 +131,43 @@ export default async function SettingsPage() {
           </label>
           <SubmitButton className={button}>Save event settings</SubmitButton>
         </form>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">Name tags</h2>
+        <p className="text-sm text-foreground/70">
+          Shows &ldquo;Print my name tag&rdquo; on everyone&apos;s profile page. Each click prints one tag on the name tag
+          printer, at most once every 5 minutes per person. Printing turns off by itself when the event ends (Event ends,
+          above).
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <span
+            className={`rounded px-2 py-0.5 text-sm ${nameTags.open ? "bg-green-600/15 text-green-700" : "bg-foreground/10"}`}
+          >
+            {nameTags.open ? "On" : nameTags.switchedOn && nameTags.ended ? "Off: the event has ended" : "Off"}
+          </span>
+          <form action={setNameTagsEnabled}>
+            <input type="hidden" name="enabled" value={nameTags.switchedOn ? "false" : "true"} />
+            <SubmitButton className={button} disabled={!nameTags.switchedOn && nameTags.ended}>
+              {nameTags.switchedOn ? "Turn off printing" : "Turn on printing"}
+            </SubmitButton>
+          </form>
+          {!nameTags.switchedOn && nameTags.ended && (
+            <span className="text-sm text-foreground/70">The event has ended. Move &ldquo;Event ends&rdquo; later to print again.</span>
+          )}
+        </div>
+        {(recentTags ?? []).length > 0 && (
+          <div className="text-sm">
+            <p className="font-medium">Last {recentTags!.length} sent to the printer</p>
+            <ul className="text-foreground/70">
+              {recentTags!.map((t) => (
+                <li key={t.id}>
+                  {formatPacific(t.requested_at)}: {t.first_name} {t.last_name}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </section>
 
       <section className="space-y-3">
