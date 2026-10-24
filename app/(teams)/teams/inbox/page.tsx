@@ -2,11 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { acceptApplicant, acceptInvite, cancelInvite, declineApplicant, declineInvite, leaveTeam } from "../actions";
 import { ActionButton } from "../_components/action-button";
+import { BalanceBadges } from "../_components/badges";
 import { DeadlineBanner } from "../_components/deadline-banner";
 import { PersonDetails, personFromProfile } from "../_components/person";
 import { TeamsTabs } from "../_components/teams-tabs";
 import { inboxCount, loadInbox, type InviteToMe, type MyApplication } from "../_lib/inbox";
-import { getViewer } from "../_lib/teams";
+import { getViewer, TEAM_MAX } from "../_lib/teams";
 
 const card = "rounded-lg border border-line bg-bg-raised";
 
@@ -97,6 +98,9 @@ export default async function InboxPage() {
                       pendingLabel="Declining…"
                       variant="ghost"
                     />
+                    <Link href={`/teams/${invite.teamId}`} className="btn btn-ghost">
+                      View team
+                    </Link>
                   </div>
                 )}
               </li>
@@ -181,16 +185,25 @@ function Section({ title, count, children }: { title: string; count?: number; ch
   );
 }
 
+// Enough to judge the team without leaving the inbox; "View team" opens the full roster.
 function InviteSummary({ invite }: { invite: InviteToMe }) {
   return (
-    <div className="space-y-1">
+    <div className="space-y-2">
       <p className="text-sm">
         <Link href={`/teams/${invite.teamId}`} className="font-semibold underline">
           {invite.teamName}
         </Link>{" "}
-        <span className="text-fg-muted">· invited by {invite.invitedBy}</span>
+        <span className="text-fg-muted">
+          · invited by {invite.invitedBy} · {invite.size} of {TEAM_MAX} members
+        </span>
       </p>
       {invite.concept && <p className="line-clamp-2 text-sm text-fg-muted">{invite.concept}</p>}
+      <BalanceBadges balance={invite.balance} />
+      {invite.lookingFor && (
+        <p className="text-sm">
+          <span className="font-medium">Looking for:</span> <span className="text-fg-muted">{invite.lookingFor}</span>
+        </p>
+      )}
     </div>
   );
 }

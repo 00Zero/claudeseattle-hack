@@ -2,7 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { ProfileRow } from "../_components/person";
 import { NO_NAME, PERSON_COLUMNS } from "../_components/person";
-import type { Viewer } from "./teams";
+import { balanceOf, type Balance, type RoleBucket, type Viewer } from "./teams";
 
 // The Inbox tab: invites and applications in both directions, all in-app (no email).
 // Reads run as the viewer, so RLS decides what's visible: invitees and leaders see invites
@@ -16,6 +16,9 @@ export type InviteToMe = {
   teamId: string;
   teamName: string;
   concept: string | null;
+  lookingFor: string | null;
+  size: number;
+  balance: Balance;
   invitedBy: string;
   status: "pending" | "accepted" | "declined" | "cancelled" | "expired";
 };
@@ -43,7 +46,9 @@ export async function loadInbox(viewer: SignedIn): Promise<Inbox> {
       : Promise.resolve({ data: null }),
     supabase
       .from("teams_invites")
-      .select("team_id, status, created_at, teams(name, concept), inviter:profiles!teams_invites_invited_by_fkey(first_name, last_name)")
+      .select(
+        "team_id, status, created_at, teams(name, concept, looking_for, team_members(status, profiles(role_bucket, is_technical, platform_role))), inviter:profiles!teams_invites_invited_by_fkey(first_name, last_name)",
+      )
       .eq("profile_id", me)
       .order("created_at", { ascending: false })
       .limit(20),
@@ -89,15 +94,32 @@ export async function loadInbox(viewer: SignedIn): Promise<Inbox> {
     invitesToMe: ((invites.data ?? []) as unknown as {
       team_id: string;
       status: InviteToMe["status"];
-      teams: { name: string; concept: string | null } | null;
+      teams: {
+        name: string;
+        concept: string | null;
+        looking_for: string | null;
+        team_members: {
+          status: string;
+          profiles: { role_bucket: RoleBucket | null; is_technical: boolean | null; platform_role: string } | null;
+        }[];
+      } | null;
       inviter: { first_name: string; last_name: string } | null;
-    }[]).map((row) => ({
-      teamId: row.team_id,
-      teamName: row.teams?.name ?? "A team",
-      concept: row.teams?.concept ?? null,
-      invitedBy: fullName(row.inviter),
-      status: row.status,
-    })),
+    }[]).map((row) => {
+      // Same balance rule as the team cards: mentors don't count.
+      const members = (row.teams?.team_members ?? [])
+        .filter((m) => m.status === "member" && m.profiles)
+        .map((m) => ({ ...m.profiles!, is_mentor: m.profiles!.platform_role === "mentor" }));
+      return {
+        teamId: row.team_id,
+        teamName: row.teams?.name ?? "A team",
+        concept: row.teams?.concept ?? null,
+        lookingFor: row.teams?.looking_for ?? null,
+        size: members.length,
+        balance: balanceOf(members),
+        invitedBy: fullName(row.inviter),
+        status: row.status,
+      };
+    }),
     applicationsToMyTeam,
     myApplications: ((applications.data ?? []) as unknown as { team_id: string; status: MyApplication["status"]; teams: { name: string } | null }[]).map(
       (row) => ({ teamId: row.team_id, teamName: row.teams?.name ?? "A team", status: row.status }),
