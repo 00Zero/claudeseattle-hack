@@ -5,6 +5,7 @@ import { assertAdmin } from "@/lib/admin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkEntry } from "@/app/(judge)/submit/_lib/checklist";
 import { LIMITS } from "@/app/(judge)/submit/_lib/entry";
+import { aiNotesConfigured, generateAiNotes, MODEL as NOTES_MODEL } from "@/app/(judge)/_lib/ai-notes";
 
 // Admin judging actions. Each re-checks the caller is an admin, then writes with the
 // service-role client (the admin layout's check is not enough on its own).
@@ -221,4 +222,60 @@ export async function createFallbackEntry(_prev: RowState, formData: FormData): 
     });
   if (error) return { status: "error", message: error.message };
   return { ...done(), message: `Added ${teamName}.` };
+}
+
+const NOTES_BATCH = 10;
+const NOTES_PARALLEL = 4;
+
+// AI notes for judges (app/(judge)/_lib/ai-notes.ts). One world at a time; writes notes for
+// submitted entries that have none, or whose entry changed after its notes were written.
+// A batch per click keeps each request well under the function time limit.
+export async function generateNotes(_prev: RowState, formData: FormData): Promise<RowState> {
+  await assertAdmin();
+  if (!aiNotesConfigured()) return { status: "error", message: "AI_GATEWAY_API_KEY isn't set, so AI notes are off." };
+  const isTest = formData.get("world") === "test";
+  const admin = createAdminClient();
+
+  const [{ data: results }, { data: entries }, { data: notes }] = await Promise.all([
+    admin.from("judge_entry_results").select("entry_id").eq("submitted", true).eq("is_test", isTest),
+    admin.from("judge_entries").select("id, title, tagline, description_short, description_long, video_url, repo_url, links, updated_at"),
+    admin.from("judge_ai_notes").select("entry_id, created_at"),
+  ]);
+  const inWorld = new Set((results ?? []).map((r) => r.entry_id as string));
+  const notedAt = new Map((notes ?? []).map((n) => [n.entry_id as string, n.created_at as string]));
+  const todo = (entries ?? []).filter((e) => inWorld.has(e.id) && !(notedAt.get(e.id) && notedAt.get(e.id)! >= e.updated_at));
+  if (!todo.length) return { status: "ok", message: "Every submitted entry has up-to-date notes." };
+
+  const batch = todo.slice(0, NOTES_BATCH);
+  let written = 0;
+  let failed = 0;
+  for (let i = 0; i < batch.length; i += NOTES_PARALLEL) {
+    await Promise.all(
+      batch.slice(i, i + NOTES_PARALLEL).map(async (entry) => {
+        try {
+          const result = await generateAiNotes(entry);
+          if (!result) {
+            failed++;
+            return;
+          }
+          const { error } = await admin
+            .from("judge_ai_notes")
+            .upsert({ entry_id: entry.id, model: NOTES_MODEL, notes: result.notes, draft_scores: result.draft_scores, created_at: new Date().toISOString() });
+          if (error) failed++;
+          else written++;
+        } catch (error) {
+          console.error("Judge AI notes failed:", error instanceof Error ? error.message : error);
+          failed++;
+        }
+      }),
+    );
+  }
+
+  revalidatePath("/admin/judging");
+  revalidatePath("/judge");
+  const left = todo.length - written;
+  return {
+    status: failed && !written ? "error" : "ok",
+    message: `Wrote notes for ${written} entr${written === 1 ? "y" : "ies"}${failed ? `, ${failed} failed` : ""}.${left ? ` ${left} still need notes; click again.` : ""}`,
+  };
 }

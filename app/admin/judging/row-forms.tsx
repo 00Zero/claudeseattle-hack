@@ -1,7 +1,7 @@
 "use client";
 
 import { startTransition, useActionState } from "react";
-import { assignJudge, createFallbackEntry, setFinalist, type RowState } from "./actions";
+import { assignJudge, createFallbackEntry, generateNotes, setFinalist, type RowState } from "./actions";
 
 const select = "rounded border border-foreground/20 bg-background text-xs disabled:opacity-60";
 const button = "rounded border border-foreground/20 px-2 py-0.5 text-xs hover:bg-foreground/5 disabled:cursor-wait disabled:opacity-50";
@@ -113,5 +113,23 @@ export function FallbackEntryForm() {
         </div>
       </form>
     </details>
+  );
+}
+
+// Writes AI notes for the next batch of submitted entries without up-to-date notes.
+export function AiNotesForm({ world, disabled }: { world: "real" | "test"; disabled: boolean }) {
+  const [state, formAction, pending] = useActionState(generateNotes, idle);
+  return (
+    <form action={formAction} className="flex flex-wrap items-center gap-2">
+      <input type="hidden" name="world" value={world} />
+      <button type="submit" disabled={pending || disabled} className={button} title={disabled ? "AI_GATEWAY_API_KEY isn't set" : undefined}>
+        {pending ? "Writing notes (up to a minute)…" : "Write AI notes"}
+      </button>
+      {state.message && (
+        <span className={`text-xs ${state.status === "error" ? "text-red-600" : "text-foreground/70"}`} role="status">
+          {state.message}
+        </span>
+      )}
+    </form>
   );
 }
