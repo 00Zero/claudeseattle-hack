@@ -13,6 +13,8 @@ export type EntryDetailsData = {
   links: { label: string; url: string }[] | null;
 };
 
+const PROVIDER_NAMES = { youtube: "YouTube", loom: "Loom", vimeo: "Vimeo", drive: "Google Drive" } as const;
+
 export type RosterMember = { name: string; detail?: string | null };
 
 // Links were checked on save, but render only http(s) anyway.
@@ -78,7 +80,7 @@ export function EntryDetails({ entry, roster }: { entry: EntryDetailsData; roste
         )}
         {videoHref && video && (
           <li>
-            <ExternalLink href={videoHref}>Video on {video.provider === "drive" ? "Google Drive" : video.provider[0].toUpperCase() + video.provider.slice(1)}</ExternalLink>
+            <ExternalLink href={videoHref}>Video on {PROVIDER_NAMES[video.provider]}</ExternalLink>
           </li>
         )}
         {links.map((l) => (

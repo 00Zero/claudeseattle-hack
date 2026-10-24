@@ -98,12 +98,9 @@ function Deadline({ closesAt, isPast }: { closesAt: string; isPast: boolean }) {
 
 function LastSaved({ entry }: { entry: Entry | null }) {
   if (!entry?.last_saved_at) return <p className="text-sm text-fg-muted">Not saved yet.</p>;
-  return (
-    <p className="text-sm text-fg-muted">
-      Last saved {formatPacific(entry.last_saved_at)}
-      {entry.last_saved_by_name ? ` by ${entry.last_saved_by_name}` : ""}.
-    </p>
-  );
+  // Display names end in an initial ("Ada T."), so don't add a second period after one.
+  const text = `Last saved ${formatPacific(entry.last_saved_at)}${entry.last_saved_by_name ? ` by ${entry.last_saved_by_name}` : ""}`;
+  return <p className="text-sm text-fg-muted">{text.endsWith(".") ? text : `${text}.`}</p>;
 }
 
 function LateSaveStatus({ lateSave }: { lateSave: LateSave }) {

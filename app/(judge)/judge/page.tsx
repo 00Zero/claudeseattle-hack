@@ -77,7 +77,7 @@ export default async function JudgePage() {
           <p className="text-sm text-fg-muted">Every judge scores every finalist during the live demos.</p>
         </div>
         {final.finalists.length === 0 ? (
-          <p className="text-fg-muted">No finalists yet. They appear here once every judge has picked one.</p>
+          <p className="text-fg-muted">No finalists yet. Each judge&apos;s top prelim entry appears here once they&apos;ve scored their group.</p>
         ) : (
           <>
             <ul className="space-y-2">
