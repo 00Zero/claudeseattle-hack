@@ -11,6 +11,8 @@ export type EntryDetailsData = {
   video_url: string | null;
   repo_url: string | null;
   links: { label: string; url: string }[] | null;
+  // "Who did what", for the Teamwork criterion. Judges only; public pages don't pass it.
+  contributions?: string | null;
 };
 
 const PROVIDER_NAMES = { youtube: "YouTube", loom: "Loom", vimeo: "Vimeo", drive: "Google Drive" } as const;
@@ -95,6 +97,13 @@ export function EntryDetails({ entry, roster }: { entry: EntryDetailsData; roste
         <div className="space-y-1">
           <h3 className="eyebrow">More detail</h3>
           <p className="whitespace-pre-wrap text-fg-muted">{entry.description_long}</p>
+        </div>
+      )}
+
+      {entry.contributions && (
+        <div className="space-y-1">
+          <h3 className="eyebrow">Who did what</h3>
+          <p className="whitespace-pre-wrap text-fg-muted">{entry.contributions}</p>
         </div>
       )}
 

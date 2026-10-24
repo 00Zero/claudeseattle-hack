@@ -13,6 +13,7 @@ export const FIELD_LABELS: Record<Field, string> = {
   video_url: "Demo video link",
   repo_url: "GitHub repo link",
   links: "Other links",
+  contributions: "Who did what",
 };
 
 export const FIELDS = Object.keys(FIELD_LABELS) as Field[];
@@ -28,12 +29,13 @@ type EntryRow = {
   video_url: string | null;
   repo_url: string | null;
   links: unknown;
+  contributions: string | null;
   last_saved_at: string | null;
   saver: unknown;
 };
 
 const SAVED_ENTRY_COLUMNS =
-  "title, tagline, description_short, description_long, video_url, repo_url, links, last_saved_at, saver:profiles!judge_entries_last_saved_by_fkey(display_name)";
+  "title, tagline, description_short, description_long, video_url, repo_url, links, contributions, last_saved_at, saver:profiles!judge_entries_last_saved_by_fkey(display_name)";
 
 export function entryValues(row: Omit<EntryRow, "last_saved_at" | "saver">): EntryValues {
   return {
@@ -44,6 +46,7 @@ export function entryValues(row: Omit<EntryRow, "last_saved_at" | "saver">): Ent
     video_url: row.video_url ?? "",
     repo_url: row.repo_url ?? "",
     links: Array.isArray(row.links) ? (row.links as EntryLink[]) : [],
+    contributions: row.contributions ?? "",
   };
 }
 

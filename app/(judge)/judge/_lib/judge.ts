@@ -2,7 +2,8 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import type { AiNotesBody } from "../../_lib/ai-notes";
-import { mean, rankByScore } from "../../_lib/scoring";
+import { getEnabledCriteria } from "../../_lib/criteria";
+import { ALL_CRITERIA, mean, rankByScore, type Criterion } from "../../_lib/scoring";
 
 // Data for /judge. Everything reads as the logged-in judge, so RLS limits it to their own
 // assignments and scores; the finalist list comes from judge_finalists(), which checks is_judge().
@@ -21,7 +22,8 @@ export async function getJudgeViewer(): Promise<JudgeViewer> {
   return { kind: "judge", id: profile.id, name: profile.display_name, isAdmin: profile.platform_role === "admin" };
 }
 
-export type MyScore = { scores: number[]; comment: string | null; updated_at: string };
+// criteria: the keys `scores` covers, in order (null = the default four).
+export type MyScore = { scores: number[]; criteria: string[] | null; comment: string | null; updated_at: string };
 
 type EntryRow = { id: string; title: string; fallback_team_name: string | null; teams: { name: string } | null };
 
@@ -33,10 +35,10 @@ async function myScores(judgeId: string, round: Round) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("judge_scores")
-    .select("entry_id, scores, comment, updated_at")
+    .select("entry_id, scores, criteria, comment, updated_at")
     .eq("judge_id", judgeId)
     .eq("round", round);
-  return new Map((data ?? []).map((s) => [s.entry_id as string, { scores: s.scores, comment: s.comment, updated_at: s.updated_at } as MyScore]));
+  return new Map((data ?? []).map((s) => [s.entry_id as string, { scores: s.scores, criteria: s.criteria, comment: s.comment, updated_at: s.updated_at } as MyScore]));
 }
 
 // My prelim group, ranked by my mean score. The top entry (if not tied) is my finalist.
@@ -77,12 +79,12 @@ export async function getEntryForJudge(judgeId: string, entryId: string, round: 
   const supabase = await createClient();
   const { data: entry } = await supabase
     .from("judge_entries")
-    .select("id, team_id, title, tagline, description_short, description_long, video_url, repo_url, links, fallback_team_name, teams(name)")
+    .select("id, team_id, title, tagline, description_short, description_long, video_url, repo_url, links, contributions, fallback_team_name, teams(name)")
     .eq("id", entryId)
     .maybeSingle();
   if (!entry) return null;
 
-  const [assigned, finalists, scores, roster, notes] = await Promise.all([
+  const [assigned, finalists, scores, roster, notes, { criteria }] = await Promise.all([
     supabase.from("judge_assignments").select("entry_id").eq("entry_id", entryId).eq("judge_id", judgeId).maybeSingle(),
     supabase.rpc("judge_finalists"),
     myScores(judgeId, round),
@@ -94,6 +96,7 @@ export async function getEntryForJudge(judgeId: string, entryId: string, round: 
           .eq("status", "member")
       : Promise.resolve({ data: [] }),
     supabase.from("judge_ai_notes").select("notes, model").eq("entry_id", entryId).maybeSingle(),
+    getEnabledCriteria(supabase),
   ]);
 
   const isFinalist = ((finalists.data ?? []) as { entry_id: string }[]).some((f) => f.entry_id === entryId);
@@ -110,15 +113,19 @@ export async function getEntryForJudge(judgeId: string, entryId: string, round: 
     isAssigned: Boolean(assigned.data),
     isFinalist,
     myScore: scores.get(entryId) ?? null,
+    criteria,
     // Never draft_scores: judges don't see AI-suggested scores (decided Oct 24).
-    notes: notes.data ? { ...normalizeNotes(notes.data.notes), model: notes.data.model as string } : null,
+    notes: notes.data ? { ...normalizeNotes(notes.data.notes, criteria), model: notes.data.model as string } : null,
   };
 }
 
-// judge_ai_notes.notes is { focus, criteria, unknowns }; tolerate older shapes too.
-function normalizeNotes(raw: unknown): AiNotesBody {
-  if (Array.isArray(raw)) return { focus: [], criteria: raw as AiNotesBody["criteria"], unknowns: [] };
-  const body = (raw ?? {}) as Partial<AiNotesBody>;
+// judge_ai_notes.notes is { focus, criteria, unknowns }; tolerate older shapes too. Only notes for
+// enabled criteria are shown; older notes have no key, so match those by name.
+function normalizeNotes(raw: unknown, enabled: Criterion[]): AiNotesBody {
+  const body = (Array.isArray(raw) ? { criteria: raw } : (raw ?? {})) as Partial<AiNotesBody>;
   const list = <T,>(v: T[] | undefined) => (Array.isArray(v) ? v : []);
-  return { focus: list(body.focus), criteria: list(body.criteria), unknowns: list(body.unknowns) };
+  const on = new Set<string>(enabled.map((c) => c.key));
+  const keyOf = (n: AiNotesBody["criteria"][number]) => n.key ?? ALL_CRITERIA.find((c) => c.name === n.criterion)?.key;
+  const criteria = list(body.criteria).filter((n) => on.has(keyOf(n) ?? ""));
+  return { focus: list(body.focus), criteria, unknowns: list(body.unknowns) };
 }
