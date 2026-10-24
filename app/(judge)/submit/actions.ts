@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { formatPacific } from "@/lib/time";
 import { checkEntry } from "./_lib/checklist";
 import { getSubmissionDeadline, getSubmitContext, LIMITS, type EntryLink, type EntryValues } from "./_lib/entry";
 
@@ -96,13 +97,33 @@ export async function saveEntry(_prev: SaveState, formData: FormData): Promise<S
     links: values.links,
     checklist,
   };
+  // The entry's last_saved_at when this form loaded ("" if it hadn't been saved yet). The update
+  // only matches if nobody saved since, so a teammate's stale form can't quietly undo a save.
+  const loadedSavedAt = text(formData, "last_saved_at", 64);
   const { data: saved, error } = ctx.entry
-    ? await supabase.from("judge_entries").update(row).eq("id", ctx.entry.id).select("id")
+    ? await supabase
+        .from("judge_entries")
+        .update(row)
+        .eq("id", ctx.entry.id)
+        .filter("last_saved_at", loadedSavedAt ? "eq" : "is", loadedSavedAt || null)
+        .select("id")
     : await supabase.from("judge_entries").insert({ ...row, team_id: ctx.team.id }).select("id");
   if (error || !saved?.length) {
     // The deadline passed while this save was running (the link checks take a few seconds), so
     // RLS refused it: store it as a late save rather than dropping it.
     if ((await getSubmissionDeadline()).isPast) return saveLate();
+    const { data: latest } = await supabase
+      .from("judge_entries")
+      .select("last_saved_at, saver:profiles!judge_entries_last_saved_by_fkey(display_name)")
+      .eq("team_id", teamId)
+      .maybeSingle();
+    if (latest?.last_saved_at && latest.last_saved_at !== loadedSavedAt) {
+      const name = (latest.saver as unknown as { display_name: string } | null)?.display_name ?? "A teammate";
+      return {
+        status: "error",
+        message: `${name} saved changes at ${formatPacific(latest.last_saved_at)} after you opened this page, so your save didn't go through. Your edits are still here: copy anything you need, reload to see their version, then save again.`,
+      };
+    }
     if (error?.code === "23505") return { status: "error", message: "A teammate just saved. Reload the page and try again." };
     return { status: "error", message: "We couldn't save your entry. Try again." };
   }

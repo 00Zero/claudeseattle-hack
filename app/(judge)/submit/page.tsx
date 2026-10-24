@@ -72,7 +72,7 @@ export default async function SubmitPage() {
           <p className="text-fg-muted">Your team didn&apos;t submit an entry before the deadline. Find an organizer.</p>
         )
       ) : (
-        <EntryForm action={saveEntry} values={values} limits={LIMITS} videoHint={VIDEO_HOSTS_HINT} />
+        <EntryForm action={saveEntry} values={values} lastSavedAt={entry?.last_saved_at ?? ""} limits={LIMITS} videoHint={VIDEO_HOSTS_HINT} />
       )}
     </div>
   );
