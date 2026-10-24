@@ -17,10 +17,12 @@ export function NameTagButton({
   preview,
   initialRetryAt,
   isAdmin,
+  printingOff,
 }: {
   preview: string;
   initialRetryAt: number | null;
   isAdmin: boolean;
+  printingOff: boolean;
 }) {
   const [state, action, pending] = useActionState(async () => requestNameTag(), idle);
   const retryAt = state.status === "printing" || state.status === "wait" ? state.retryAt : initialRetryAt;
@@ -47,6 +49,9 @@ export function NameTagButton({
         <p className="text-sm text-foreground/70">
           Your tag will show: <span className="text-foreground">{preview}</span>. Edit your profile below to change it.
         </p>
+        {printingOff && (
+          <p className="text-sm text-amber-700">Printing is off for attendees. As an admin, you can still print.</p>
+        )}
       </div>
 
       <form action={action}>
