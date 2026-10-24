@@ -3,8 +3,9 @@
 --
 -- 1. profiles.technical_level: the person's own rating, the one that counts. Self-service like
 --    is_technical; the app also sets is_technical = (technical_level >= 3) on save, so balance,
---    filters and matching keep reading is_technical. Pages show others a band (none 1–2,
---    some 3, builder 4–5), never the number.
+--    filters and matching keep reading is_technical. Pages show only the person their own
+--    number; others see the is_technical flag. Like every profiles column, the number is
+--    readable through the API by anyone who can browse (profiles_browse).
 -- 2. profile_technical_ai: Claude's suggestion from the person's Luma answers, LinkedIn
 --    enrichment and attendee survey (lib/technical-rating.ts). A separate table, not profiles
 --    columns, because anyone who can browse can read every profiles column through the API,
