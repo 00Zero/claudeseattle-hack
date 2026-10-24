@@ -3,6 +3,7 @@ import { getCurrentAccess, type Access } from "@/lib/access";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import type { Checklist } from "./checklist";
+import { entryValues } from "./merge";
 
 // docs/REQUIREMENTS.md, "Judging app": the entry form's fields and their limits.
 export const LIMITS = {
@@ -104,13 +105,7 @@ export async function getSubmitContext(): Promise<SubmitContext> {
   const entry: Entry | null = row
     ? {
         id: row.id,
-        title: row.title ?? "",
-        tagline: row.tagline ?? "",
-        description_short: row.description_short ?? "",
-        description_long: row.description_long ?? "",
-        video_url: row.video_url ?? "",
-        repo_url: row.repo_url ?? "",
-        links: Array.isArray(row.links) ? (row.links as EntryLink[]) : [],
+        ...entryValues(row),
         checklist: Object.keys(row.checklist ?? {}).length ? (row.checklist as Checklist) : null,
         last_saved_at: row.last_saved_at,
         last_saved_by_name: (row.saver as unknown as { display_name: string } | null)?.display_name ?? null,

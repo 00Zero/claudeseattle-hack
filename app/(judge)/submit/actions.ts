@@ -3,10 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { formatPacific } from "@/lib/time";
-import { checkEntry } from "./_lib/checklist";
+import { checkEntry, type Checklist } from "./_lib/checklist";
 import { getSubmissionDeadline, getSubmitContext, LIMITS, type EntryLink, type EntryValues } from "./_lib/entry";
+import { fieldList, FIELDS, loadSavedEntry, mergeValues, writeEntry, type SavedEntry } from "./_lib/merge";
 
-export type SaveState = { status: "idle" | "ok" | "late" | "error"; message?: string };
+// entry: the saved version after this save, or the teammate's version it conflicted with.
+export type SaveState = { status: "idle" | "ok" | "late" | "error"; message?: string; entry?: SavedEntry };
 
 function text(formData: FormData, key: string, max: number) {
   const value = formData.get(key);
@@ -37,10 +39,37 @@ function parseLinks(formData: FormData): EntryLink[] | string {
   return links;
 }
 
+// The saved version the form last had, sent as JSON so the save can tell the editor's changes
+// from fields they left alone.
+function parseBase(formData: FormData): EntryValues | null {
+  try {
+    const raw = JSON.parse(String(formData.get("base")));
+    const ok = FIELDS.every((field) => (field === "links" ? Array.isArray(raw[field]) : typeof raw[field] === "string"));
+    return ok ? (raw as EntryValues) : null;
+  } catch {
+    return null;
+  }
+}
+
+function invalid(values: EntryValues) {
+  if (!values.title) return "Give your project a title.";
+  // docs/REQUIREMENTS.md: demo video and repo are required. Whether they load is the checklist's job.
+  if (!values.video_url) return "Add a link to your demo video. You can update it any time before the deadline.";
+  if (!values.repo_url) return "Add your GitHub repo link. You can update it any time before the deadline.";
+  for (const key of ["video_url", "repo_url"] as const) {
+    if (!isWebUrl(values[key])) return `The ${key === "video_url" ? "demo video" : "repo"} link should start with https://.`;
+  }
+  return null;
+}
+
 // Save the caller's team entry. Before the deadline it writes judge_entries (RLS: a team member
 // who may submit, and judge_submissions_open()); a trigger stamps who saved and when. After the
 // deadline the save is kept in judge_late_saves for an organizer to accept or reject.
-export async function saveEntry(_prev: SaveState, formData: FormData): Promise<SaveState> {
+//
+// Teammates edit the same entry, so the save merges field by field with what's saved now: fields
+// this editor didn't change keep teammates' saves. If a teammate changed the same field since the
+// editor's form last had it, the save is refused and the form shows both versions.
+export async function saveEntry(formData: FormData): Promise<SaveState> {
   const ctx = await getSubmitContext();
   if (ctx.kind === "signed_out") return { status: "error", message: "Your session expired. Log in again." };
   if (ctx.kind === "no_access") return { status: "error", message: "Your registration is awaiting approval." };
@@ -48,8 +77,10 @@ export async function saveEntry(_prev: SaveState, formData: FormData): Promise<S
 
   const links = parseLinks(formData);
   if (typeof links === "string") return { status: "error", message: links };
+  const base = parseBase(formData);
+  if (!base) return { status: "error", message: "Something went wrong. Reload the page and save again." };
 
-  const values: EntryValues = {
+  const mine: EntryValues = {
     title: text(formData, "title", LIMITS.title),
     tagline: text(formData, "tagline", LIMITS.tagline),
     description_short: text(formData, "description_short", LIMITS.description_short),
@@ -58,22 +89,12 @@ export async function saveEntry(_prev: SaveState, formData: FormData): Promise<S
     repo_url: text(formData, "repo_url", LIMITS.url),
     links,
   };
-  if (!values.title) return { status: "error", message: "Give your project a title." };
-  // docs/REQUIREMENTS.md: demo video and repo are required. Whether they load is the checklist's job.
-  if (!values.video_url) return { status: "error", message: "Add a link to your demo video. You can update it any time before the deadline." };
-  if (!values.repo_url) return { status: "error", message: "Add your GitHub repo link. You can update it any time before the deadline." };
-  for (const key of ["video_url", "repo_url"] as const) {
-    if (!isWebUrl(values[key])) {
-      return { status: "error", message: `The ${key === "video_url" ? "demo video" : "repo"} link should start with https://.` };
-    }
-  }
 
-  const checklist = await checkEntry(values);
   const supabase = await createClient();
+  const teamId = ctx.team.id;
 
   // After the deadline, keep the save for an organizer instead of losing it.
-  const teamId = ctx.team.id;
-  async function saveLate(): Promise<SaveState> {
+  async function saveLate(values: EntryValues, checklist: Checklist): Promise<SaveState> {
     const { error } = await supabase
       .from("judge_late_saves")
       .insert({ team_id: teamId, payload: { ...values, checklist } });
@@ -85,53 +106,49 @@ export async function saveEntry(_prev: SaveState, formData: FormData): Promise<S
     };
   }
 
-  if (ctx.isPast) return saveLate();
-
-  const row = {
-    title: values.title,
-    tagline: values.tagline || null,
-    description_short: values.description_short || null,
-    description_long: values.description_long || null,
-    video_url: values.video_url || null,
-    repo_url: values.repo_url || null,
-    links: values.links,
-    checklist,
-  };
-  // The entry's last_saved_at when this form loaded ("" if it hadn't been saved yet). The update
-  // only matches if nobody saved since, so a teammate's stale form can't quietly undo a save.
-  const loadedSavedAt = text(formData, "last_saved_at", 64);
-  const { data: saved, error } = ctx.entry
-    ? await supabase
-        .from("judge_entries")
-        .update(row)
-        .eq("id", ctx.entry.id)
-        .filter("last_saved_at", loadedSavedAt ? "eq" : "is", loadedSavedAt || null)
-        .select("id")
-    : await supabase.from("judge_entries").insert({ ...row, team_id: ctx.team.id }).select("id");
-  if (error || !saved?.length) {
-    // The deadline passed while this save was running (the link checks take a few seconds), so
-    // RLS refused it: store it as a late save rather than dropping it.
-    if ((await getSubmissionDeadline()).isPast) return saveLate();
-    const { data: latest } = await supabase
-      .from("judge_entries")
-      .select("last_saved_at, saver:profiles!judge_entries_last_saved_by_fkey(display_name)")
-      .eq("team_id", teamId)
-      .maybeSingle();
-    if (latest?.last_saved_at && latest.last_saved_at !== loadedSavedAt) {
-      const name = (latest.saver as unknown as { display_name: string } | null)?.display_name ?? "A teammate";
+  let current: SavedEntry | null = ctx.entry
+    ? { values: ctx.entry, savedAt: ctx.entry.last_saved_at, savedBy: ctx.entry.last_saved_by_name }
+    : null;
+  // The write only lands if nobody saved since `current` was read. If someone did (the link checks
+  // take a few seconds), merge with their save and try again.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { values, conflicts, kept } = current ? mergeValues(base, mine, current.values) : { values: mine, conflicts: [], kept: [] };
+    const problem = invalid(values);
+    if (problem) return { status: "error", message: problem };
+    const who = current?.savedBy ?? "A teammate";
+    if (current && conflicts.length && !ctx.isPast) {
       return {
         status: "error",
-        message: `${name} saved changes at ${formatPacific(latest.last_saved_at)} after you opened this page, so your save didn't go through. Your edits are still here: copy anything you need, reload to see their version, then save again.`,
+        message: `${who} also changed ${fieldList(conflicts)}${current.savedAt ? ` at ${formatPacific(current.savedAt)}` : ""}, so your save didn't go through. Your edits are still here: pick a version under ${conflicts.length === 1 ? "that field" : "each of those fields"}, then save again.`,
+        entry: current,
       };
     }
-    if (error?.code === "23505") return { status: "error", message: "A teammate just saved. Reload the page and try again." };
-    return { status: "error", message: "We couldn't save your entry. Try again." };
-  }
 
-  revalidatePath("/submit");
-  const missing = checklist.items.filter((item) => item.required && item.status !== "ok").length;
-  return {
-    status: "ok",
-    message: missing ? `Saved. ${missing} required item${missing === 1 ? " still needs" : "s still need"} fixing.` : "Saved. Everything judges need is there.",
-  };
+    const checklist = await checkEntry(values);
+    if (ctx.isPast) return saveLate(values, checklist);
+
+    const { saved, error } = await writeEntry(supabase, teamId, current, {
+      title: values.title,
+      tagline: values.tagline || null,
+      description_short: values.description_short || null,
+      description_long: values.description_long || null,
+      video_url: values.video_url || null,
+      repo_url: values.repo_url || null,
+      links: values.links,
+      checklist,
+    });
+    if (saved) {
+      revalidatePath("/submit");
+      const missing = checklist.items.filter((item) => item.required && item.status !== "ok").length;
+      const status = missing ? `Saved. ${missing} required item${missing === 1 ? " still needs" : "s still need"} fixing.` : "Saved. Everything judges need is there.";
+      return { status: "ok", message: kept.length ? `${status} Kept ${who}'s changes to ${fieldList(kept)}.` : status, entry: saved };
+    }
+    // The deadline passed while this save was running, so RLS refused it: store it as a late save
+    // rather than dropping it.
+    if ((await getSubmissionDeadline()).isPast) return saveLate(values, checklist);
+    // 23505: a teammate created the entry first. No error: a teammate saved since `current`.
+    if (error && error.code !== "23505") return { status: "error", message: "We couldn't save your entry. Try again." };
+    current = await loadSavedEntry(supabase, teamId);
+  }
+  return { status: "error", message: "Teammates are saving at the same moment. Wait a few seconds and save again." };
 }
