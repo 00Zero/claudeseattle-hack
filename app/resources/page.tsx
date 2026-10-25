@@ -3,11 +3,14 @@ import { getCurrentAccess } from "@/lib/access";
 import { isDriveFolder, RESOURCE_SECTIONS, type Resource } from "@/lib/resources";
 import { createClient } from "@/lib/supabase/server";
 import { DriveFolderCard } from "./drive-folder-card";
+import { UploadForm } from "./upload-form";
 
 // Links for approved attendees: credits, the name tag form, the small business data folder.
 // A Google Drive folder gets its own card with buttons to open it and add Claude's Drive connector.
 // RLS (resources_read) returns only visible rows, and only to people with full access.
 // Admins edit the list in /admin/settings.
+// At the bottom, approved attendees upload photos and videos to a restricted Google Drive folder
+// (lib/media.ts); they never see the folder. "Your uploads" lists only the viewer's own (RLS).
 export default async function ResourcesPage() {
   const access = await getCurrentAccess();
   if (!access) redirect("/login");
@@ -17,7 +20,7 @@ export default async function ResourcesPage() {
     return (
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold">Resources</h1>
-        <p>Credits, the name tag form, and the small business data are available here once your registration is approved.</p>
+        <p>Credits, the name tag form, the small business data, and photo and video uploads are available here once your registration is approved.</p>
       </div>
     );
   }
@@ -29,6 +32,11 @@ export default async function ResourcesPage() {
     .order("sort_order")
     .order("title");
   const resources = (data ?? []) as Resource[];
+  const { data: uploads } = await supabase
+    .from("media_uploads")
+    .select("id, file_name, size_bytes")
+    .order("created_at", { ascending: false })
+    .limit(100);
 
   return (
     <div className="space-y-8">
@@ -67,6 +75,24 @@ export default async function ResourcesPage() {
           </section>
         );
       })}
+      <section id="upload-media" className="scroll-mt-20 space-y-3 border-t border-line pt-8">
+        <h2 className="text-lg font-semibold">Upload photos and videos</h2>
+        <p className="text-fg-muted">Share your photos and videos from the event. They go to the organizers; other attendees can&apos;t see them.</p>
+        <UploadForm />
+        {uploads && uploads.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="font-medium">Your uploads ({uploads.length})</h3>
+            <ul className="divide-y divide-line rounded border border-line text-sm">
+              {uploads.map((u) => (
+                <li key={u.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                  <span className="min-w-0 truncate">{u.file_name}</span>
+                  <span className="shrink-0 text-fg-muted">{(u.size_bytes / 1024 / 1024).toFixed(1)} MB</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </section>
     </div>
   );
 }
