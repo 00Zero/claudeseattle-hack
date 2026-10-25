@@ -4,9 +4,11 @@ import { getMatchingProfiles } from "@/lib/matching";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 
-// docs/REQUIREMENTS.md, "Teams app": 2–6 enforced, 3–5 recommended.
+// docs/REQUIREMENTS.md, "Teams app": 2–5 enforced, 3–5 recommended. A team is full at 5;
+// only admins can add a 6th (shared_team_cap_five enforces both).
 export const TEAM_MIN = 2;
-export const TEAM_MAX = 6;
+export const TEAM_MAX = 5;
+export const ADMIN_TEAM_MAX = 6;
 export const IDEAL_MIN = 3;
 export const IDEAL_MAX = 5;
 // Open applications per person (status 'applied'); shared_application_limit enforces it too.

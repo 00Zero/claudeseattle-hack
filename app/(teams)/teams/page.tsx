@@ -191,7 +191,7 @@ function TeamCard({ team, mine, reasons }: { team: TeamSummary; mine: boolean; r
       {team.concept && <p className="line-clamp-3 text-sm text-fg-muted">{team.concept}</p>}
       <p className="text-sm">
         <span className="font-medium">
-          {team.memberCount} of {TEAM_MAX}
+          {team.memberCount} of {Math.max(TEAM_MAX, team.memberCount)}
         </span>{" "}
         <span className="text-fg-muted">members</span>
       </p>

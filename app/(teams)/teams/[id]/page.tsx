@@ -421,7 +421,7 @@ function ViewerPanel({ viewer, team, teamId, size }: { viewer: Viewer; team: Tea
       </p>
     );
   }
-  if (full) return <p className={`${box} text-sm text-fg-muted`}>This team is full ({TEAM_MAX} people).</p>;
+  if (full) return <p className={`${box} text-sm text-fg-muted`}>This team is full ({size} people).</p>;
   if (viewer.openApplications >= MAX_APPLICATIONS) {
     return (
       <p className={`${box} text-sm`}>
