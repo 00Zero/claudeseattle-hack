@@ -3,7 +3,7 @@
 import type { User } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { isValidEmail, maskEmail, normalizeEmail } from "@/lib/email";
+import { isValidEmail, maskEmail, normalizeEmail, sendEmail } from "@/lib/email";
 import { getOrigin } from "@/lib/site-url";
 
 // How long after a link is sent before we send another to the same account. Supabase keeps
@@ -15,91 +15,113 @@ export type LoginState =
   | { status: "idle" }
   | {
       status: "sent";
-      shownAddress: string;
-      // linked: the typed email is verified on an account with another auth email.
-      // luma: the typed email is the Claude-account email on a Luma registration.
-      redirectedFrom: "linked" | "luma" | null;
-      // The typed email, when it may sign in on its own instead (no account has the Luma email yet).
-      directEmail: string | null;
+      address: string;
       // When the live link was sent, and when a new one may be requested (ISO times).
       sentAt: string;
       resendAt: string;
       // True when a link sent earlier is still on its way, so none was sent this time.
       alreadySent: boolean;
-      // What to post to request a new link once resendAt has passed.
-      resend: { email: string; direct: boolean };
     }
+  | {
+      // No link sent. linked: the email is linked to an account that signs in with another
+      // address. claude: it's the Claude-account email on a Luma registration. unregistered:
+      // not on Luma. requested / declined: a sign-in request for it exists.
+      status: "not_sent";
+      reason: "linked" | "claude" | "unregistered" | "requested" | "declined";
+      typed: string;
+      // The address to use instead (masked), for linked and claude.
+      useInstead: string | null;
+    }
+  | { status: "error"; message: string };
+
+export type RequestState =
+  | { status: "idle" }
+  | { status: "requested"; email: string }
   | { status: "error"; message: string };
 
 // When this account's live sign-in link was sent: a magic link (recovery_sent_at) or, for an
 // account that hasn't signed in yet, the signup confirmation. Null once that link was used.
-function liveLinkSentAt(user: User | null) {
+function liveLinkSentAt(user: User) {
   const sent = Math.max(
-    user?.recovery_sent_at ? Date.parse(user.recovery_sent_at) : 0,
-    user?.confirmation_sent_at ? Date.parse(user.confirmation_sent_at) : 0,
+    user.recovery_sent_at ? Date.parse(user.recovery_sent_at) : 0,
+    user.confirmation_sent_at ? Date.parse(user.confirmation_sent_at) : 0,
   );
-  const signedIn = user?.last_sign_in_at ? Date.parse(user.last_sign_in_at) : 0;
+  const signedIn = user.last_sign_in_at ? Date.parse(user.last_sign_in_at) : 0;
   return sent > signedIn ? sent : null;
 }
 
-// Sends a magic link. If the typed email is a verified email on an existing
-// profile whose auth email differs, the link goes to the auth email instead,
-// so every linked email logs into the same account. If it is the Claude-account
-// email someone gave on their Luma registration, the link goes to their Luma
-// email (or that account's auth email), so accounts start from the Luma email.
-// "direct" skips the Luma redirect, for people who don't use that inbox.
+type Kind =
+  | { kind: "account"; user: User } // signs in with this email
+  | { kind: "registered" } // a Luma registration email with no account yet
+  | { kind: "linked"; authEmail: string } // verified on an account that signs in with authEmail
+  | { kind: "claude"; guestId: string; lumaEmail: string } // the Claude-account email on a registration
+  | { kind: "unregistered" };
+
+// What a typed email is. Links go only to "account" and "registered" emails, and only to the
+// email as typed: a link sent to another inbox looked like a slow email, so people asked again.
+async function classify(email: string): Promise<Kind> {
+  const admin = createAdminClient();
+  const { data: owner } = await admin
+    .from("profile_emails")
+    .select("profile_id")
+    .eq("email", email)
+    .eq("verified", true)
+    .maybeSingle();
+  if (owner) {
+    const { data } = await admin.auth.admin.getUserById(owner.profile_id);
+    const authEmail = data.user?.email?.toLowerCase();
+    if (data.user && authEmail === email) return { kind: "account", user: data.user };
+    if (authEmail) return { kind: "linked", authEmail };
+  }
+
+  const { data: guest } = await admin.from("luma_guests").select("guest_id").eq("email", email).limit(1).maybeSingle();
+  if (guest) return { kind: "registered" };
+
+  const { data: guestId } = await admin.rpc("luma_guest_for_claude_email", { p_email: email });
+  if (typeof guestId === "string") {
+    const { data: g } = await admin.from("luma_guests").select("email").eq("guest_id", guestId).single();
+    if (g) return { kind: "claude", guestId, lumaEmail: g.email };
+  }
+  return { kind: "unregistered" };
+}
+
+// Sends a magic link to the typed email if it has an account or is a Luma registration email.
+// Otherwise it says which email to use instead, and the page offers a sign-in request.
 // Within RESEND_AFTER_SECONDS of the last link, it reports that link instead of sending.
 export async function sendMagicLink(_prev: LoginState, formData: FormData): Promise<LoginState> {
   const typed = normalizeEmail(formData.get("email"));
   if (!isValidEmail(typed)) {
     return { status: "error", message: "Enter a valid email address." };
   }
-  const direct = formData.get("direct") === "1";
 
-  const admin = createAdminClient();
-  const accountFor = async (email: string) => {
-    const { data: owner } = await admin
-      .from("profile_emails")
-      .select("profile_id")
-      .eq("email", email)
-      .eq("verified", true)
+  const what = await classify(typed);
+  if (what.kind === "linked" || what.kind === "claude" || what.kind === "unregistered") {
+    const { data: request } = await createAdminClient()
+      .from("login_requests")
+      .select("status")
+      .eq("email", typed)
       .maybeSingle();
-    if (!owner) return null;
-    const { data } = await admin.auth.admin.getUserById(owner.profile_id);
-    return data.user;
-  };
-
-  let account = await accountFor(typed);
-  let target = account?.email?.toLowerCase() ?? typed;
-  let redirectedFrom: "linked" | "luma" | null = target !== typed ? "linked" : null;
-  let directEmail: string | null = null;
-  if (target === typed && !direct) {
-    const { data: lumaEmail } = await admin.rpc("luma_email_for_claude_email", { p_email: typed });
-    if (typeof lumaEmail === "string") {
-      account = await accountFor(lumaEmail.toLowerCase());
-      target = account?.email?.toLowerCase() ?? lumaEmail.toLowerCase();
-      redirectedFrom = "luma";
-      if (!account) directEmail = typed;
-    }
+    const reason =
+      request?.status === "pending" ? "requested" : request?.status === "declined" ? "declined" : what.kind;
+    const useInstead =
+      what.kind === "linked" ? maskEmail(what.authEmail) : what.kind === "claude" ? maskEmail(what.lumaEmail) : null;
+    return { status: "not_sent", reason, typed, useInstead };
   }
 
   const sent = (sentAt: number, alreadySent: boolean): LoginState => ({
     status: "sent",
-    shownAddress: redirectedFrom ? maskEmail(target) : typed,
-    redirectedFrom,
-    directEmail,
+    address: typed,
     sentAt: new Date(sentAt).toISOString(),
     resendAt: new Date(sentAt + RESEND_AFTER_SECONDS * 1000).toISOString(),
     alreadySent,
-    resend: { email: typed, direct },
   });
 
-  const lastSent = liveLinkSentAt(account);
+  const lastSent = what.kind === "account" ? liveLinkSentAt(what.user) : null;
   if (lastSent && Date.now() - lastSent < RESEND_AFTER_SECONDS * 1000) return sent(lastSent, true);
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithOtp({
-    email: target,
+    email: typed,
     // The email templates link to {{ .RedirectTo }}?token_hash=…, so this also
     // decides which deployment (localhost, preview, production) the link opens.
     options: { emailRedirectTo: `${await getOrigin()}/auth/confirm` },
@@ -118,4 +140,74 @@ export async function sendMagicLink(_prev: LoginState, formData: FormData): Prom
   }
 
   return sent(Date.now(), false);
+}
+
+const escapeHtml = (text: string) =>
+  text.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+
+// Emails every (non-test) admin about a new sign-in request. Failures are logged, not shown:
+// the request is saved either way and appears in Admin -> People.
+async function notifyAdmins(email: string, name: string, lumaEmail: string | null) {
+  const admin = createAdminClient();
+  const { data: admins } = await admin.from("profiles").select("id").eq("platform_role", "admin").eq("is_test", false);
+  const { data: inboxes } = await admin
+    .from("profile_emails")
+    .select("email")
+    .eq("is_default", true)
+    .in("profile_id", (admins ?? []).map((a) => a.id));
+  const url = `${await getOrigin()}/admin/people`;
+  const registration = lumaEmail
+    ? `It's the Claude account email on the Luma registration for ${lumaEmail}; they say they can't use that inbox.`
+    : "This email isn't on the Luma guest list. Approving also gives them full access.";
+  await Promise.all(
+    (inboxes ?? []).map(({ email: to }) =>
+      sendEmail({
+        to,
+        subject: `Sign-in request: ${name} (${email})`,
+        text: `${name} asked to sign in with ${email}. ${registration}\n\nApprove or decline: ${url}`,
+        html: `<p><strong>${escapeHtml(name)}</strong> asked to sign in with ${escapeHtml(email)}.</p><p>${escapeHtml(registration)}</p><p><a href="${url}">Approve or decline in Admin → People</a></p>`,
+      }).catch((error) => console.error("sign-in request: admin email failed", error)),
+    ),
+  );
+}
+
+// Saves a request to sign in with an email that can't get a link by itself (a Claude-account
+// email or one that isn't on Luma). No link is sent until an admin approves it.
+export async function requestAccess(_prev: RequestState, formData: FormData): Promise<RequestState> {
+  const email = normalizeEmail(formData.get("email"));
+  const name = typeof formData.get("name") === "string" ? (formData.get("name") as string).trim() : "";
+  if (!isValidEmail(email)) return { status: "error", message: "Enter a valid email address." };
+  if (!name) return { status: "error", message: "Enter your name so the organizers know who's asking." };
+  if (name.length > 200) return { status: "error", message: "That name is too long." };
+  if (formData.get("ack") !== "on") {
+    return { status: "error", message: "Check the box to confirm you'll wait for an organizer's approval." };
+  }
+
+  const what = await classify(email);
+  if (what.kind === "account" || what.kind === "registered") {
+    return { status: "error", message: "This email can already sign in. Go back and request a sign-in link." };
+  }
+  if (what.kind === "linked") {
+    return { status: "error", message: "This email is linked to an account. Sign in with that account's email." };
+  }
+
+  const admin = createAdminClient();
+  const { data: inserted, error } = await admin
+    .from("login_requests")
+    .upsert(
+      { email, name, luma_guest_id: what.kind === "claude" ? what.guestId : null },
+      { onConflict: "email", ignoreDuplicates: true },
+    )
+    .select("email");
+  if (error) return { status: "error", message: "We couldn't save your request. Try again in a minute." };
+
+  if (inserted?.length) {
+    await notifyAdmins(email, name, what.kind === "claude" ? what.lumaEmail : null);
+  } else {
+    const { data: existing } = await admin.from("login_requests").select("status").eq("email", email).single();
+    if (existing?.status === "declined") {
+      return { status: "error", message: "An organizer declined a request for this email. Please find one at the event." };
+    }
+  }
+  return { status: "requested", email };
 }
