@@ -1,4 +1,4 @@
--- 20261024193938_shared_technical_rating.sql
+-- 20261025002037_shared_technical_rating.sql
 -- Technical level 1–5 (docs/REQUIREMENTS.md, Teams nice-to-have 6). Additive only.
 --
 -- 1. profiles.technical_level: the person's own rating, the one that counts. Self-service like

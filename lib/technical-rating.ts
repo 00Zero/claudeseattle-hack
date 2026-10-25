@@ -9,7 +9,7 @@ import { TECHNICAL_LEVELS } from "@/lib/technical-levels";
 // Technical level 1–5 (docs/REQUIREMENTS.md, Teams nice-to-have 6). The person's own rating is
 // profiles.technical_level and is the one that counts; Claude suggests one from their Luma
 // answers, LinkedIn enrichment and attendee survey, stored in profile_technical_ai
-// (20261024193938_shared_technical_rating.sql). The form preselects the suggestion until the
+// (20261025002037_shared_technical_rating.sql). The form preselects the suggestion until the
 // person saves their own.
 //
 // Privacy: inputs include matching-only signals (CLAUDE.md, "Luma answers ... are for matching
