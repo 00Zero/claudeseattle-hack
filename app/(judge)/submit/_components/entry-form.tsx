@@ -75,6 +75,9 @@ export function EntryForm({
   const form = useRef<HTMLFormElement>(null);
   const [state, setState] = useState(idle);
   const [pending, startTransition] = useTransition();
+  // The form differs from the saved version it's in step with, and when that was saved.
+  const [dirty, setDirty] = useState(false);
+  const [lastSaved, setLastSaved] = useState(saved.savedAt);
   // Showing the "this save will be late" warning; confirmLate makes the next submit send it.
   const [askLate, setAskLate] = useState(false);
   const confirmLate = useRef(false);
@@ -98,6 +101,14 @@ export function EntryForm({
     return cleanLinks(all("link_url").map((url, i) => ({ label: labels[i] ?? "", url })));
   }
 
+  function recheck() {
+    if (form.current) setDirty(FIELDS.some((field) => !same(formValue(field), base.current[field])));
+  }
+  // After a change that re-renders inputs (link rows), once the DOM has them.
+  function recheckSoon() {
+    requestAnimationFrame(recheck);
+  }
+
   function setFormValue(field: Field, value: EntryValues[Field]) {
     if (field !== "links") {
       textInput(field).value = value as string;
@@ -113,6 +124,7 @@ export function EntryForm({
     if (!form.current || next.savedAt === seenAt.current) return;
     if (seenAt.current && next.savedAt && Date.parse(next.savedAt) < Date.parse(seenAt.current)) return;
     seenAt.current = next.savedAt;
+    setLastSaved(next.savedAt);
     const updates: Partial<Record<Field, Theirs | null>> = {};
     for (const field of FIELDS) {
       const mine = formValue(field);
@@ -135,6 +147,7 @@ export function EntryForm({
       }
       return out;
     });
+    recheckSoon();
   }
 
   // Use theirs: the field takes the teammate's value. Keep mine: the next save overwrites theirs.
@@ -148,6 +161,7 @@ export function EntryForm({
       delete out[field];
       return out;
     });
+    recheckSoon();
   }
 
   function note(field: Field) {
@@ -179,6 +193,7 @@ export function EntryForm({
   return (
     <form
       ref={form}
+      onInput={recheck}
       // Submit by hand so a failed save keeps what was typed (React resets forms after an action).
       onSubmit={(event) => {
         event.preventDefault();
@@ -260,7 +275,14 @@ export function EntryForm({
                 defaultValue={link.url}
                 className={input}
               />
-              <button type="button" onClick={() => setLinks(links.filter((l) => l.key !== link.key))} className="btn btn-ghost shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setLinks(links.filter((l) => l.key !== link.key));
+                  recheckSoon();
+                }}
+                className="btn btn-ghost shrink-0"
+              >
                 Remove
               </button>
             </div>
@@ -277,44 +299,56 @@ export function EntryForm({
         <input type="hidden" name="contributions" defaultValue={saved.values.contributions} />
       </fieldset>
 
-      {state.message && (
-        <p
-          className={`text-sm ${state.status === "error" ? "text-red-600" : state.status === "late" ? "text-fg" : "text-fg-muted"}`}
-          role={state.status === "error" ? "alert" : "status"}
-        >
-          {state.message}
-        </p>
-      )}
-      {askLate ? (
-        <div className="space-y-3 rounded border border-red-600 bg-accent-soft px-4 py-3" role="alertdialog" aria-labelledby="late-heading" aria-describedby="late-detail">
-          <p id="late-heading" className="font-semibold text-red-600">
-            Submissions closed {formatPacific(closesAt)}.
+      {/* Sticks to the bottom of the screen while the form is in view, then scrolls away with
+          it, so it's never mistaken for the Save on each "who did what" part below. Room on the
+          right for the /feedback button. */}
+      <div className="sticky bottom-0 z-30 space-y-2 border-t border-line bg-bg pt-3 pr-28 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        {state.message && (
+          <p
+            className={`text-sm ${state.status === "error" ? "text-red-600" : state.status === "late" ? "text-fg" : "text-fg-muted"}`}
+            role={state.status === "error" ? "alert" : "status"}
+          >
+            {state.message}
           </p>
-          <p id="late-detail" className="text-sm">
-            Saves after the deadline are kept, but your project will be marked as <strong>submitted late</strong>. Save anyway?
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => {
-                confirmLate.current = true;
-                form.current?.requestSubmit();
-              }}
-              className="btn disabled:opacity-50"
-            >
-              Save and mark as late
-            </button>
-            <button type="button" disabled={pending} onClick={() => setAskLate(false)} className="btn btn-ghost">
-              Cancel
-            </button>
+        )}
+        {askLate ? (
+          <div className="space-y-3 rounded border border-red-600 bg-accent-soft px-4 py-3" role="alertdialog" aria-labelledby="late-heading" aria-describedby="late-detail">
+            <p id="late-heading" className="font-semibold text-red-600">
+              Submissions closed {formatPacific(closesAt)}.
+            </p>
+            <p id="late-detail" className="text-sm">
+              Saves after the deadline are kept, but your project will be marked as <strong>submitted late</strong>. Save anyway?
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => {
+                  confirmLate.current = true;
+                  form.current?.requestSubmit();
+                }}
+                className="btn disabled:opacity-50"
+              >
+                Save and mark as late
+              </button>
+              <button type="button" disabled={pending} onClick={() => setAskLate(false)} className="btn btn-ghost">
+                Cancel
+              </button>
+            </div>
           </div>
-        </div>
-      ) : (
-        <button type="submit" disabled={pending} className="btn disabled:opacity-50">
-          {pending ? "Saving and checking links…" : "Save entry"}
-        </button>
-      )}
+        ) : (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <button type="submit" disabled={pending} className="btn disabled:opacity-50">
+              {pending ? "Saving and checking links…" : "Save entry"}
+            </button>
+            {!pending && (
+              <span className={`text-sm ${dirty ? "font-medium text-clay" : "text-fg-muted"}`} aria-live="polite">
+                {dirty ? "Unsaved changes" : lastSaved ? `Saved ${formatPacific(lastSaved)}` : "Not saved yet"}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
     </form>
   );
 }
