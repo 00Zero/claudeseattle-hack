@@ -1,8 +1,9 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { BalanceBadges, Pill } from "./_components/badges";
 import { DeadlineBanner } from "./_components/deadline-banner";
-import { TeamsTabs } from "./_components/teams-tabs";
+import { InboxNotice, TeamsTabs } from "./_components/teams-tabs";
 import { inboxCount } from "./_lib/inbox";
 import { getMatchingProfiles } from "@/lib/matching";
 import { fitForViewer, type Fit } from "./_lib/fit";
@@ -34,7 +35,13 @@ export default async function TeamsPage({ searchParams }: PageProps<"/teams">) {
   const onlyJoinable = canJoin && pick("open") === "1";
   const sort = pick("sort") === "name" ? "name" : pick("sort") === "open" || !canJoin ? "open" : "fit";
 
-  const all = sortTeams(await listTeams(viewer.signedIn));
+  // Teams and the viewer's own matching signals load together; the inbox count streams in.
+  const waiting = inboxCount(viewer);
+  const [teamList, [me]] = await Promise.all([
+    listTeams(viewer.signedIn),
+    sort === "fit" && viewer.signedIn ? getMatchingProfiles([viewer.profile.id]).catch(() => []) : [],
+  ]);
+  const all = sortTeams(teamList);
   const myTeam = myTeamId ? all.find((t) => t.id === myTeamId) : undefined;
   const words = query.toLowerCase();
   let teams = all.filter(
@@ -48,10 +55,7 @@ export default async function TeamsPage({ searchParams }: PageProps<"/teams">) {
   // interests (same scoring as the people page, from their side). Reasons use only roles and
   // words from their own public profile.
   const fits = new Map<string, Fit>();
-  if (sort === "fit" && viewer.signedIn) {
-    const [me] = await getMatchingProfiles([viewer.profile.id]).catch(() => []);
-    if (me) for (const t of teams) fits.set(t.id, fitForViewer(t, me));
-  }
+  if (me) for (const t of teams) fits.set(t.id, fitForViewer(t, me));
   if (sort === "fit" && fits.size) {
     teams = [...teams].sort(
       (a, b) =>
@@ -64,26 +68,20 @@ export default async function TeamsPage({ searchParams }: PageProps<"/teams">) {
   }
   const filtered = Boolean(query || needs || onlyJoinable);
   const control = "rounded border border-line-strong bg-bg-raised px-3 py-2";
-  const waiting = await inboxCount(viewer);
 
   return (
     <div className="space-y-6">
       <div className="space-y-3">
         <h1 className="text-2xl font-semibold">Teams</h1>
-        <DeadlineBanner />
+        <Suspense>
+          <DeadlineBanner />
+        </Suspense>
       </div>
       {viewer.signedIn && <TeamsTabs active="teams" inboxCount={waiting} />}
 
-      {waiting > 0 && (
-        <p className="rounded-lg border border-accent bg-accent-soft px-4 py-3 text-sm">
-          <strong>
-            {waiting} {waiting === 1 ? "thing needs" : "things need"} your answer.
-          </strong>{" "}
-          <Link href="/teams/inbox" className="underline">
-            Open your inbox
-          </Link>
-        </p>
-      )}
+      <Suspense>
+        <InboxNotice count={waiting} />
+      </Suspense>
 
       {!viewer.signedIn ? (
         <p className="text-sm">

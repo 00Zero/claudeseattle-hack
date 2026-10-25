@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { getMatchingProfiles } from "@/lib/matching";
+import { getMatchingProfiles, type MatchingProfile } from "@/lib/matching";
 import { createClient } from "@/lib/supabase/server";
 import { cancelInvite, inviteToTeam } from "../actions";
 import { NoteForm } from "../_components/note-form";
@@ -13,7 +13,7 @@ import { TeamsTabs } from "../_components/teams-tabs";
 import { inboxCount } from "../_lib/inbox";
 import { PERSON_COLUMNS, PersonDetails, personFromProfile, type ProfileRow } from "../_components/person";
 import { fitFor, type Fit } from "../_lib/fit";
-import { balanceOf, getViewer, joinableIds, TEAM_MAX, type RoleBucket } from "../_lib/teams";
+import { balanceOf, getViewer, TEAM_MAX, type RoleBucket } from "../_lib/teams";
 
 const ROLES = [
   ["", "Any role"],
@@ -25,28 +25,28 @@ const ROLES = [
 
 type Row = ProfileRow & { profile_confirmed: boolean };
 
-// People who can join a team and haven't: participants and mentors with full access (see
-// joinableIds) and no 'member' row. Volunteers, judges, and admins aren't listed. RLS:
-// profiles_browse. If matching is unavailable, falls back to Luma approval.
-async function listUnmatched(viewerId: string) {
+// People who can join a team and haven't: participants and mentors with full access (same
+// rule as joinableIds) and no 'member' row. Volunteers, judges, and admins aren't listed. RLS:
+// profiles_browse. If matching is unavailable (null), falls back to Luma approval.
+async function listUnmatched(viewerId: string, matchingPromise: Promise<MatchingProfile[] | null>) {
   const supabase = await createClient();
-  const eligible = await joinableIds();
-  if (eligible && eligible.size === 0) return [];
-  let peopleQuery = supabase.from("profiles").select(`${PERSON_COLUMNS}, profile_confirmed`);
-  peopleQuery = eligible
-    ? peopleQuery.in("id", [...eligible])
-    : peopleQuery.eq("luma_status", "approved").in("platform_role", ["participant", "mentor"]);
-  const [people, members] = await Promise.all([
-    peopleQuery,
+  // The profiles and memberships load alongside the matching read; eligibility filters after.
+  const [matching, people, members] = await Promise.all([
+    matchingPromise,
+    supabase.from("profiles").select(`${PERSON_COLUMNS}, profile_confirmed`).in("platform_role", ["participant", "mentor"]),
     supabase.from("team_members").select("profile_id").eq("status", "member"),
   ]);
   if (people.error) throw people.error;
   if (members.error) throw members.error;
+  const eligible = matching
+    ? new Set(matching.filter((r) => r.platform_role === "participant" || r.platform_role === "mentor").map((r) => r.profile_id))
+    : null;
+  const canJoin = (p: Row) => (eligible ? eligible.has(p.id) : p.luma_status === "approved");
 
   const onTeam = new Set((members.data ?? []).map((m) => m.profile_id));
   const name = (p: Row) => `${p.first_name} ${p.last_name}`.trim();
   return ((people.data ?? []) as Row[])
-    .filter((p) => p.id !== viewerId && !onTeam.has(p.id))
+    .filter((p) => canJoin(p) && p.id !== viewerId && !onTeam.has(p.id))
     .sort(
       // Confirmed profiles first (they've added a bio and what they're looking for), then by
       // name. People with no name yet (approved without a Luma match) go last.
@@ -94,13 +94,11 @@ async function loadMyTeam(teamId: string) {
 
 // Fit per person id, from the matching signals. Only the score and derived reasons leave
 // this function. If matching is unavailable, the page falls back to sorting by name.
-async function scoreFits(team: NonNullable<Awaited<ReturnType<typeof loadMyTeam>>>, ids: string[]) {
+function scoreFits(team: NonNullable<Awaited<ReturnType<typeof loadMyTeam>>>, ids: string[], matching: MatchingProfile[] | null) {
   const fits = new Map<string, Fit>();
-  if (!ids.length) return fits;
-  try {
-    for (const signals of await getMatchingProfiles(ids)) fits.set(signals.profile_id, fitFor(team, signals));
-  } catch (error) {
-    console.error("Best-fit matching unavailable", error);
+  const wanted = new Set(ids);
+  for (const signals of matching ?? []) {
+    if (wanted.has(signals.profile_id)) fits.set(signals.profile_id, fitFor(team, signals));
   }
   return fits;
 }
@@ -120,7 +118,21 @@ export default async function PeoplePage({ searchParams }: PageProps<"/teams/peo
   const here = pick("here") === "yes";
   const query = pick("q").trim().toLowerCase();
 
-  const everyone = await listUnmatched(viewer.profile.id);
+  // One read of everyone's matching signals serves both "who can join" and best fit, and the
+  // page's queries run together: each round trip to the database is slow from the server.
+  const matchingPromise = getMatchingProfiles().catch((error) => {
+    console.error("Matching unavailable", error);
+    return null;
+  });
+  const supabase = await createClient();
+  const [everyone, matching, myTeam, { data: inviteRows }] = await Promise.all([
+    listUnmatched(viewer.profile.id, matchingPromise),
+    matchingPromise,
+    viewer.myTeamId ? loadMyTeam(viewer.myTeamId) : null,
+    viewer.myTeamId
+      ? supabase.from("teams_invites").select("profile_id").eq("team_id", viewer.myTeamId).eq("status", "pending")
+      : { data: [] },
+  ]);
   const people = everyone.filter(
     (p) =>
       (role === "" ||
@@ -133,22 +145,12 @@ export default async function PeoplePage({ searchParams }: PageProps<"/teams/peo
   const checkedIn = everyone.filter((p) => p.checked_in_at).length;
 
   // "Best fit for <team>" is the default order for people on a team; "name" is the other.
-  const myTeam = viewer.myTeamId ? await loadMyTeam(viewer.myTeamId) : null;
-  const fits = myTeam && pick("sort") !== "name" ? await scoreFits(myTeam, everyone.map((p) => p.id)) : new Map<string, Fit>();
+  const fits = myTeam && pick("sort") !== "name" ? scoreFits(myTeam, everyone.map((p) => p.id), matching) : new Map<string, Fit>();
   const byFit = fits.size > 0;
 
   // Leaders can invite from here; people they've already invited show as invited.
   const iLead = myTeam?.leaderId === viewer.profile.id;
-  const invited = new Set<string>();
-  if (iLead) {
-    const supabase = await createClient();
-    const { data } = await supabase
-      .from("teams_invites")
-      .select("profile_id")
-      .eq("team_id", viewer.myTeamId!)
-      .eq("status", "pending");
-    for (const row of data ?? []) invited.add(row.profile_id);
-  }
+  const invited = new Set<string>(iLead ? (inviteRows ?? []).map((row) => row.profile_id as string) : []);
 
   // Claude's top picks: the 15 best by the scoring rule, re-ranked with reasons. Only on the
   // unfiltered fit view of a team with room.
@@ -178,9 +180,11 @@ export default async function PeoplePage({ searchParams }: PageProps<"/teams/peo
     <div className="space-y-6">
       <div className="space-y-3">
         <h1 className="text-2xl font-semibold">Teams</h1>
-        <DeadlineBanner />
+        <Suspense>
+          <DeadlineBanner />
+        </Suspense>
       </div>
-      <TeamsTabs active="people" inboxCount={await inboxCount(viewer)} />
+      <TeamsTabs active="people" inboxCount={inboxCount(viewer)} />
       <div className="space-y-3">
         <p className="text-sm text-fg-muted">
           {everyone.length} {everyone.length === 1 ? "person is" : "people are"} still looking. Find someone your team
