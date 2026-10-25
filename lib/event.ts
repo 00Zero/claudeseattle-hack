@@ -36,6 +36,8 @@ export const prizes = {
     "Tickets to the Seattle AI Week AI Summit (courtesy of WTIA)",
     "A one-year WTIA membership",
   ],
+  // The top three places (the winner included).
+  topThree: ["Anthropic swag"],
 };
 
 // Docs/REQUIREMENTS.md, "Rubric". Each criterion is scored 1–8; the entry score is the mean of
