@@ -7,6 +7,7 @@ const tabs = [
   { href: "/admin/import", label: "Import" },
   { href: "/admin/people", label: "People" },
   { href: "/admin/standby", label: "Standby" },
+  { href: "/admin/offers", label: "Offers" },
   { href: "/admin/judging", label: "Judging" },
   { href: "/admin/test-accounts", label: "Test accounts" },
   { href: "/admin/settings", label: "Settings" },

@@ -1,15 +1,19 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentAccess } from "@/lib/access";
+import type { AttendeeOffer } from "@/lib/offers";
 import { isDriveFolder, RESOURCE_SECTIONS, type Resource } from "@/lib/resources";
 import { createClient } from "@/lib/supabase/server";
 import { DriveFolderCard } from "./drive-folder-card";
+import { OfferCard } from "./offer-card";
 import { UploadForm } from "./upload-form";
 
 // Links for approved attendees: credits, the name tag form, the small business data folder.
 // A Google Drive folder gets its own card with buttons to open it and add Claude's Drive connector.
 // RLS (resources_read) returns only visible rows, and only to people with full access.
 // Admins edit the list in /admin/settings.
+// Sponsor offers (lib/offers.ts) lead the Credits section; attendee_offers() leaves out their links
+// until the person has checked in, where an admin requires it. Admins manage them in /admin/offers.
 // At the bottom, approved attendees upload photos and videos to a restricted Google Drive folder
 // (lib/media.ts); they never see the folder. "Your uploads" lists only the viewer's own (RLS).
 export default async function ResourcesPage() {
@@ -27,12 +31,16 @@ export default async function ResourcesPage() {
   }
 
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("resources")
-    .select("id, section, title, description, url, sort_order, visible")
-    .order("sort_order")
-    .order("title");
+  const [{ data }, { data: offerRows }] = await Promise.all([
+    supabase
+      .from("resources")
+      .select("id, section, title, description, url, sort_order, visible")
+      .order("sort_order")
+      .order("title"),
+    supabase.rpc("attendee_offers"),
+  ]);
   const resources = (data ?? []) as Resource[];
+  const offers = (offerRows ?? []) as AttendeeOffer[];
   const { data: uploads } = await supabase
     .from("media_uploads")
     .select("id, file_name, size_bytes")
@@ -45,34 +53,46 @@ export default async function ResourcesPage() {
         <h1 className="text-2xl font-semibold">Resources</h1>
         <p className="text-fg-muted">For attendees of the Claude Impact Lab Hackathon. Please don&apos;t share these links outside the event.</p>
       </div>
-      {resources.length === 0 && <p className="text-fg-muted">Nothing here yet. Check back closer to the event.</p>}
+      {resources.length === 0 && offers.length === 0 && <p className="text-fg-muted">Nothing here yet. Check back closer to the event.</p>}
       {RESOURCE_SECTIONS.map((section) => {
         const items = resources.filter((r) => r.section === section.key);
-        if (items.length === 0) return null;
+        const sectionOffers = section.key === "credits" ? offers : [];
+        if (items.length === 0 && sectionOffers.length === 0) return null;
         return (
           <section key={section.key} className="space-y-3">
             <h2 className="text-lg font-semibold">{section.label}</h2>
-            <ul className="grid gap-3 sm:grid-cols-2">
-              {items.map((r) =>
-                isDriveFolder(r.url) ? (
-                  <li key={r.id} className="sm:col-span-2">
-                    <DriveFolderCard resource={r} />
+            {sectionOffers.length > 0 && (
+              <ul className="grid gap-4 lg:grid-cols-2">
+                {sectionOffers.map((o) => (
+                  <li key={o.slug}>
+                    <OfferCard offer={o} />
                   </li>
-                ) : (
-                  <li key={r.id}>
-                    <a
-                      href={r.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block h-full rounded border border-line p-4 no-underline hover:border-line-strong hover:bg-fg/5"
-                    >
-                      <span className="font-medium text-fg">{r.title} ↗</span>
-                      {r.description && <span className="mt-1 block text-sm text-fg-muted">{r.description}</span>}
-                    </a>
-                  </li>
-                ),
-              )}
-            </ul>
+                ))}
+              </ul>
+            )}
+            {items.length > 0 && (
+              <ul className="grid gap-3 sm:grid-cols-2">
+                {items.map((r) =>
+                  isDriveFolder(r.url) ? (
+                    <li key={r.id} className="sm:col-span-2">
+                      <DriveFolderCard resource={r} />
+                    </li>
+                  ) : (
+                    <li key={r.id}>
+                      <a
+                        href={r.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block h-full rounded border border-line p-4 no-underline hover:border-line-strong hover:bg-fg/5"
+                      >
+                        <span className="font-medium text-fg">{r.title} ↗</span>
+                        {r.description && <span className="mt-1 block text-sm text-fg-muted">{r.description}</span>}
+                      </a>
+                    </li>
+                  ),
+                )}
+              </ul>
+            )}
           </section>
         );
       })}
