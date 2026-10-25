@@ -13,11 +13,11 @@
 //    URL into Vercel as MEDIA_UPLOAD_URL. "Anyone" only means the URL needs no Google sign-in;
 //    every request must carry the secret.
 // After editing the script, Deploy > Manage deployments > Edit > New version keeps the same URL.
+// No size cap here: Drive takes files up to 5 TB, and the site uploads in chunks it can resume.
 
 // DriveApp.createFile() is never called; naming it makes Apps Script ask for full Drive access
 // instead of read-only, which the upload links need.
 
-const MAX_BYTES = 500 * 1024 * 1024;
 const ALLOWED_ORIGIN = /^(https:\/\/hack\.claudeseattle\.org|http:\/\/localhost:\d+)$/;
 
 function authorize() {
@@ -52,7 +52,7 @@ function start_(body) {
   const origin = String(body.origin || '');
   if (!name) throw new Error('Missing file name');
   if (!/^(image|video)\//.test(mimeType)) throw new Error('Only photos and videos');
-  if (!(size > 0 && size <= MAX_BYTES)) throw new Error('File must be under 500 MB');
+  if (!(size > 0)) throw new Error('The file is empty');
   if (!ALLOWED_ORIGIN.test(origin)) throw new Error('Origin not allowed');
 
   // fields=id keeps the folder out of what the browser gets back when the upload finishes.
