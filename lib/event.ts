@@ -40,7 +40,7 @@ export const judges: Entry[] = [
 export const sponsors: Entry[] = [
   { name: "Anthropic", logo: "/partners/anthropic.png", description: "$100 in Claude API credits for every participant, plus Claude Max 20x for the winning team.", website: "https://www.anthropic.com" },
   { name: "Tavily", logo: "/partners/tavily.svg", description: "8,000 free API credits for web search and extraction built for AI agents.", website: "https://www.tavily.com" },
-  { name: "OpenRouter", logo: "/partners/openrouter.svg", description: "$10 in API credits: one key for hundreds of models, Claude, GPT and Gemini among them.", website: "https://openrouter.ai" },
+  { name: "OpenRouter", logo: "/partners/openrouter.svg", description: "$10 in API credits: one key for hundreds of LLMs.", website: "https://openrouter.ai" },
   { name: "Wispr Flow", logo: "/partners/wispr-flow.svg", description: "Free months of Wispr Flow Pro: AI voice dictation that works in every app.", website: "https://wisprflow.ai" },
 ];
 export const partners: Entry[] = [
