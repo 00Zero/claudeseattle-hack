@@ -10,6 +10,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { EVENT_TIME_ZONE } from "@/lib/time";
 import { AgendaSlide, type AgendaItem } from "./agenda-slide";
+import floorPlan from "./floor-plan.png";
 import { Deck, type Slide } from "./deck";
 import { SiteTour } from "./site-tour";
 import styles from "./slides.module.css";
@@ -21,6 +22,14 @@ export const metadata: Metadata = { robots: { index: false } };
 // opens it in full screen). Intro slides follow Adam's "Claude Impact Lab" deck; event details
 // follow the Luma blasts and the spec. Deadlines, Wi-Fi, and criteria are read live, so the deck
 // stays right if they change in Settings.
+
+// Rooms closed to the hackathon (yellow on thinkspace's plan), placed over floor-plan.png as
+// percentages of the image so the marks scale with it.
+const OFF_LIMITS = [
+  { name: "112", left: 5.9, top: 70.8, width: 14.1, height: 27 },
+  { name: "113", left: 20.15, top: 70.8, width: 15.15, height: 11.8 },
+  { name: "118", left: 22.75, top: 55.4, width: 8.85, height: 9.5 },
+];
 
 // Section header styled as a Claude Code tool call, like the home page's.
 function Sig({ call, title }: { call: string; title: ReactNode }) {
@@ -381,6 +390,43 @@ export default async function SlidesPage() {
             <div className="rounded-xl border border-line p-7">
               <p className="font-mono text-[18px] uppercase tracking-[0.14em] text-fg-faint">Mentors, all day</p>
               <p className="mt-3 text-[24px] leading-snug text-fg-muted">Small business questions, project scoping, Claude Code, GitHub, and API credits. Flag one down anytime.</p>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: "Where to work",
+      tone: "light",
+      content: (
+        <div className="flex h-full flex-col gap-6">
+          <Sig call="Read(floor-plan.pdf)" title="Where you can work" />
+          <div className="grid min-h-0 flex-1 grid-cols-[1fr_340px] gap-10">
+            <div className="flex min-h-0 items-start justify-center">
+              <div className="relative h-full overflow-hidden rounded-xl border border-line bg-white" style={{ aspectRatio: `${floorPlan.width} / ${floorPlan.height}` }}>
+                <Image src={floorPlan} alt="thinkspace Lake Union level 1 floor plan" className="h-full w-full object-contain" placeholder="blur" />
+                {OFF_LIMITS.map((room) => (
+                  <div
+                    key={room.name}
+                    className="absolute flex items-center justify-center bg-[repeating-linear-gradient(135deg,rgba(191,95,63,0.55)_0_10px,rgba(191,95,63,0.25)_10px_20px)] ring-4 ring-clay-deep"
+                    style={{ left: `${room.left}%`, top: `${room.top}%`, width: `${room.width}%`, height: `${room.height}%` }}
+                  >
+                    <span className="rounded bg-clay-deep px-2 py-0.5 text-center font-mono text-[17px] font-semibold uppercase leading-tight tracking-[0.08em] text-ivory">
+                      {room.name}
+                      <br />
+                      Off limits
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-col justify-center gap-6">
+              <div className="flex items-center gap-4">
+                <span className="h-10 w-10 shrink-0 rounded bg-[repeating-linear-gradient(135deg,rgba(191,95,63,0.55)_0_6px,rgba(191,95,63,0.25)_6px_12px)] ring-4 ring-clay-deep" />
+                <span className="font-display text-[38px] font-light leading-tight">Off limits</span>
+              </div>
+              <p className="text-[26px] leading-snug text-fg-muted">Rooms {OFF_LIMITS.map((room) => room.name).join(", ").replace(/, ([^,]*)$/, " and $1")} are not part of the hackathon. Please don&apos;t work in them.</p>
+              <p className="font-mono text-[19px] text-fg-faint">thinkspace Seattle · level 1</p>
             </div>
           </div>
         </div>
