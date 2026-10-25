@@ -10,8 +10,11 @@ const pages = [
   { href: "/profile", label: "profile" },
 ];
 
-// Signed-in people only; /resources itself checks approval.
-const signedInPages = [{ href: "/resources", label: "resources" }];
+// Signed-in people only; /resources and /media check approval themselves.
+const signedInPages = [
+  { href: "/resources", label: "resources" },
+  { href: "/media", label: "media" },
+];
 
 // Judges and admins: where they score. /judge itself checks the role.
 const judgePages = [{ href: "/judge", label: "judge" }];
