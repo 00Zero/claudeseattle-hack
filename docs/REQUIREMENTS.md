@@ -32,7 +32,7 @@ Numbers as of Oct 17: 498 Luma registrations, 83 approved, 391 pending, 4 waitli
 
 Theme: build AI tools, workflows, and playbooks that small businesses can adopt. All projects are open-sourced on GitHub, which is why team and entry pages are public.
 
-Prizes, for the home page and results page: every participant gets $100 in Claude API credits; the winning team gets one month of Claude Max 20x per person, tickets to the Seattle AI Week AI Summit (courtesy of WTIA), and a one-year WTIA membership. Venue: thinkspace Seattle, 1700 Westlake Ave N #200.
+Prizes, for the home page and results page: every participant gets $100 in Claude API credits; the winning team gets one month of Claude Max 20x per person and a one-year WTIA membership, up to $1,000 in prizes per person in total; the top three teams get tickets to the Seattle AI Week AI Summit and the AI Week Opening Reception (courtesy of WTIA) and Anthropic swag. Venue: thinkspace Seattle, 1700 Westlake Ave N #200.
 
 ## Shared foundation (Adam, before kickoff)
 
@@ -52,7 +52,7 @@ Everything both apps depend on is built once, before day one, so neither dev bui
 | `supabase/migrations/0001_shared.sql` | Adam | Shared tables below; changes need both devs' review |
 | `supabase/migrations/00NN_teams_*.sql`, `00NN_judge_*.sql` | Each dev | Own tables, prefixed `teams_` or `judge_` |
 
-**Login and emails.** Magic link via Supabase Auth with Resend SMTP. A person can have several emails; any linked email logs into the same account; one is marked default and receives platform mail. Adding an email sends a verification link to that address first. The Luma import seeds two emails per guest. The registration email is pre-verified and is the preferred login: typing the Claude-account email sends the link there. The Claude-account email is self-reported (other people's addresses and typos turn up), so it links a guest only when exactly one guest gave it and it isn't someone's Luma email, and it is attached unverified; the person verifies it from their profile to sign in with it.
+**Login and emails.** Magic link via Supabase Auth with Resend SMTP. A person can have several emails; any linked email logs into the same account; one is marked default and receives platform mail. Adding an email sends a verification link to that address first. The Luma import seeds two emails per guest. The registration email is pre-verified and is the login. A link goes only to the email as typed, and only if it has an account or is a Luma registration email: typing the Claude-account email says to use the registration email (masked) instead, because links sent to another inbox looked slow and people asked again, which cancels the earlier link. Within 5 minutes of a link, the login form shows when it was sent instead of sending another. The Claude-account email is self-reported (other people's addresses and typos turn up), so it links a guest only when exactly one guest gave it and it isn't someone's Luma email, and it is attached unverified; the person verifies it from their profile to sign in with it.
 
 **Access.** Status comes from the Luma import and a `role` column on the profile.
 
@@ -66,7 +66,7 @@ Everything both apps depend on is built once, before day one, so neither dev bui
 | Declined | no |  |  |  |  |  |  |
 | Admin (profile flag, seeded with Adam) | yes | yes | yes | yes | yes | yes | yes |
 
-Anyone not in the whitelist can still sign up and lands on the pending page; the admin queue shows them with the Luma email they typed, and Adam approves or ignores. The pending page says registration is awaiting approval and shows the Sunday schedule.
+Anyone whose email isn't on Luma (or who can't use their Luma inbox) gets no link. They can file a sign-in request (`login_requests`) with their name, after confirming they'll wait for approval; the admins get an email, and Admin → People lists it. Approving creates the account (or switches the registration's existing account to the requested email), approves it if it isn't on Luma, and emails a sign-in link. Accounts created before Oct 25 that aren't on Luma stay in the "Not in Luma" queue. The pending page says registration is awaiting approval and shows the Sunday schedule.
 
 **Luma import.** Admin page: upload the Luma guests CSV, upsert on `guest_id`. Adam re-runs it every time he approves a batch and again Sunday morning for check-ins. Columns used: name, email, Claude-account email, approval status, ticket name, checked-in time, LinkedIn, GitHub, professional role, company, title, employee count, Claude Code level, GitHub experience, "why join", "features of interest". Role buckets: founder, small business owner, small business executive → owner; experienced professional, academia, non-profit, government, artist, other → professional; current student, recent grad → student. Technical flag pre-set to yes when GitHub experience is "run a shared repo" or "contributed to shared repos"; user confirms on first login. The import holds back a file whose ticket names have no access rule (Luma renamed Standard to Participant once) unless the admin confirms. LinkedIn enrichment lands in `linkedin_enrichment`, one row per profile per source, keyed by the slug of the LinkedIn URL the person gave (Apify rows by the URL that was requested, since LinkedIn may redirect to a renamed profile). Apify (harvestapi/linkedin-profile-scraper) is the main source; EnrichLayer validates it and fills gaps. `linkedin_profiles` merges them field by field (Apify first) and feeds `matching_profiles`; `linkedin_enrichment_check` (admin) compares the two. `scripts/import-linkedin-enrichment.ts` loads either export: dates normalized, at most 10 roles, and `raw` limited to the person's own profile (no suggested profiles, recommendations, followed accounts, photos, emails or open-to-work status). An admin upload comes later; it has to trim in the browser and send rows in batches, because Apify exports run about 50 KB per profile and Server Actions accept 1 MB per request.
 
@@ -107,7 +107,7 @@ A mobile-first tool people use on their phones at the happy hour and at Sunday c
 - [ ] Browse teams: card per team with name, concept, member count, role-balance badges (owner / professional / student / technical: present or missing), "looking for" text. Search by name. Sort: open teams first.
 - [ ] Apply to a team; leader sees applicants on the team page and accepts or rejects. Applicant sees status.
 - [ ] One team per person. Leaving a team or being removed by the leader frees the person to apply elsewhere.
-- [ ] Team size 2–6 enforced; warning shown when outside 3–5 ("teams should be 3–5").
+- [ ] Team size 2–5 enforced (only admins can add a 6th); warning shown when outside 3–5 ("teams should be 3–5").
 - [ ] Team page: roster with name, title at company, LinkedIn and GitHub icons, approval badge per member, mentor badge, leader badge; applicants section for the leader; remove-member for the leader.
 - [ ] Deadline shown on every teams page: "Team formation closes Sun Oct 25, 10:30 am". After it, pages still work but show "past deadline".
 - [ ] Public team page (no login) through the public view: name, concept, members as first name and last initial, no links.
@@ -137,7 +137,7 @@ Teams submit an entry by 5:30 pm Sunday; five judges each score about four entri
 - [ ] Entry form at `/submit`, one per team, editable by any member until the deadline: title, one-line tagline, description (short and long), demo video URL (required), repo URL (required), additional links. Pre-filled from the team's concept. Shows "Last saved" timestamp and the deadline. After 5:30 pm the form is read-only; a save after the deadline is still stored but flagged `late` for admin to accept or reject.
 - [ ] Completeness check on every save: required fields filled, repo URL returns 200 and looks public, video URL loads. Shown to the team as a checklist, so they fix it before 5:30.
 - [ ] Admin: assign entries to judges (manual, table of entries with a judge dropdown; must handle an entry with no judge and a judge with no entries).
-- [ ] Judge view at `/judge`: only my assigned entries. Entry page shows video embedded at the top, repo link, tagline, description, team roster, then a collapsed AI-notes section. Score form: four criteria, each 1–8 with no middle, one optional comment. Live ranking of my group by mean score; the top one is my finalist. Exact ties must be broken by adjusting scores.
+- [ ] Judge view at `/judge`: only my assigned entries. Entry page shows video embedded at the top, repo link, tagline, description, team roster, then a collapsed AI-notes section. Score form: the enabled criteria (four by default), each 1–8 with no middle, one optional comment. Live ranking of my group by mean score; the top one is my finalist. Exact ties must be broken by adjusting scores.
 - [ ] Final round: all five judges score each finalist with the same rubric; final score is the mean across judges.
 - [ ] Admin table: one row per entry; columns for team, submitted, late flag, assigned judge, prelim score and vote count, final score and vote count, finalist, place. Sortable. Badge: "teams without a submission: N".
 - [ ] Publish toggles: "publish finalists" and "publish winners". A public results page shows what is published and nothing else; teams never see raw scores by default.
@@ -149,10 +149,10 @@ Teams submit an entry by 5:30 pm Sunday; five judges each score about four entri
 2. Auto-distribute entries evenly across judges, with manual override.
 3. Hide chosen entry fields from judges (for example member names).
 4. Optional per-team score and rank visibility, off by default.
-5. Configurable criteria and weights for future events; weights equal this time.
+5. Configurable weights for future events; weights equal this time. (Choosing enabled criteria is built: `/admin/judging`, "Criteria".)
 6. Judge groups (several judges per group) for future events.
 
-**Rubric.** Four criteria, equal weight, each scored 1–8. Entry score is the mean of the four, shown to one decimal. Anchors are written per pair; the judge picks the low or high end of the pair.
+**Rubric.** Five criteria, equal weight, each scored 1–8; admins choose which are enabled on `/admin/judging` (default: the first four on, Teamwork off; at least one on). Entry score is the mean of the enabled criteria, shown to one decimal. Anchors are written per pair; the judge picks the low or high end of the pair. The setting locks once a judge saves a real score, so every score in a round uses the same criteria (test-world scores don't lock it). Each score records the criteria keys it covers (`judge_scores.criteria`; null = the default four).
 
 | Criterion | 1–2 | 3–4 | 5–6 | 7–8 |
 | --- | --- | --- | --- | --- |
@@ -160,6 +160,9 @@ Teams submit an entry by 5:30 pm Sunday; five judges each score about four entri
 | Ease of implementation for a small business | Needs a developer and custom setup | Needs technical help to get started | A motivated owner could set it up with the README | Plug-and-play; clear README, no code needed |
 | Impact on the business's operations | Unclear who it helps or how | Helps a narrow task a little | Saves real time or money on a common task | Changes how a core part of the business runs |
 | Creativity of the solution | Generic chatbot or template | Sensible but predictable | A fresh angle on a known problem | Something judges hadn't thought of |
+| Teamwork (off by default) | One person did essentially everything, or no sign of who did what | One or two people did most of it; other roles unclear | Clear roles; most members visibly contributed (code, design, business, research, or pitch) | Every member had a distinct, visible role, and the team shows how they worked together |
+
+Teamwork: not everyone needs to write code; business, design, research, and pitch roles count. While it's on, `/submit` shows an optional "Who did what" field (judges and AI notes see it; public pages don't).
 
 **Out of scope.** Scores out of 1000, AI ranking teams against each other, messaging, prizes management, check-in (comes from the Luma import).
 
@@ -183,11 +186,12 @@ Each dev owns their route group and merges their own PRs without approval; anyth
 | --- | --- | --- |
 | One app or two | One Next.js app, route groups by owner | One login, one deploy, no cookie-domain work; cost is the Saturday freeze |
 | Attendee login | Magic link, both Luma emails whitelisted, extra emails linkable with verification | 288 of 325 Claude-account emails differ from the Luma email |
-| Unapproved sign-ups | Account plus pending page with schedule; admin queue | Cheap; five manual approvals beat an email-linking flow |
-| Team size | 2–6 hard, 3–5 warned | Removes the exception workflow |
+| Unapproved sign-ups | Sign-in request, no link until an admin approves (was: account plus pending page) | Oct 24 happy hour: links sent to a different inbox than the one typed led to repeat requests and about 147 expired-link clicks |
+| Team size | 2–5 hard (admins can add a 6th), 3–5 warned | Removes the exception workflow |
 | Technical flag | Self-declared, pre-set from GitHub experience | Luma has no direct question |
 | Finalist selection | Highest mean in the judge's group; judge adjusts scores to break ties | Simpler than a separate pick; prelim scores aren't published |
-| Score | Mean of four criteria, 1–8, one decimal | Matches the rubric; no 1000-point scale |
+| Score | Mean of the enabled criteria (four by default), 1–8, one decimal | Matches the rubric; no 1000-point scale |
+| Teamwork criterion | Fifth criterion, off by default; admins enable criteria before judging, locked once real scores exist | Rewards teams where every member had a role; reusable for future events |
 | Public pages | Teams from the start, entries after deadline; members as first name and last initial unless opted in | Projects are public anyway; profile data came from registration |
 | Supabase | New org, free plan, manual `pg_dump` snapshots | Org membership is all-or-nothing; Pro's only win was backups |
 | Domain | claudeseattle.org on Cloudflare, `hack` CNAME to Vercel (DNS-only) | Matches webuildwithai.org; NS delegation for other ambassadors |

@@ -36,7 +36,7 @@ export function AuthLink({ initialSignedIn }: { initialSignedIn: boolean }) {
   const cmd = "rounded border border-line-strong px-2 py-1 text-fg hover:bg-fg/5";
   if (!signedIn) {
     return (
-      <Link href="/login" className={cmd}>
+      <Link href="/login" prefetch={false} className={cmd}>
         <span className="text-accent">/</span>login
       </Link>
     );

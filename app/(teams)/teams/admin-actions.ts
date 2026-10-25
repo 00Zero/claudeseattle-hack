@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { FormState } from "./actions";
-import { getViewer, isTeamFull, joinableIds, TEAM_MAX } from "./_lib/teams";
+import { ADMIN_TEAM_MAX, getViewer, isTeamFull, joinableIds } from "./_lib/teams";
 
 // Organizer tools on the team page: move, add, remove, hand over, delete. They run as the
 // admin's own session; RLS allows admins everything on teams, team_members, and
@@ -96,8 +96,8 @@ export async function adminMoveMember(_prev: FormState, formData: FormData): Pro
   if (fromTeam?.leader_id === profileId) {
     return { status: "error", message: "They lead this team. Make someone else leader first." };
   }
-  if ((await memberCount(supabase, to)) >= TEAM_MAX) {
-    return { status: "error", message: `${toTeam.name} is full (${TEAM_MAX} people).` };
+  if ((await memberCount(supabase, to)) >= ADMIN_TEAM_MAX) {
+    return { status: "error", message: `${toTeam.name} is full (${ADMIN_TEAM_MAX} people).` };
   }
 
   const { data: removed, error: removeError } = await supabase
@@ -112,7 +112,7 @@ export async function adminMoveMember(_prev: FormState, formData: FormData): Pro
   const addError = await makeMember(supabase, to, profileId);
   if (addError) {
     await supabase.from("team_members").update({ status: "member" }).eq("team_id", from).eq("profile_id", profileId);
-    if (isTeamFull(addError)) return { status: "error", message: `${toTeam.name} is full (${TEAM_MAX} people). Nothing changed.` };
+    if (isTeamFull(addError)) return { status: "error", message: `${toTeam.name} is full (${ADMIN_TEAM_MAX} people). Nothing changed.` };
     return { status: "error", message: "We couldn't move them. Nothing changed; try again." };
   }
   return done(from, to);
@@ -136,11 +136,11 @@ export async function adminAddMember(_prev: FormState, formData: FormData): Prom
   if (current) return { status: "error", message: "They're already on a team. Use Move on their team's page." };
   const eligible = await joinableIds([profileId]);
   if (eligible && !eligible.has(profileId)) return { status: "error", message: "They can't join a team." };
-  if ((await memberCount(supabase, teamId)) >= TEAM_MAX) {
-    return { status: "error", message: `This team is full (${TEAM_MAX} people).` };
+  if ((await memberCount(supabase, teamId)) >= ADMIN_TEAM_MAX) {
+    return { status: "error", message: `This team is full (${ADMIN_TEAM_MAX} people).` };
   }
   const error = await makeMember(supabase, teamId, profileId);
-  if (isTeamFull(error)) return { status: "error", message: `This team is full (${TEAM_MAX} people).` };
+  if (isTeamFull(error)) return { status: "error", message: `This team is full (${ADMIN_TEAM_MAX} people).` };
   if (error?.code === "23505") return { status: "error", message: "They just joined another team. Reload." };
   if (error) return { status: "error", message: "We couldn't add them. Try again." };
   return done(teamId);

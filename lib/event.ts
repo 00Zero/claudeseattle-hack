@@ -31,18 +31,27 @@ export const ambassadors: Entry[] = [];
 
 export const prizes = {
   everyone: "Every participant gets $100 in Claude API credits.",
-  winners: [
-    "One month of Claude Max 20x per person",
-    "Tickets to the Seattle AI Week AI Summit (courtesy of WTIA)",
-    "A one-year WTIA membership",
-  ],
+  winners: ["One month of Claude Max 20x per person", "A one-year WTIA membership"],
+  // Shown under the list: the winning team's prizes in total.
+  winnersValue: "The winning team receives up to $1,000 in prizes per person.",
+  // The top three places (the winner included).
+  topThree: ["Tickets to the Seattle AI Week AI Summit and the AI Week Opening Reception (courtesy of WTIA)", "Anthropic swag"],
 };
 
-// Docs/REQUIREMENTS.md, "Rubric". Each criterion is scored 1–8; the entry score is the mean.
-export const rubric = {
+// Docs/REQUIREMENTS.md, "Rubric". Each criterion is scored 1–8; the entry score is the mean of
+// the enabled criteria. `key` is stored with every score (judge_scores.criteria) and in
+// event_settings.judging_criteria, so never change or reuse one; names and anchors can change.
+// Admins choose the enabled criteria on /admin/judging; `defaultCriteria` is what null means
+// there and on scores saved before criteria were configurable.
+export type CriterionKey = "works" | "ease" | "impact" | "creativity" | "teamwork";
+export type Criterion = { key: CriterionKey; name: string; anchors: string[]; note?: string };
+
+export const rubric: { bands: string[]; criteria: Criterion[]; defaultCriteria: CriterionKey[] } = {
   bands: ["1–2", "3–4", "5–6", "7–8"],
+  defaultCriteria: ["works", "ease", "impact", "creativity"],
   criteria: [
     {
+      key: "works",
       name: "Does it work",
       anchors: [
         "Didn't run or is slides only",
@@ -52,6 +61,7 @@ export const rubric = {
       ],
     },
     {
+      key: "ease",
       name: "Ease of implementation for a small business",
       anchors: [
         "Needs a developer and custom setup",
@@ -61,6 +71,7 @@ export const rubric = {
       ],
     },
     {
+      key: "impact",
       name: "Impact on the business's operations",
       anchors: [
         "Unclear who it helps or how",
@@ -70,6 +81,7 @@ export const rubric = {
       ],
     },
     {
+      key: "creativity",
       name: "Creativity of the solution",
       anchors: [
         "Generic chatbot or template",
@@ -77,6 +89,17 @@ export const rubric = {
         "A fresh angle on a known problem",
         "Something judges hadn't thought of",
       ],
+    },
+    {
+      key: "teamwork",
+      name: "Teamwork",
+      anchors: [
+        "One person did essentially everything, or no sign of who did what",
+        "One or two people did most of it; other roles unclear",
+        "Clear roles; most members visibly contributed (code, design, business, research, or pitch)",
+        "Every member had a distinct, visible role, and the team shows how they worked together",
+      ],
+      note: "Not everyone needs to write code: business, design, research, and pitch roles count.",
     },
   ],
 };

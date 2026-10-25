@@ -14,6 +14,7 @@ import {
   viewAsTestAccount,
 } from "./actions";
 import { SignInLink } from "./sign-in-link";
+import { TechnicalLevelsSection } from "../technical-levels";
 
 type TestAccount = {
   id: string;
@@ -236,6 +237,8 @@ export default async function TestAccountsPage({ searchParams }: PageProps<"/adm
           </div>
         )}
       </section>
+
+      {tests.length > 0 && <TechnicalLevelsSection world="test" />}
 
       {tests.length > 0 && (
         <section className="space-y-3">

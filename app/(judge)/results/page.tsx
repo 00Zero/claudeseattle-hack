@@ -62,7 +62,14 @@ export default async function ResultsPage() {
               <span className="eyebrow">Winning team</span>
             </div>
           ))}
+          {prizes.topThree.map((prize) => (
+            <div key={prize} className="flex flex-wrap items-baseline justify-between gap-2 border-t border-line py-4">
+              <span className="font-display text-xl font-light">{prize}</span>
+              <span className="eyebrow">Top 3 teams</span>
+            </div>
+          ))}
         </div>
+        <p className="text-sm text-fg-muted">{prizes.winnersValue}</p>
         <Link href="/entries" className="btn btn-ghost">
           Browse every entry
         </Link>

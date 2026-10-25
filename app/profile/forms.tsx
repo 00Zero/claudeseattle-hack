@@ -1,7 +1,8 @@
 "use client";
 
-import { startTransition, useActionState } from "react";
+import { startTransition, Suspense, use, useActionState, useEffect, useState } from "react";
 import { ROLE_LABEL, type RoleBucket } from "@/lib/roles";
+import { TECHNICAL_LEVELS } from "@/lib/technical-levels";
 import { addEmail, makeDefaultEmail, saveProfile, type FormState } from "./actions";
 
 const input = "w-full rounded border border-foreground/20 bg-background px-3 py-2";
@@ -30,7 +31,7 @@ export type ProfileValues = {
   first_name: string;
   last_name: string;
   role_bucket: string | null;
-  is_technical: boolean | null;
+  technical_level: number | null;
   job_title: string | null;
   company: string | null;
   linkedin_url: string | null;
@@ -43,9 +44,91 @@ export type ProfileValues = {
   public_profile: boolean;
 };
 
-export function ProfileForm({ profile }: { profile: ProfileValues }) {
+// From the person's own LinkedIn enrichment, for fields they left empty (lib/linkedin-prefill.ts).
+type Prefill = { job_title: string | null; company: string | null; bio: string | null };
+
+// A text input that offers a LinkedIn value when it's empty; nothing changes until they accept.
+function PrefillInput({ name, value, suggestion, maxLength }: { name: string; value: string | null; suggestion: string | null; maxLength?: number }) {
+  const [text, setText] = useState(value ?? "");
+  const offer = !value && suggestion && text !== suggestion ? suggestion : null;
+  return (
+    <>
+      <input name={name} maxLength={maxLength} value={text} onChange={(e) => setText(e.target.value)} className={input} />
+      {offer && (
+        <span className="flex flex-wrap items-baseline gap-x-2 text-sm text-foreground/70">
+          <span>
+            From your LinkedIn: <span className="text-foreground">{offer}</span>
+          </span>
+          <button type="button" onClick={() => setText(offer)} className="underline">
+            Use this
+          </button>
+        </span>
+      )}
+    </>
+  );
+}
+
+// Waits for Claude's suggestion and preselects it, unless they already picked a level.
+function Suggestion({ promise, onSuggest }: { promise: Promise<number | null>; onSuggest: (level: number) => void }) {
+  const level = use(promise);
+  useEffect(() => {
+    if (level != null) onSuggest(level);
+  }, [level, onSuggest]);
+  if (level == null) return null;
+  return (
+    <p className="text-sm text-foreground/70">
+      Suggested from your registration and LinkedIn: {level}. Adjust it if it&apos;s off.
+    </p>
+  );
+}
+
+function TechnicalLevel({ saved, suggestedLevel }: { saved: number | null; suggestedLevel: Promise<number | null> }) {
+  const [level, setLevel] = useState<number | null>(saved);
+  // Stable, and never replaces a level they already picked.
+  const [onSuggest] = useState(() => (suggested: number) => setLevel((current) => current ?? suggested));
+  return (
+    <fieldset className="space-y-2">
+      <legend className="text-sm font-medium">How hands-on are you with code?</legend>
+      <p className="text-sm text-foreground/70">
+        Others never see the number. Team pages show you as technical at 3 or higher.
+      </p>
+      {saved == null && (
+        <Suspense fallback={<p className="text-sm text-foreground/70">Getting a suggestion from your registration…</p>}>
+          <Suggestion promise={suggestedLevel} onSuggest={onSuggest} />
+        </Suspense>
+      )}
+      <div className="space-y-1.5">
+        {TECHNICAL_LEVELS.map((t) => (
+          <label key={t.level} className="flex items-start gap-2">
+            <input
+              type="radio"
+              name="technical_level"
+              value={t.level}
+              required
+              checked={level === t.level}
+              onChange={() => setLevel(t.level)}
+              className="mt-1"
+            />
+            <span>
+              <span className="font-medium">{t.level}</span> <span className="text-foreground/80">{t.label}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+export function ProfileForm({
+  profile,
+  suggestedLevel,
+  linkedin,
+}: {
+  profile: ProfileValues;
+  suggestedLevel: Promise<number | null>;
+  linkedin: Prefill;
+}) {
   const [state, formAction, pending] = useActionState(saveProfile, idle);
-  const technical = profile.is_technical === null ? "" : profile.is_technical ? "yes" : "no";
 
   return (
     <form
@@ -79,23 +162,13 @@ export function ProfileForm({ profile }: { profile: ProfileValues }) {
           ))}
         </select>
       </Field>
-      <fieldset className="space-y-1">
-        <legend className="text-sm font-medium">Are you technical (comfortable working in a shared code repo)?</legend>
-        <div className="flex gap-6">
-          <label className="flex items-center gap-2">
-            <input type="radio" name="is_technical" value="yes" required defaultChecked={technical === "yes"} /> Yes
-          </label>
-          <label className="flex items-center gap-2">
-            <input type="radio" name="is_technical" value="no" defaultChecked={technical === "no"} /> No
-          </label>
-        </div>
-      </fieldset>
+      <TechnicalLevel saved={profile.technical_level} suggestedLevel={suggestedLevel} />
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Title">
-          <input name="job_title" defaultValue={profile.job_title ?? ""} className={input} />
+          <PrefillInput name="job_title" value={profile.job_title} suggestion={linkedin.job_title} />
         </Field>
         <Field label="Company or school">
-          <input name="company" defaultValue={profile.company ?? ""} className={input} />
+          <PrefillInput name="company" value={profile.company} suggestion={linkedin.company} />
         </Field>
         <Field label="LinkedIn URL">
           <input name="linkedin_url" placeholder="linkedin.com/in/your-name" defaultValue={profile.linkedin_url ?? ""} className={input} />
@@ -114,7 +187,7 @@ export function ProfileForm({ profile }: { profile: ProfileValues }) {
         />
       </Field>
       <Field label="One-line bio">
-        <input name="bio" maxLength={300} defaultValue={profile.bio ?? ""} className={input} />
+        <PrefillInput name="bio" maxLength={300} value={profile.bio} suggestion={linkedin.bio} />
       </Field>
       <Field label="Interests">
         <textarea name="interests" maxLength={500} rows={2} defaultValue={profile.interests ?? ""} className={input} />
@@ -123,10 +196,20 @@ export function ProfileForm({ profile }: { profile: ProfileValues }) {
         <textarea name="looking_for" maxLength={500} rows={3} defaultValue={profile.looking_for ?? ""} className={input} />
       </Field>
       <label className="flex items-start gap-2">
-        <input type="checkbox" name="public_profile" defaultChecked={profile.public_profile} className="mt-1" />
-        <span className="text-sm">
-          Show my full name, title, company, and LinkedIn on public team pages. If you leave this off, people who
-          aren&apos;t logged in see only your first name and last initial.
+        {/* Checked for people confirming for the first time; after that, their saved choice. */}
+        <input
+          type="checkbox"
+          name="public_profile"
+          defaultChecked={profile.profile_confirmed ? profile.public_profile : true}
+          className="mt-1"
+        />
+        <span className="space-y-1 text-sm">
+          <span className="block font-medium">Show my details to the public (anyone, without logging in)</span>
+          <span className="block text-foreground/70">
+            On (default): people who aren&apos;t logged in see your full name, title, company and LinkedIn on public
+            team pages. Off: they see only your first name and last initial. Either way, attendees who are logged in
+            can see your full profile so teams can find you.
+          </span>
         </span>
       </label>
       <Status state={state} />

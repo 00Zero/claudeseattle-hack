@@ -2,6 +2,7 @@ import "server-only";
 import { getCurrentAccess, type Access } from "@/lib/access";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/supabase/profile";
+import { getEnabledCriteria } from "../../_lib/criteria";
 import type { Checklist } from "./checklist";
 import { entryValues } from "./merge";
 
@@ -14,6 +15,7 @@ export const LIMITS = {
   url: 500,
   linkLabel: 60,
   links: 5,
+  contributions: 1000,
 };
 
 export type EntryLink = { label: string; url: string };
@@ -26,6 +28,8 @@ export type EntryValues = {
   video_url: string;
   repo_url: string;
   links: EntryLink[];
+  // "Who did what", for the Teamwork criterion; the form shows it only while Teamwork is on.
+  contributions: string;
 };
 
 export type Entry = EntryValues & {
@@ -48,6 +52,7 @@ export type SubmitContext =
       lateSave: LateSave | null;
       closesAt: string;
       isPast: boolean;
+      teamwork: boolean;
     };
 
 function blockedReason(role: string) {
@@ -86,11 +91,11 @@ export async function getSubmitContext(): Promise<SubmitContext> {
   const team = membership?.teams as unknown as { id: string; name: string; concept: string | null } | null;
   if (!team) return { kind: "blocked", reason: "Join or create a team first; each team submits one entry." };
 
-  const [{ closesAt, isPast }, { data: row }, { data: late }] = await Promise.all([
+  const [{ closesAt, isPast }, { data: row }, { data: late }, { keys }] = await Promise.all([
     getSubmissionDeadline(),
     supabase
       .from("judge_entries")
-      .select("id, title, tagline, description_short, description_long, video_url, repo_url, links, checklist, last_saved_at, saver:profiles!judge_entries_last_saved_by_fkey(display_name)")
+      .select("id, title, tagline, description_short, description_long, video_url, repo_url, links, contributions, checklist, last_saved_at, saver:profiles!judge_entries_last_saved_by_fkey(display_name)")
       .eq("team_id", team.id)
       .maybeSingle(),
     supabase
@@ -100,6 +105,7 @@ export async function getSubmitContext(): Promise<SubmitContext> {
       .order("saved_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    getEnabledCriteria(supabase),
   ]);
 
   const entry: Entry | null = row
@@ -112,5 +118,5 @@ export async function getSubmitContext(): Promise<SubmitContext> {
       }
     : null;
 
-  return { kind: "ready", team, entry, lateSave: (late as LateSave | null) ?? null, closesAt, isPast };
+  return { kind: "ready", team, entry, lateSave: (late as LateSave | null) ?? null, closesAt, isPast, teamwork: keys.includes("teamwork") };
 }

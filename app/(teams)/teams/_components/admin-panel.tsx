@@ -1,7 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { adminAddMember, adminDeleteTeam, adminMakeLeader, adminMoveMember, adminRemoveMember } from "../admin-actions";
-import { joinableIds, TEAM_MAX } from "../_lib/teams";
+import { ADMIN_TEAM_MAX, joinableIds, TEAM_MAX } from "../_lib/teams";
 import { ActionButton } from "./action-button";
 import { NO_NAME, type Person } from "./person";
 import { SelectAction } from "./select-action";
@@ -25,7 +25,7 @@ async function loadChoices(teamId: string) {
   return {
     teams: (teams.data ?? []).map((t) => {
       const size = (t.team_members as { status: string }[]).filter((m) => m.status === "member").length;
-      return { value: t.id, label: `${t.name} (${size}/${TEAM_MAX})`, disabled: size >= TEAM_MAX };
+      return { value: t.id, label: `${t.name} (${size}/${ADMIN_TEAM_MAX})`, disabled: size >= ADMIN_TEAM_MAX };
     }),
     people: (people.data ?? [])
       .filter((p) => !onTeam.has(p.id))
@@ -38,7 +38,7 @@ async function loadChoices(teamId: string) {
 export async function AdminPanel({ teamId, teamName, members }: { teamId: string; teamName: string; members: Person[] }) {
   const { teams, people } = await loadChoices(teamId);
   const fields = { team_id: teamId };
-  const full = members.length >= TEAM_MAX;
+  const full = members.length >= ADMIN_TEAM_MAX;
 
   return (
     <section className="space-y-4 rounded-lg border border-dashed border-line-strong p-4" aria-label="Organizer tools">
@@ -93,8 +93,13 @@ export async function AdminPanel({ teamId, teamName, members }: { teamId: string
 
       <div className="space-y-1">
         <h3 className="text-sm font-medium">Add someone without a team</h3>
+        {!full && members.length >= TEAM_MAX && (
+          <p className="text-sm text-fg-muted">
+            Teams are full at {TEAM_MAX} for leaders and invites. Only organizers can add a {ADMIN_TEAM_MAX}th person.
+          </p>
+        )}
         {full ? (
-          <p className="text-sm text-fg-muted">This team is full ({TEAM_MAX} people).</p>
+          <p className="text-sm text-fg-muted">This team is full ({ADMIN_TEAM_MAX} people).</p>
         ) : people.length ? (
           <SelectAction
             action={adminAddMember}

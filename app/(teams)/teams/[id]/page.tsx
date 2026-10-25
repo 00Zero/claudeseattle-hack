@@ -43,54 +43,49 @@ type Team = {
 
 // Logged-in with full access: the tables, with links, approval badges, and every
 // membership row so we can show applicants and the viewer's own status (RLS: can_browse).
-async function loadFullTeam(id: string, viewerId: string): Promise<Team | null> {
+// The queries run in two parallel rounds, the first alongside getViewer(), because each round
+// trip to the database is slow from the server.
+async function loadFullTeam(id: string, viewerIdPromise: Promise<string | null>): Promise<Team | null> {
   const supabase = await createClient();
-  const { data: team } = await supabase
-    .from("teams")
-    .select(
-      `name, concept, looking_for, leader_id, team_members(status, profiles(${PERSON_COLUMNS}))`,
-    )
-    .eq("id", id)
-    .maybeSingle();
-  if (!team) return null;
+  const [{ data: team }, { data: inviteRows }, { data: noteRows }, viewerId] = await Promise.all([
+    supabase
+      .from("teams")
+      .select(`name, concept, looking_for, leader_id, team_members(status, profiles(${PERSON_COLUMNS}))`)
+      .eq("id", id)
+      .maybeSingle(),
+    // Open invites: the leader sees all of them, an invitee only their own (RLS: teams_invites_read).
+    supabase.from("teams_invites").select("profile_id, note").eq("team_id", id).eq("status", "pending"),
+    // Applicants' notes: only the leader can read them all (RLS: teams_application_notes_read).
+    supabase.from("teams_application_notes").select("profile_id, note").eq("team_id", id),
+    viewerIdPromise,
+  ]);
+  if (!team || !viewerId) return null;
 
   const rows = (team.team_members as unknown as { status: string; profiles: ProfileRow | null }[]).filter(
     (r) => r.profiles,
   );
   const person = (p: ProfileRow) => personFromProfile(p, team.leader_id);
-
-  // Applicants who have since joined another team can only be declined.
   const applied = rows.filter((r) => r.status === "applied").map((r) => r.profiles!);
-  const elsewhere = new Set<string>();
-  if (applied.length) {
-    const { data } = await supabase
-      .from("team_members")
-      .select("profile_id")
-      .in("profile_id", applied.map((p) => p.id))
-      .eq("status", "member")
-      .neq("team_id", id);
-    for (const row of data ?? []) elsewhere.add(row.profile_id);
-  }
-
-  // Open invites: the leader sees all of them, an invitee only their own (RLS: teams_invites_read).
-  const { data: inviteRows } = await supabase
-    .from("teams_invites")
-    .select("profile_id, note")
-    .eq("team_id", id)
-    .eq("status", "pending");
   const inviteIds = (inviteRows ?? []).map((r) => r.profile_id as string);
   const iLead = team.leader_id === viewerId;
-  // Applicants' notes: only the leader can read them (RLS: teams_application_notes_read).
-  const notes = new Map<string, string>();
-  if (iLead && applied.length) {
-    const { data } = await supabase.from("teams_application_notes").select("profile_id, note").eq("team_id", id);
-    for (const row of data ?? []) notes.set(row.profile_id as string, row.note as string);
-  }
-  let invited: Person[] = [];
-  if (iLead && inviteIds.length) {
-    const { data } = await supabase.from("profiles").select(PERSON_COLUMNS).in("id", inviteIds);
-    invited = ((data ?? []) as unknown as ProfileRow[]).map(person);
-  }
+
+  const [{ data: elsewhereRows }, { data: invitedRows }] = await Promise.all([
+    // Applicants who have since joined another team can only be declined.
+    applied.length
+      ? supabase
+          .from("team_members")
+          .select("profile_id")
+          .in("profile_id", applied.map((p) => p.id))
+          .eq("status", "member")
+          .neq("team_id", id)
+      : { data: [] },
+    iLead && inviteIds.length ? supabase.from("profiles").select(PERSON_COLUMNS).in("id", inviteIds) : { data: [] },
+  ]);
+  const elsewhere = new Set((elsewhereRows ?? []).map((row) => row.profile_id as string));
+  const notes = new Map<string, string>(
+    iLead ? (noteRows ?? []).map((row) => [row.profile_id as string, row.note as string]) : [],
+  );
+  const invited = ((invitedRows ?? []) as unknown as ProfileRow[]).map(person);
 
   return {
     name: team.name,
@@ -150,13 +145,16 @@ export default async function TeamPage({ params }: PageProps<"/teams/[id]">) {
   const { id } = await params;
   if (!UUID.test(id)) notFound();
 
-  const viewer = await getViewer();
+  // Start the team's queries while getViewer() runs; they wait only for the viewer's id.
+  const viewerPromise = getViewer();
+  const fullTeam = loadFullTeam(id, viewerPromise.then((v) => (v.signedIn ? v.profile.id : null)));
+  const viewer = await viewerPromise;
   if (viewer.signedIn && viewer.access === "blocked") redirect("/declined");
   if (viewer.signedIn && viewer.access !== "full") redirect("/pending");
   // Teams need to know who you are: confirm the Luma-filled profile first (sign-in does this too).
   if (viewer.signedIn && !viewer.profile.profile_confirmed) redirect("/profile");
 
-  const team = viewer.signedIn ? await loadFullTeam(id, viewer.profile.id) : await loadPublicTeam(id);
+  const team = viewer.signedIn ? await fullTeam : await loadPublicTeam(id);
   if (!team) notFound();
 
   const members = [...team.members].sort((a, b) => Number(b.is_leader) - Number(a.is_leader) || a.name.localeCompare(b.name));
@@ -172,7 +170,9 @@ export default async function TeamPage({ params }: PageProps<"/teams/[id]">) {
           ← All teams
         </Link>
         <h1 className="text-2xl font-semibold">{team.name}</h1>
-        <DeadlineBanner />
+        <Suspense>
+          <DeadlineBanner />
+        </Suspense>
       </div>
 
       {team.concept && <p className="whitespace-pre-line">{team.concept}</p>}
@@ -306,7 +306,10 @@ export default async function TeamPage({ params }: PageProps<"/teams/[id]">) {
       </section>
 
       {viewer.signedIn && viewer.profile.platform_role === "admin" && (
-        <AdminPanel teamId={id} teamName={team.name} members={members} />
+        // Its "Add someone" list reads everyone's eligibility, so it streams in after the page.
+        <Suspense fallback={<p className="text-sm text-fg-muted" role="status">Loading organizer tools…</p>}>
+          <AdminPanel teamId={id} teamName={team.name} members={members} />
+        </Suspense>
       )}
     </div>
   );
@@ -421,7 +424,7 @@ function ViewerPanel({ viewer, team, teamId, size }: { viewer: Viewer; team: Tea
       </p>
     );
   }
-  if (full) return <p className={`${box} text-sm text-fg-muted`}>This team is full ({TEAM_MAX} people).</p>;
+  if (full) return <p className={`${box} text-sm text-fg-muted`}>This team is full ({size} people).</p>;
   if (viewer.openApplications >= MAX_APPLICATIONS) {
     return (
       <p className={`${box} text-sm`}>

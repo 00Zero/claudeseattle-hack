@@ -3,9 +3,29 @@ import { requireAdminPage } from "@/lib/admin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SubmitButton } from "../submit-button";
 import { approvePerson, clearOverride, declinePerson } from "./actions";
+import { RequestButtons } from "./request-buttons";
 import { RoleForm } from "./role-form";
+import { TechnicalLevelsSection } from "../technical-levels";
 
 const small = "rounded border border-foreground/20 px-2 py-0.5 text-xs enabled:hover:bg-foreground/5";
+
+type LoginRequest = {
+  email: string;
+  name: string;
+  status: "pending" | "approved" | "declined";
+  created_at: string;
+  decided_at: string | null;
+  luma_guests: { first_name: string | null; last_name: string | null; email: string; approval_status: string } | null;
+};
+
+const when = (iso: string) =>
+  new Date(iso).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/Los_Angeles",
+  });
 
 type Person = {
   id: string;
@@ -111,7 +131,7 @@ export default async function PeoplePage({ searchParams }: PageProps<"/admin/peo
   const query = typeof q === "string" ? q.trim().toLowerCase() : "";
 
   const admin = createAdminClient();
-  const [{ data: profiles }, { data: defaults }, { data: rules }, authEmails] = await Promise.all([
+  const [{ data: profiles }, { data: defaults }, { data: rules }, authEmails, { data: requestRows }] = await Promise.all([
     admin
       .from("profiles")
       .select(
@@ -122,7 +142,14 @@ export default async function PeoplePage({ searchParams }: PageProps<"/admin/peo
     admin.from("profile_emails").select("profile_id, email").eq("is_default", true),
     admin.from("access_rules").select("ticket_name, approval_status, access, default_role"),
     loadAuthEmails(),
+    admin
+      .from("login_requests")
+      .select("email, name, status, created_at, decided_at, luma_guests(first_name, last_name, email, approval_status)")
+      .order("created_at", { ascending: false })
+      .limit(100),
   ]);
+  const requests = (requestRows ?? []) as unknown as LoginRequest[];
+  const openRequests = requests.filter((r) => r.status === "pending");
 
   const defaultEmail = new Map((defaults ?? []).map((d) => [d.profile_id, d.email]));
   const people = ((profiles ?? []) as Person[]).filter((p) => {
@@ -151,6 +178,65 @@ export default async function PeoplePage({ searchParams }: PageProps<"/admin/peo
           <button className="rounded border border-foreground/20 px-3 py-1.5 text-sm">Search</button>
         </form>
       </div>
+
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-lg font-semibold">Sign-in requests ({openRequests.length} waiting)</h2>
+          <p className="text-sm text-foreground/70">
+            People who can&apos;t use their Luma email, or aren&apos;t on Luma, asking to sign in with the email they
+            typed. Nothing is sent until you approve. Approving emails them a sign-in link; someone not on Luma also
+            gets full access. If their Luma registration already has an account, it switches to sign in with this
+            email.
+          </p>
+        </div>
+        {requests.length === 0 ? (
+          <p className="text-sm">No requests.</p>
+        ) : (
+          <div className="overflow-x-auto rounded border border-foreground/15">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-foreground/5 text-foreground/70">
+                <tr>
+                  <th className={`${th} pl-3`}>Name given</th>
+                  <th className={th}>Wants to sign in with</th>
+                  <th className={th}>Luma registration</th>
+                  <th className={th}>Asked</th>
+                  <th className={th}>Decision</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-foreground/10">
+                {requests.map((r) => (
+                  <tr key={r.email}>
+                    <td className={`${td} pl-3`}>{r.name}</td>
+                    <td className={`${td} break-all`}>{r.email}</td>
+                    <td className={`${td} break-all`}>
+                      {r.luma_guests ? (
+                        <>
+                          {`${r.luma_guests.first_name ?? ""} ${r.luma_guests.last_name ?? ""}`.trim()}
+                          <span className="block text-xs text-foreground/50">
+                            {r.luma_guests.email} · {STATUS_LABEL[r.luma_guests.approval_status] ?? r.luma_guests.approval_status}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-foreground/50">not on Luma</span>
+                      )}
+                    </td>
+                    <td className={`${td} whitespace-nowrap`}>{when(r.created_at)}</td>
+                    <td className={td}>
+                      {r.status === "pending" ? (
+                        <RequestButtons email={r.email} />
+                      ) : (
+                        <span className="text-xs text-foreground/70">
+                          {r.status} {r.decided_at && when(r.decided_at)}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       <section className="space-y-3">
         <div>
@@ -238,6 +324,8 @@ export default async function PeoplePage({ searchParams }: PageProps<"/admin/peo
           </table>
         </div>
       </section>
+
+      <TechnicalLevelsSection world="real" />
     </div>
   );
 }

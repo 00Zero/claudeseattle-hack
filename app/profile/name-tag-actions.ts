@@ -19,10 +19,12 @@ export async function requestNameTag(): Promise<NameTagState> {
   if ((await getCurrentAccess()) === "blocked") return { status: "error", message: "Name tags aren't available for this account." };
   if (!profile.first_name?.trim()) return { status: "error", message: "Add your first name to your profile first." };
 
-  if (!nameTagsStatus(await getNameTagSettings()).open) {
+  // Admins can print any time, even with printing off or the event over, and reprint a bad tag at once.
+  const isAdmin = profile.platform_role === "admin";
+  if (!isAdmin && !nameTagsStatus(await getNameTagSettings()).open) {
     return { status: "error", message: "Name tag printing is turned off right now." };
   }
-  const retryAt = await nameTagRetryAt(profile.id);
+  const retryAt = isAdmin ? null : await nameTagRetryAt(profile.id);
   if (retryAt) return { status: "wait", retryAt };
 
   const { error } = await createAdminClient()
@@ -33,7 +35,7 @@ export async function requestNameTag(): Promise<NameTagState> {
       last_name: (profile.last_name ?? "").trim(),
       job_title: profile.job_title?.trim() || null,
       company: profile.company?.trim() || null,
-      role_label: nameTagRole(profile),
+      role_label: await nameTagRole(profile),
     });
   if (error) {
     console.error("Name tag request failed", error.message);

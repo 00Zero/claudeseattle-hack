@@ -1,29 +1,34 @@
 "use client";
 
 import { startTransition, useActionState, useState } from "react";
-import { anchorFor, CRITERIA, formatScore, mean, SCORE_MAX, SCORE_MIN } from "../../_lib/scoring";
+import { anchorFor, fieldName, formatScore, mean, SCORE_MAX, SCORE_MIN, type Criterion } from "../../_lib/scoring";
 import type { ScoreState } from "../actions";
 
 const idle: ScoreState = { status: "idle" };
 const VALUES = Array.from({ length: SCORE_MAX - SCORE_MIN + 1 }, (_, i) => SCORE_MIN + i);
 
-// Four criteria, each 1–8 with no middle, plus an optional comment. Built for a phone: big
-// tap targets, the anchor for the chosen score shown under each row, the mean at the bottom.
+// The enabled criteria, each 1–8 with no middle, plus an optional comment. Built for a phone:
+// big tap targets, the anchor for the chosen score shown under each row, the mean at the bottom.
+// `initial` is my saved score by criterion key; criteria it doesn't cover start empty.
 export function ScoreForm({
   action,
   entryId,
   round,
+  criteria,
   initial,
 }: {
   action: (prev: ScoreState, formData: FormData) => Promise<ScoreState>;
   entryId: string;
   round: "prelim" | "final";
-  initial: { scores: number[]; comment: string | null } | null;
+  criteria: Criterion[];
+  initial: { byKey: Record<string, number>; comment: string | null } | null;
 }) {
   const [state, formAction, pending] = useActionState(action, idle);
-  const [scores, setScores] = useState<(number | null)[]>(initial?.scores ?? CRITERIA.map(() => null));
+  const [scores, setScores] = useState<(number | null)[]>(criteria.map((c) => initial?.byKey[c.key] ?? null));
   const complete = scores.every((s) => s !== null);
   const avg = complete ? mean(scores as number[]) : null;
+  // My saved score used other criteria (the rubric changed in the test world): say so.
+  const changed = initial !== null && (criteria.some((c) => !(c.key in initial.byKey)) || Object.keys(initial.byKey).length !== criteria.length);
 
   return (
     <form
@@ -37,15 +42,21 @@ export function ScoreForm({
     >
       <input type="hidden" name="entry_id" value={entryId} />
       <input type="hidden" name="round" value={round} />
-      {CRITERIA.map((criterion, i) => (
-        <fieldset key={criterion.name} className="space-y-2">
+      {changed && (
+        <p className="rounded border border-accent bg-accent-soft px-3 py-2 text-sm" role="status">
+          The criteria changed since you saved this score. Score every criterion below and save again.
+        </p>
+      )}
+      {criteria.map((criterion, i) => (
+        <fieldset key={criterion.key} className="space-y-2">
           <legend className="font-display text-xl font-light">{criterion.name}</legend>
+          {criterion.note && <p className="text-sm text-fg-muted">{criterion.note}</p>}
           <div className="grid grid-cols-8 gap-1">
             {VALUES.map((v) => (
               <label key={v} className="relative">
                 <input
                   type="radio"
-                  name={`c${i}`}
+                  name={fieldName(criterion)}
                   value={v}
                   checked={scores[i] === v}
                   onChange={() => setScores(scores.map((s, j) => (j === i ? v : s)))}
@@ -59,7 +70,7 @@ export function ScoreForm({
             ))}
           </div>
           <p className="min-h-5 text-sm text-fg-muted">
-            {scores[i] !== null ? anchorFor(i, scores[i]!) : "Low end of a pair = weaker, high end = stronger."}
+            {scores[i] !== null ? anchorFor(criterion, scores[i]!) : "Low end of a pair = weaker, high end = stronger."}
           </p>
         </fieldset>
       ))}
