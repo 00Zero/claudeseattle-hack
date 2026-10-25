@@ -5,7 +5,9 @@ import { assertAdmin } from "@/lib/admin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkEntry } from "@/app/(judge)/submit/_lib/checklist";
 import { LIMITS } from "@/app/(judge)/submit/_lib/entry";
-import { aiNotesConfigured, generateAiNotes, MODEL as NOTES_MODEL } from "@/app/(judge)/_lib/ai-notes";
+import { aiNotesConfigured, generateAiNotes, MODEL as NOTES_MODEL, type RosterForNotes } from "@/app/(judge)/_lib/ai-notes";
+import { criteriaLocked, getEnabledCriteria } from "@/app/(judge)/_lib/criteria";
+import { ALL_CRITERIA, criteriaKeys, sameCriteria } from "@/app/(judge)/_lib/scoring";
 
 // Admin judging actions. Each re-checks the caller is an admin, then writes with the
 // service-role client (the admin layout's check is not enough on its own).
@@ -121,7 +123,7 @@ export async function setFinalist(_prev: RowState, formData: FormData): Promise<
   return done();
 }
 
-const ENTRY_FIELDS = ["title", "tagline", "description_short", "description_long", "video_url", "repo_url", "links", "checklist"] as const;
+const ENTRY_FIELDS = ["title", "tagline", "description_short", "description_long", "video_url", "repo_url", "links", "contributions", "checklist"] as const;
 
 // Accept: copy the late save onto the team's entry (creating it if the team never saved before
 // the deadline), stamped with when and by whom it was saved. Reject: keep the on-time version.
@@ -172,6 +174,36 @@ export async function setPublish(formData: FormData) {
   done();
 }
 
+// The criteria judges score (event_settings.judging_criteria): one checkbox per criterion, at
+// least one on. Locked once any real-world score exists, so every score in a round uses the same
+// criteria; test-world scores don't lock it. The default set is stored as null.
+export async function setJudgingCriteria(_prev: RowState, formData: FormData): Promise<RowState> {
+  await assertAdmin();
+  const picked = formData.getAll("criteria").map(String);
+  if (!picked.length) return { status: "error", message: "Keep at least one criterion on." };
+  if (picked.some((k) => !ALL_CRITERIA.some((c) => c.key === k))) return { status: "error", message: "Unknown criterion." };
+  const keys = criteriaKeys(picked);
+
+  const admin = createAdminClient();
+  const lock = await criteriaLocked(admin);
+  if (lock.locked) {
+    return {
+      status: "error",
+      message: lock.failed ? "Couldn't check for scores, so the criteria stay as they are." : "Judges have already scored real entries, so the criteria are locked.",
+    };
+  }
+  const { error } = await admin
+    .from("event_settings")
+    .update({ judging_criteria: sameCriteria(keys, null) ? null : keys })
+    .eq("id", 1);
+  if (error) return { status: "error", message: error.message };
+  revalidatePath("/");
+  revalidatePath("/submit");
+  revalidatePath("/judge", "layout");
+  done();
+  return { status: "ok", message: "Saved." };
+}
+
 const EMAIL = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/;
 
 function fieldText(formData: FormData, key: string, max: number) {
@@ -203,6 +235,7 @@ export async function createFallbackEntry(_prev: RowState, formData: FormData): 
     video_url: fieldText(formData, "video_url", LIMITS.url),
     repo_url: fieldText(formData, "repo_url", LIMITS.url),
     links: [],
+    contributions: "",
   };
 
   if (teamName.length < 2) return { status: "error", message: "Add the team's name." };
@@ -259,15 +292,21 @@ export async function generateNotes(_prev: RowState, formData: FormData): Promis
   const isTest = formData.get("world") === "test";
   const admin = createAdminClient();
 
-  const [{ data: results }, { data: entries }, { data: notes }, { data: ratings }] = await Promise.all([
+  const [{ data: results }, { data: entries }, { data: notes }, { data: ratings }, { criteria, keys }] = await Promise.all([
     admin.from("judge_entry_results").select("entry_id").eq("submitted", true).eq("is_test", isTest),
-    admin.from("judge_entries").select("id, title, tagline, description_short, description_long, video_url, repo_url, links, updated_at"),
+    admin
+      .from("judge_entries")
+      .select("id, team_id, title, tagline, description_short, description_long, video_url, repo_url, links, contributions, updated_at"),
     admin.from("judge_ai_notes").select("entry_id, created_at"),
-    admin.from("judge_ai_ratings").select("entry_id, created_at"),
+    admin.from("judge_ai_ratings").select("entry_id, created_at, criteria"),
+    getEnabledCriteria(admin),
   ]);
   const inWorld = new Set((results ?? []).map((r) => r.entry_id as string));
   const notedAt = new Map((notes ?? []).map((n) => [n.entry_id as string, n.created_at as string]));
-  const ratedAt = new Map((ratings ?? []).map((r) => [r.entry_id as string, r.created_at as string]));
+  // Ratings for other criteria than the enabled ones are stale too (the notes are written with them).
+  const ratedAt = new Map(
+    (ratings ?? []).filter((r) => sameCriteria(r.criteria as string[] | null, keys)).map((r) => [r.entry_id as string, r.created_at as string]),
+  );
   const fresh = (at: string | undefined, updated: string) => Boolean(at && at >= updated);
   const todo = (entries ?? []).filter(
     (e) => inWorld.has(e.id) && !(fresh(notedAt.get(e.id), e.updated_at) && fresh(ratedAt.get(e.id), e.updated_at)),
@@ -275,13 +314,28 @@ export async function generateNotes(_prev: RowState, formData: FormData): Promis
   if (!todo.length) return { status: "ok", message: "Every submitted entry has up-to-date notes." };
 
   const batch = todo.slice(0, NOTES_BATCH);
+  // Rosters, for Teamwork: names and titles as judges see them on the entry page.
+  const rosters = new Map<string, RosterForNotes>();
+  if (keys.includes("teamwork")) {
+    const teamIds = batch.map((e) => e.team_id).filter((t): t is string => Boolean(t));
+    const { data: members } = teamIds.length
+      ? await admin.from("team_members").select("team_id, profiles(display_name, job_title, company)").eq("status", "member").in("team_id", teamIds)
+      : { data: [] };
+    for (const m of members ?? []) {
+      const p = m.profiles as unknown as { display_name: string; job_title: string | null; company: string | null } | null;
+      if (!p) continue;
+      const list = rosters.get(m.team_id) ?? [];
+      list.push({ name: p.display_name, detail: [p.job_title, p.company].filter(Boolean).join(" at ") || null });
+      rosters.set(m.team_id, list);
+    }
+  }
   let written = 0;
   let failed = 0;
   for (let i = 0; i < batch.length; i += NOTES_PARALLEL) {
     await Promise.all(
       batch.slice(i, i + NOTES_PARALLEL).map(async (entry) => {
         try {
-          const result = await generateAiNotes(entry);
+          const result = await generateAiNotes(entry, criteria, rosters.get(entry.team_id ?? "") ?? []);
           if (!result) {
             failed++;
             return;
@@ -292,7 +346,14 @@ export async function generateNotes(_prev: RowState, formData: FormData): Promis
             admin.from("judge_ai_notes").upsert({ entry_id: entry.id, model: NOTES_MODEL, notes: result.notes, draft_scores: null, created_at: now }),
             admin
               .from("judge_ai_ratings")
-              .upsert({ entry_id: entry.id, model: NOTES_MODEL, scores: result.rating.scores, rating: result.rating.mean, created_at: now }),
+              .upsert({
+                entry_id: entry.id,
+                model: NOTES_MODEL,
+                criteria: result.rating.criteria,
+                scores: result.rating.scores,
+                rating: result.rating.mean,
+                created_at: now,
+              }),
           ]);
           if (notesError || ratingError) failed++;
           else written++;

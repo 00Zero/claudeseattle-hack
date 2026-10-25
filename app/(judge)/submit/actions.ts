@@ -88,6 +88,7 @@ export async function saveEntry(formData: FormData): Promise<SaveState> {
     video_url: text(formData, "video_url", LIMITS.url),
     repo_url: text(formData, "repo_url", LIMITS.url),
     links,
+    contributions: text(formData, "contributions", LIMITS.contributions),
   };
 
   const supabase = await createClient();
@@ -135,6 +136,7 @@ export async function saveEntry(formData: FormData): Promise<SaveState> {
       video_url: values.video_url || null,
       repo_url: values.repo_url || null,
       links: values.links,
+      contributions: values.contributions || null,
       checklist,
     });
     if (saved) {

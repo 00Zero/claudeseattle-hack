@@ -12,7 +12,7 @@ const idle: SaveState = { status: "idle" };
 // How often an open form checks for teammates' saves (also whenever the tab comes back into view).
 const POLL_MS = 15_000;
 
-type Limits = { title: number; tagline: number; description_short: number; description_long: number; url: number; linkLabel: number; links: number };
+type Limits = { title: number; tagline: number; description_short: number; description_long: number; url: number; linkLabel: number; links: number; contributions: number };
 
 // A teammate's saved version of a field this editor is in the middle of changing.
 type Theirs = { value: EntryValues[Field]; by: string | null };
@@ -60,12 +60,16 @@ export function EntryForm({
   saved,
   limits,
   videoHint,
+  teamwork,
 }: {
   action: (formData: FormData) => Promise<SaveState>;
   teamId: string;
   saved: SavedEntry;
   limits: Limits;
   videoHint: string;
+  // Teamwork is a judging criterion: show "Who did what". Otherwise it rides along hidden, so a
+  // save never clears what teammates wrote while it was on.
+  teamwork: boolean;
 }) {
   const router = useRouter();
   const form = useRef<HTMLFormElement>(null);
@@ -253,6 +257,25 @@ export function EntryForm({
           )}
           {note("links")}
         </fieldset>
+
+        {teamwork ? (
+          <Field
+            label="Who did what (optional)"
+            hint="A line per teammate: their role and what they did. Judges score teamwork, and business, design, research, and pitch roles count as much as code."
+            note={note("contributions")}
+          >
+            <textarea
+              name="contributions"
+              rows={4}
+              maxLength={limits.contributions}
+              placeholder={"Sam (business owner): the problem, tested it with customers\nAlex: built the workflow"}
+              defaultValue={saved.values.contributions}
+              className={input}
+            />
+          </Field>
+        ) : (
+          <input type="hidden" name="contributions" defaultValue={saved.values.contributions} />
+        )}
       </fieldset>
 
       {state.message && (
