@@ -210,7 +210,7 @@ function InviteSummary({ invite }: { invite: InviteToMe }) {
           {invite.teamName}
         </Link>{" "}
         <span className="text-fg-muted">
-          · invited by {invite.invitedBy} · {invite.size} of {TEAM_MAX} members
+          · invited by {invite.invitedBy} · {invite.size} of {Math.max(TEAM_MAX, invite.size)} members
         </span>
       </p>
       {invite.concept && <p className="line-clamp-2 text-sm text-fg-muted">{invite.concept}</p>}

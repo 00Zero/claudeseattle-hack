@@ -107,7 +107,7 @@ A mobile-first tool people use on their phones at the happy hour and at Sunday c
 - [ ] Browse teams: card per team with name, concept, member count, role-balance badges (owner / professional / student / technical: present or missing), "looking for" text. Search by name. Sort: open teams first.
 - [ ] Apply to a team; leader sees applicants on the team page and accepts or rejects. Applicant sees status.
 - [ ] One team per person. Leaving a team or being removed by the leader frees the person to apply elsewhere.
-- [ ] Team size 2–6 enforced; warning shown when outside 3–5 ("teams should be 3–5").
+- [ ] Team size 2–5 enforced (only admins can add a 6th); warning shown when outside 3–5 ("teams should be 3–5").
 - [ ] Team page: roster with name, title at company, LinkedIn and GitHub icons, approval badge per member, mentor badge, leader badge; applicants section for the leader; remove-member for the leader.
 - [ ] Deadline shown on every teams page: "Team formation closes Sun Oct 25, 10:30 am". After it, pages still work but show "past deadline".
 - [ ] Public team page (no login) through the public view: name, concept, members as first name and last initial, no links.
@@ -187,7 +187,7 @@ Each dev owns their route group and merges their own PRs without approval; anyth
 | One app or two | One Next.js app, route groups by owner | One login, one deploy, no cookie-domain work; cost is the Saturday freeze |
 | Attendee login | Magic link, both Luma emails whitelisted, extra emails linkable with verification | 288 of 325 Claude-account emails differ from the Luma email |
 | Unapproved sign-ups | Account plus pending page with schedule; admin queue | Cheap; five manual approvals beat an email-linking flow |
-| Team size | 2–6 hard, 3–5 warned | Removes the exception workflow |
+| Team size | 2–5 hard (admins can add a 6th), 3–5 warned | Removes the exception workflow |
 | Technical flag | Self-declared, pre-set from GitHub experience | Luma has no direct question |
 | Finalist selection | Highest mean in the judge's group; judge adjusts scores to break ties | Simpler than a separate pick; prelim scores aren't published |
 | Score | Mean of the enabled criteria (four by default), 1–8, one decimal | Matches the rubric; no 1000-point scale |
