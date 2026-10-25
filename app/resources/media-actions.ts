@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { getCurrentAccess } from "@/lib/access";
-import { checkDriveUpload, isMediaType, MEDIA_MAX_BYTES, startDriveUpload } from "@/lib/media";
+import { checkDriveUpload, startDriveUpload } from "@/lib/media";
+import { mediaType } from "@/lib/media-types";
 import { getOrigin } from "@/lib/site-url";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -33,12 +34,13 @@ export async function startMediaUpload(file: { name: string; type: string; size:
   if (!who) return { ok: false, message: "Log in with an approved registration to upload." };
   const name = String(file.name ?? "").trim().slice(0, 200);
   if (!name) return { ok: false, message: "The file needs a name." };
-  if (!isMediaType(String(file.type ?? ""))) return { ok: false, message: `${name}: only photos and videos.` };
-  if (!(file.size > 0 && file.size <= MEDIA_MAX_BYTES)) return { ok: false, message: `${name}: files must be under 500 MB.` };
+  const type = mediaType(name, String(file.type ?? ""));
+  if (!type) return { ok: false, message: `${name}: only photos and videos.` };
+  if (!(file.size > 0)) return { ok: false, message: `${name}: the file is empty.` };
 
   const origin = (await headers()).get("origin") ?? (await getOrigin());
   try {
-    const uploadUrl = await startDriveUpload({ name: `${who.label} - ${name}`.slice(0, 250), mimeType: file.type, size: file.size, origin });
+    const uploadUrl = await startDriveUpload({ name: `${who.label} - ${name}`.slice(0, 250), mimeType: type, size: file.size, origin });
     return { ok: true, uploadUrl };
   } catch (error) {
     return { ok: false, message: `${name}: ${error instanceof Error ? error.message : "couldn't start the upload."}` };

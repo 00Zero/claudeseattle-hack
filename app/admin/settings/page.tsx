@@ -202,7 +202,8 @@ export default async function SettingsPage() {
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Resources</h2>
         <p className="text-sm text-foreground/70">
-          Links on the Resources page (/resources): credits, the name tag form, the small business data folder. Only
+          Links on the Resources page (/resources): credits, the name tag form, the small business data folder. Sponsor
+          offers with promo codes are on the Offers tab. Only
           approved attendees see them, and only the visible ones. Each link is the same for everyone. Lower order numbers
           come first within a section.
         </p>

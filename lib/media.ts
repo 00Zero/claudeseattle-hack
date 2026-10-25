@@ -4,12 +4,6 @@ import "server-only";
 // scripts/apps-script/media-upload.gs (MEDIA_UPLOAD_URL), which runs as the folder's owner and
 // checks MEDIA_UPLOAD_SECRET. The folder's ID lives only in the script's properties.
 
-export const MEDIA_MAX_BYTES = 500 * 1024 * 1024;
-
-export function isMediaType(mimeType: string) {
-  return /^(image|video)\//.test(mimeType);
-}
-
 async function callScript<T>(body: Record<string, unknown>): Promise<T> {
   const url = process.env.MEDIA_UPLOAD_URL;
   const secret = process.env.MEDIA_UPLOAD_SECRET;
