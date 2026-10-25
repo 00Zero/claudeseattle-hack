@@ -279,7 +279,7 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
             ))}
           </ul>
         )}
-        {!groups.error && <CreateGroupForm key={groupList.length} world={isTest ? "test" : "real"} judges={solo} />}
+        <CreateGroupForm key={groupList.length} world={isTest ? "test" : "real"} judges={solo} />
       </section>
 
       <section className="space-y-3">

@@ -100,6 +100,7 @@ export async function createGroup(_prev: RowState, formData: FormData): Promise<
     if (reason) return { status: "error", message: reason };
   }
   const { data: group, error } = await admin.from("judge_groups").insert({ name, is_test: isTest }).select("id").single();
+  if (error?.code === "PGRST205") return { status: "error", message: "Groups aren't in the database yet: apply the judge_groups migration." };
   if (error || !group) return { status: "error", message: error?.message ?? "Couldn't create the group." };
   const { error: membersError } = await admin.from("judge_group_members").insert(picked.map((judge_id) => ({ judge_id, group_id: group.id })));
   if (membersError) {
