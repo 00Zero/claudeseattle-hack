@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useActionState, useState } from "react";
+import { startTransition, useActionState, useRef, useState } from "react";
 import { checkIn, type CheckInState } from "./actions";
 
 const button = "rounded bg-foreground px-4 py-2 text-background disabled:opacity-40";
@@ -9,8 +9,14 @@ const button = "rounded bg-foreground px-4 py-2 text-background disabled:opacity
 export function CheckInButton({ label }: { label: string }) {
   const [state, formAction, pending] = useActionState<CheckInState, FormData>(checkIn, { status: "idle" });
   const [locating, setLocating] = useState(false);
+  const sent = useRef(false);
+  const fallback = useRef<ReturnType<typeof setTimeout>>(undefined);
 
+  // Exactly one submit per tap: the position, the browser's error, or the fallback below.
   function submit(fields: Record<string, string>) {
+    if (sent.current) return;
+    sent.current = true;
+    clearTimeout(fallback.current);
     const data = new FormData();
     Object.entries(fields).forEach(([key, value]) => data.set(key, value));
     setLocating(false);
@@ -18,8 +24,12 @@ export function CheckInButton({ label }: { label: string }) {
   }
 
   function onClick() {
+    sent.current = false;
     if (!("geolocation" in navigator)) return submit({ gps_error: "unsupported" });
     setLocating(true);
+    // Safari never calls back if the permission prompt is dismissed or ignored (its timeout only
+    // starts after permission), so check in without a position after 20 seconds.
+    fallback.current = setTimeout(() => submit({ gps_error: "timeout" }), 20_000);
     navigator.geolocation.getCurrentPosition(
       (p) =>
         submit({

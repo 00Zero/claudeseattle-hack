@@ -43,6 +43,7 @@ export default async function CheckInPage() {
       {!checkin ? (
         <section className="space-y-4">
           <h1 className="text-2xl font-semibold">Standby check-in</h1>
+          <p className="font-medium">You&apos;re signed in but not checked in yet. Tap the button below.</p>
           <p>
             You&apos;re on the standby list. Check in here once you&apos;re at {venue.name} ({venue.address}). As spots
             open up, organizers let standby guests in, picking people so teams get the mix of roles they need.
