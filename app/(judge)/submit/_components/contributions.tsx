@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatPacific } from "@/lib/time";
 import type { PartEdit, PartResult, PartState } from "../actions";
 import type { Teammate } from "../_lib/entry";
+import { ErrorMessage } from "./error-info";
 import { loadParts, type Part } from "../_lib/parts";
 
 const input = "w-full rounded border border-line-strong bg-bg-raised px-3 py-2";
@@ -49,7 +50,17 @@ function AddGithub({ teammate, closed, action }: { teammate: Teammate; closed: b
     const data = new FormData();
     data.set("profile_id", teammate.id);
     data.set("github", value);
-    startTransition(async () => setState(await action(data)));
+    startTransition(async () => {
+      try {
+        setState(await action(data));
+      } catch {
+        setState({
+          status: "error",
+          message: "We couldn't reach the server, so it wasn't added.",
+          details: ["Your internet connection may have dropped, or the site was updating. Check that you're online, then press Add again."],
+        });
+      }
+    });
   }
   return (
     <div className="space-y-1 rounded border border-clay bg-accent-soft px-3 py-2 text-sm">
@@ -79,11 +90,14 @@ function AddGithub({ teammate, closed, action }: { teammate: Teammate; closed: b
           </button>
         </div>
       )}
-      {state.message && (
-        <p className={state.status === "error" ? "text-red-600" : "text-fg-muted"} role={state.status === "error" ? "alert" : "status"}>
-          {state.message}
-        </p>
-      )}
+      {state.message &&
+        (state.status === "error" ? (
+          <ErrorMessage message={state.message} details={state.details} />
+        ) : (
+          <p className="text-fg-muted" role="status">
+            {state.message}
+          </p>
+        ))}
     </div>
   );
 }

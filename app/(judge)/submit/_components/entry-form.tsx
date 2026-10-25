@@ -7,6 +7,7 @@ import { formatPacific } from "@/lib/time";
 import type { PartEdit, PartResult, PartState, SaveState } from "../actions";
 import type { Teammate } from "../_lib/entry";
 import { Contributions, type ContributionsHandle } from "./contributions";
+import { ErrorMessage } from "./error-info";
 import type { EntryLink, EntryValues } from "../_lib/entry";
 import { cleanLinks, FIELDS, loadSavedEntry, same, withField, type Field, type SavedEntry } from "../_lib/merge";
 
@@ -67,6 +68,15 @@ type ContributionsConfig = {
   githubAction: (formData: FormData) => Promise<PartState>;
 };
 
+// A save that never got an answer: the connection dropped, or the site was mid-update.
+const CONNECTION_LOST: SaveState = {
+  status: "error",
+  message: "We couldn't reach the server, so nothing was saved.",
+  details: [
+    "Your internet connection may have dropped, or the site was updating. Your text is still on this page: check that you're online (open another site), then press Save again. If it still fails, copy your text somewhere safe and reload the page.",
+  ],
+};
+
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 function names(list: string[]) {
@@ -77,16 +87,22 @@ function names(list: string[]) {
 function combined(entry: SaveState | null, parts: PartResult[], nameOf: (id: string) => string): SaveState {
   const saved = parts.filter((r) => r.status === "ok").map((r) => nameOf(r.profile_id));
   const conflicts = parts.filter((r) => r.status === "conflict").map((r) => nameOf(r.profile_id));
-  const errors = parts.filter((r) => r.status === "error").map((r) => r.message ?? "");
+  const errors = parts.filter((r) => r.status === "error");
   const messages = [
     entry?.message,
     saved.length > 0 && `Saved who did what for ${names(saved)}.`,
     conflicts.length > 0 &&
       `${names(conflicts)}'s part${conflicts.length === 1 ? " was" : "s were"} changed by a teammate meanwhile, so ${conflicts.length === 1 ? "it wasn't" : "they weren't"} saved: pick a version there, then save again.`,
-    errors[0],
+    errors[0]?.message,
   ].filter(Boolean);
+  const details = [
+    ...(entry?.status === "error" ? (entry.details ?? []) : []),
+    conflicts.length > 0 &&
+      `A teammate saved ${names(conflicts)}'s section while you were editing it. Nothing you typed is lost: in that section there's an orange box. Open “Show their version”, choose Use theirs or Keep mine, then press Save again.`,
+    errors[0]?.detail,
+  ].filter((d): d is string => Boolean(d));
   const failed = entry?.status === "error" || conflicts.length > 0 || errors.length > 0;
-  return { status: failed ? "error" : (entry?.status ?? "ok"), message: messages.join(" "), entry: entry?.entry };
+  return { status: failed ? "error" : (entry?.status ?? "ok"), message: messages.join(" "), details, entry: entry?.entry };
 }
 
 export function EntryForm({
@@ -256,7 +272,14 @@ export function EntryForm({
         data.set("base", JSON.stringify(base.current));
         if (confirmed) data.set("confirm_late", "yes");
         startTransition(async () => {
-          const [entryResult, partResults] = await Promise.all([withEntry ? action(data) : Promise.resolve(null), edits.length ? partsAction(edits) : Promise.resolve([])]);
+          let entryResult: SaveState | null;
+          let partResults: PartResult[];
+          try {
+            [entryResult, partResults] = await Promise.all([withEntry ? action(data) : Promise.resolve(null), edits.length ? partsAction(edits) : Promise.resolve([])]);
+          } catch {
+            setState(CONNECTION_LOST);
+            return;
+          }
           parts.current?.apply(partResults);
           if (entryResult?.status === "confirm_late") {
             setAskLate(true);
@@ -365,14 +388,14 @@ export function EntryForm({
       {/* One Save for the entry and "who did what", stuck to the bottom of the screen while the
           form is in view. Room on the right for the /feedback button. */}
       <div className="sticky bottom-0 z-30 space-y-2 border-t border-line bg-bg pt-3 pr-28 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        {state.message && (
-          <p
-            className={`text-sm ${state.status === "error" ? "text-red-600" : state.status === "late" ? "text-fg" : "text-fg-muted"}`}
-            role={state.status === "error" ? "alert" : "status"}
-          >
-            {state.message}
-          </p>
-        )}
+        {state.message &&
+          (state.status === "error" ? (
+            <ErrorMessage message={state.message} details={state.details} />
+          ) : (
+            <p className={`text-sm ${state.status === "late" ? "text-fg" : "text-fg-muted"}`} role="status">
+              {state.message}
+            </p>
+          ))}
         {askLate ? (
           <div className="space-y-3 rounded border border-red-600 bg-accent-soft px-4 py-3" role="alertdialog" aria-labelledby="late-heading" aria-describedby="late-detail">
             <p id="late-heading" className="font-semibold text-red-600">
