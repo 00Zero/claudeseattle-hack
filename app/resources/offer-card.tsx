@@ -70,7 +70,8 @@ async function copyText(text: string) {
 
 // One sponsor offer. A link with a promo code copies the code when clicked, shows a check on the
 // button for a moment, then opens the redemption page in a new tab, so the code is ready to paste
-// there (well within the browser's allowance for opening a tab after a click). The code also shows on the
+// there (well within the browser's allowance for opening a tab after a click). That happens whether
+// or not the offer shows its codes; show_code only decides whether the code itself is on the card. The code also shows on the
 // card with its own copy button. Locked offers (check-in required) show what they are, not the links.
 // Each click is logged for the admin stats, in the background.
 export function OfferCard({ offer }: { offer: AttendeeOffer }) {
@@ -107,8 +108,11 @@ export function OfferCard({ offer }: { offer: AttendeeOffer }) {
     }, COPIED_PAUSE_MS);
   }
 
-  // One chip per distinct code, logged against the first link that carries it.
-  const codeLinks = offer.links.filter((l, i, all) => l.code && all.findIndex((o) => o.code === l.code) === i);
+  // One chip per distinct code the offer shows, logged against the first link that carries it.
+  const codeLinks = offer.links.filter(
+    (l, i, all) => l.code && l.show_code !== false && all.findIndex((o) => o.code === l.code) === i,
+  );
+  const shown = (code: string) => offer.links.some((l) => l.code === code && l.show_code !== false);
 
   return (
     <article className="flex h-full flex-col gap-4 rounded-lg border border-line bg-bg-raised p-5">
@@ -204,7 +208,11 @@ export function OfferCard({ offer }: { offer: AttendeeOffer }) {
               ))}
             </div>
             <p role="status" className="min-h-5 text-sm text-live">
-              {copied ? `Copied ${copied}. Paste it if the page asks for a code.` : ""}
+              {copied
+                ? shown(copied)
+                  ? `Copied ${copied}. Paste it if the page asks for a code.`
+                  : "Promo code copied to your clipboard. Paste it if the page asks for one."
+                : ""}
             </p>
           </>
         )}

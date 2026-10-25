@@ -3,7 +3,8 @@
 // admins switch them on and off, manage the links and see who clicked what in /admin/offers.
 
 // id is null for a personal link (offer_codes), which isn't an offer_links row.
-export type OfferLink = { id: string | null; label: string; url: string; code: string | null };
+// show_code: false when the offer hides its codes on the card; clicking still copies the code.
+export type OfferLink = { id: string | null; label: string; url: string; code: string | null; show_code?: boolean };
 
 // A row of attendee_offers(). links is empty while the offer is locked (check-in required).
 // personal: each person gets their own code (offer_codes); their link comes first in links.
@@ -31,7 +32,7 @@ export type Offer = {
   enabled: boolean;
   requires_checkin: boolean;
   personal_link_label: string | null;
-  // NULL counts as true. When false, attendee_offers() leaves the codes out of the links.
+  // NULL counts as true. When false, the card hides the codes; clicking a link still copies its code.
   show_code: boolean | null;
 };
 
