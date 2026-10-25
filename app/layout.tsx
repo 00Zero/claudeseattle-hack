@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Newsreader } from "next/font/google";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { FEEDBACK_MAX_LENGTH, getFeedbackSender } from "@/lib/feedback";
+import { getLiveBanners } from "@/lib/banners";
 import { FeedbackButton } from "@/components/site/feedback-button";
+import { SiteBanners } from "@/components/site/site-banners";
 import { TestAccountBanner } from "@/components/site/test-account-banner";
 import { TitleBar } from "@/components/site/title-bar";
 import { ThemeSync } from "@/components/theme/theme-sync";
@@ -38,11 +40,15 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Live announcement banners, read alongside the profile. A failed read hides them rather than
+  // the page; SiteBanners retries every minute.
+  const liveBanners = getLiveBanners().catch(() => []);
   // If the profile read fails, render the header signed out; the page's own call throws the same
   // error and app/error.tsx shows "try again" below it.
   const profile = await getCurrentProfile().catch(() => null);
   const isAdmin = profile?.platform_role === "admin";
   const showFeedback = profile ? Boolean(await getFeedbackSender().catch(() => null)) : false;
+  const banners = await liveBanners;
 
   return (
     // suppressHydrationWarning: the inline script below sets data-theme before React hydrates.
@@ -53,6 +59,7 @@ export default async function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} ${newsreader.variable} antialiased`}>
         {profile?.is_test && <TestAccountBanner name={`${profile.first_name} ${profile.last_name}`} />}
         <TitleBar signedIn={Boolean(profile)} isAdmin={isAdmin} isSuperAdmin={isAdmin && Boolean(profile?.is_super_admin)} isJudge={profile?.platform_role === "judge"} />
+        <SiteBanners initial={banners} />
         <ThemeSync />
         <main className="mx-auto max-w-4xl px-4 py-8">{children}</main>
         {showFeedback && <FeedbackButton maxLength={FEEDBACK_MAX_LENGTH} />}
