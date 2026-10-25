@@ -141,7 +141,7 @@ Teams submit an entry by 5:30 pm Sunday; five judges each score about four entri
 
 - [ ] Entry form at `/submit`, one per team, editable by any member until the deadline: title, one-line tagline, one description, demo video URL (required, 3 minutes or less), repo URL (required), additional links. Pre-filled from the team's concept. Shows "Last saved" timestamp and the deadline. After 5:30 pm the form stays open, starting from the team's pending late save if any: a save first warns that it will mark the project as submitted late and needs a confirm click, then is stored as a late save for admin to accept or reject. "Who did what" is read-only after the deadline.
 - [ ] Completeness check on every save: required fields filled, repo URL returns 200 and looks public, video URL loads. Shown to the team as a checklist, so they fix it before 5:30.
-- [ ] Admin: assign entries to judges (manual, table of entries with a judge dropdown; must handle an entry with no judge and a judge with no entries).
+- [ ] Admin: assign entries to judges (manual, table of entries with a judge dropdown; must handle an entry with no judge and a judge with no entries). Judging groups (built): admins put two or more judges in a group on `/admin/judging`; the dropdown then offers the group, every member scores its entries, and the group's top entry by mean of its judges' scores is its finalist. A judge in no group judges alone, which is the default.
 - [ ] Judge view at `/judge`: only my assigned entries. Entry page shows video embedded at the top, repo link, tagline, description, team roster, then a collapsed AI-notes section. Score form: the enabled criteria (four by default), each 1–8 with no middle, one optional comment. Live ranking of my group by mean score; the top one is my finalist. Exact ties must be broken by adjusting scores.
 - [ ] Final round: all five judges score each finalist with the same rubric; final score is the mean across judges.
 - [ ] Admin table: one row per entry; columns for team, submitted, late flag, assigned judge, prelim score and vote count, final score and vote count, finalist, place. Sortable. Badge: "teams without a submission: N".
@@ -155,7 +155,7 @@ Teams submit an entry by 5:30 pm Sunday; five judges each score about four entri
 3. Hide chosen entry fields from judges (for example member names).
 4. Optional per-team score and rank visibility, off by default.
 5. Configurable weights for future events; weights equal this time. (Choosing enabled criteria is built: `/admin/judging`, "Criteria".)
-6. Judge groups (several judges per group) for future events.
+6. ~~Judge groups (several judges per group)~~: built, see the admin assignment item above.
 
 **Rubric.** Five criteria, equal weight, each scored 1–8; admins choose which are enabled on `/admin/judging` (default: the first four on, Teamwork off; at least one on). Entry score is the mean of the enabled criteria, shown to one decimal. Anchors are written per pair; the judge picks the low or high end of the pair. The setting locks once a judge saves a real score, so every score in a round uses the same criteria (test-world scores don't lock it). Each score records the criteria keys it covers (`judge_scores.criteria`; null = the default four).
 
