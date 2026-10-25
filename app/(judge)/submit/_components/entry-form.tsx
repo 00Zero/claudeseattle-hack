@@ -12,7 +12,7 @@ const idle: SaveState = { status: "idle" };
 // How often an open form checks for teammates' saves (also whenever the tab comes back into view).
 const POLL_MS = 15_000;
 
-type Limits = { title: number; tagline: number; description_short: number; description_long: number; url: number; linkLabel: number; links: number; contributions: number };
+type Limits = { title: number; tagline: number; description: number; url: number; linkLabel: number; links: number };
 
 // A teammate's saved version of a field this editor is in the middle of changing.
 type Theirs = { value: EntryValues[Field]; by: string | null };
@@ -60,16 +60,12 @@ export function EntryForm({
   saved,
   limits,
   videoHint,
-  teamwork,
 }: {
   action: (formData: FormData) => Promise<SaveState>;
   teamId: string;
   saved: SavedEntry;
   limits: Limits;
   videoHint: string;
-  // Teamwork is a judging criterion: show "Who did what". Otherwise it rides along hidden, so a
-  // save never clears what teammates wrote while it was on.
-  teamwork: boolean;
 }) {
   const router = useRouter();
   const form = useRef<HTMLFormElement>(null);
@@ -198,20 +194,13 @@ export function EntryForm({
           <input name="tagline" maxLength={limits.tagline} defaultValue={saved.values.tagline} className={input} />
         </Field>
         <Field
-          label="Short description"
-          hint="A few sentences judges read first: the problem, the small business, what you built."
-          note={note("description_short")}
+          label="Description"
+          hint="The problem and the small business it's for, what you built and how it works, how a business would set it up, and what's still rough. Judges review without talking to you, so put it here."
+          note={note("description")}
         >
-          <textarea name="description_short" rows={4} maxLength={limits.description_short} defaultValue={saved.values.description_short} className={input} />
+          <textarea name="description" rows={12} maxLength={limits.description} defaultValue={saved.values.description} className={input} />
         </Field>
-        <Field
-          label="Long description"
-          hint="How it works, how a business would set it up, what's still rough. Judges review without talking to you, so put it here."
-          note={note("description_long")}
-        >
-          <textarea name="description_long" rows={10} maxLength={limits.description_long} defaultValue={saved.values.description_long} className={input} />
-        </Field>
-        <Field label="Demo video link (required)" hint={`${videoHint}. Show the problem, the solution, and a walkthrough.`} note={note("video_url")}>
+        <Field label="Demo video link (required)" hint={`${videoHint}. Show the problem, the solution, and a walkthrough. Keep it to 3 minutes or less: judges stop watching at 3:00.`} note={note("video_url")}>
           <input name="video_url" type="url" required inputMode="url" placeholder="https://www.youtube.com/watch?v=…" maxLength={limits.url} defaultValue={saved.values.video_url} className={input} />
         </Field>
         <Field
@@ -258,24 +247,8 @@ export function EntryForm({
           {note("links")}
         </fieldset>
 
-        {teamwork ? (
-          <Field
-            label="Who did what (optional)"
-            hint="A line per teammate: their role and what they did. Judges score teamwork, and business, design, research, and pitch roles count as much as code."
-            note={note("contributions")}
-          >
-            <textarea
-              name="contributions"
-              rows={4}
-              maxLength={limits.contributions}
-              placeholder={"Sam (business owner): the problem, tested it with customers\nAlex: built the workflow"}
-              defaultValue={saved.values.contributions}
-              className={input}
-            />
-          </Field>
-        ) : (
-          <input type="hidden" name="contributions" defaultValue={saved.values.contributions} />
-        )}
+        {/* The shared "who did what" from before teammates wrote their own parts: kept as it is. */}
+        <input type="hidden" name="contributions" defaultValue={saved.values.contributions} />
       </fieldset>
 
       {state.message && (

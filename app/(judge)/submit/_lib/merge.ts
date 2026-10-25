@@ -1,6 +1,7 @@
 // Merging teammates' saves field by field. Used by saveEntry and by the entry form, which brings
 // in teammates' saves as they land, so nothing here is server-only.
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { joinDescription } from "../../_lib/description";
 import type { EntryLink, EntryValues } from "./entry";
 
 export type Field = keyof EntryValues;
@@ -8,8 +9,7 @@ export type Field = keyof EntryValues;
 export const FIELD_LABELS: Record<Field, string> = {
   title: "Title",
   tagline: "Tagline",
-  description_short: "Short description",
-  description_long: "Long description",
+  description: "Description",
   video_url: "Demo video link",
   repo_url: "GitHub repo link",
   links: "Other links",
@@ -41,8 +41,7 @@ export function entryValues(row: Omit<EntryRow, "last_saved_at" | "saver">): Ent
   return {
     title: row.title ?? "",
     tagline: row.tagline ?? "",
-    description_short: row.description_short ?? "",
-    description_long: row.description_long ?? "",
+    description: joinDescription(row.description_short, row.description_long),
     video_url: row.video_url ?? "",
     repo_url: row.repo_url ?? "",
     links: Array.isArray(row.links) ? (row.links as EntryLink[]) : [],

@@ -167,7 +167,7 @@ Teams submit an entry by 5:30 pm Sunday; five judges each score about four entri
 | Creativity of the solution | Generic chatbot or template | Sensible but predictable | A fresh angle on a known problem | Something judges hadn't thought of |
 | Teamwork (off by default) | One person did essentially everything, or no sign of who did what | One or two people did most of it; other roles unclear | Clear roles; most members visibly contributed (code, design, business, research, or pitch) | Every member had a distinct, visible role, and the team shows how they worked together |
 
-Teamwork: not everyone needs to write code; business, design, research, and pitch roles count. While it's on, `/submit` shows an optional "Who did what" field (judges and AI notes see it; public pages don't).
+Teamwork: not everyone needs to write code; business, design, research, and pitch roles count. While it's on, `/submit` shows a "Who did what" section per teammate (`judge_contributions`): name, role, team lead, and GitHub username, where anyone on the team can write or edit any teammate's part and fill in a missing GitHub username; each part saves on its own, and a save that crosses a teammate's shows both versions to pick from. Judges and AI notes see it; public pages don't.
 
 **Out of scope.** Scores out of 1000, AI ranking teams against each other, messaging, prizes management, check-in (comes from the Luma import).
 

@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { formatPacific } from "@/lib/time";
 import { PageHeader } from "../_components/ui";
 import { VIDEO_HOSTS_HINT } from "../_lib/video";
-import { saveEntry } from "./actions";
+import { saveContribution, saveEntry, setTeammateGithub } from "./actions";
+import { Contributions } from "./_components/contributions";
 import { EntryForm } from "./_components/entry-form";
 import type { CheckItem, Checklist } from "./_lib/checklist";
 import { getSubmitContext, LIMITS, type Entry, type EntryValues, type LateSave } from "./_lib/entry";
@@ -28,13 +29,12 @@ export default async function SubmitPage() {
     );
   }
 
-  const { team, entry, lateSave, closesAt, isPast, teamwork } = ctx;
+  const { team, entry, lateSave, closesAt, isPast, teamwork, me, teammates } = ctx;
   const values: EntryValues = entry
     ? {
         title: entry.title,
         tagline: entry.tagline,
-        description_short: entry.description_short,
-        description_long: entry.description_long,
+        description: entry.description,
         video_url: entry.video_url,
         repo_url: entry.repo_url,
         links: entry.links,
@@ -43,8 +43,7 @@ export default async function SubmitPage() {
     : {
     title: team.name,
     tagline: "",
-    description_short: team.concept ?? "",
-    description_long: "",
+    description: team.concept ?? "",
     video_url: "",
     repo_url: "",
     links: [],
@@ -72,7 +71,7 @@ export default async function SubmitPage() {
 
       {isPast ? (
         entry ? (
-          <ReadOnlyEntry entry={entry} teamwork={teamwork} />
+          <ReadOnlyEntry entry={entry} />
         ) : (
           <p className="text-fg-muted">Your team didn&apos;t submit an entry before the deadline. Find an organizer.</p>
         )
@@ -83,7 +82,20 @@ export default async function SubmitPage() {
           saved={{ values, savedAt: entry?.last_saved_at ?? null, savedBy: entry?.last_saved_by_name ?? null }}
           limits={LIMITS}
           videoHint={VIDEO_HOSTS_HINT}
-          teamwork={teamwork}
+        />
+      )}
+
+      {/* Teamwork is a judging criterion: the team says what each person did. */}
+      {teamwork && (
+        <Contributions
+          teamId={team.id}
+          teammates={teammates}
+          me={me}
+          closed={isPast}
+          legacy={entry?.contributions ?? ""}
+          limit={LIMITS.contribution}
+          saveAction={saveContribution}
+          githubAction={setTeammateGithub}
         />
       )}
     </div>
@@ -157,15 +169,13 @@ function ChecklistView({ checklist }: { checklist: Checklist }) {
   );
 }
 
-function ReadOnlyEntry({ entry, teamwork }: { entry: Entry; teamwork: boolean }) {
+function ReadOnlyEntry({ entry }: { entry: Entry }) {
   const rows: [string, React.ReactNode][] = [
     ["Title", entry.title],
     ["Tagline", entry.tagline],
-    ["Short description", entry.description_short],
-    ["Long description", entry.description_long],
+    ["Description", entry.description],
     ["Demo video", entry.video_url && <ExternalLink href={entry.video_url} />],
     ["GitHub repo", entry.repo_url && <ExternalLink href={entry.repo_url} />],
-    ...(teamwork || entry.contributions ? ([["Who did what", entry.contributions]] as [string, React.ReactNode][]) : []),
   ];
   return (
     <dl className="space-y-4">

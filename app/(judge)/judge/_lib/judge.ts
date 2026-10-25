@@ -4,6 +4,7 @@ import { getCurrentProfile } from "@/lib/supabase/profile";
 import type { AiNotesBody } from "../../_lib/ai-notes";
 import { getEnabledCriteria } from "../../_lib/criteria";
 import { ALL_CRITERIA, mean, rankByScore, type Criterion } from "../../_lib/scoring";
+import { normalizeGithubUsername } from "@/app/(teams)/teams/_lib/links";
 
 // Data for /judge. Everything reads as the logged-in judge, so RLS limits it to their own
 // assignments and scores; the finalist list comes from judge_finalists(), which checks is_judge().
@@ -84,16 +85,19 @@ export async function getEntryForJudge(judgeId: string, entryId: string, round: 
     .maybeSingle();
   if (!entry) return null;
 
-  const [assigned, finalists, scores, roster, notes, { criteria }] = await Promise.all([
+  const [assigned, finalists, scores, roster, parts, notes, { criteria }] = await Promise.all([
     supabase.from("judge_assignments").select("entry_id").eq("entry_id", entryId).eq("judge_id", judgeId).maybeSingle(),
     supabase.rpc("judge_finalists"),
     myScores(judgeId, round),
     entry.team_id
       ? supabase
           .from("team_members")
-          .select("profiles(display_name, job_title, company)")
+          .select("profiles(id, display_name, job_title, company, github_username)")
           .eq("team_id", entry.team_id)
           .eq("status", "member")
+      : Promise.resolve({ data: [] }),
+    entry.team_id
+      ? supabase.from("judge_contributions").select("profile_id, body").eq("team_id", entry.team_id)
       : Promise.resolve({ data: [] }),
     supabase.from("judge_ai_notes").select("notes, model").eq("entry_id", entryId).maybeSingle(),
     getEnabledCriteria(supabase),
@@ -101,10 +105,17 @@ export async function getEntryForJudge(judgeId: string, entryId: string, round: 
 
   const isFinalist = ((finalists.data ?? []) as { entry_id: string }[]).some((f) => f.entry_id === entryId);
   const canScore = round === "prelim" ? Boolean(assigned.data) : isFinalist;
-  const members = ((roster.data ?? []) as unknown as { profiles: { display_name: string; job_title: string | null; company: string | null } | null }[])
+  const partBy = new Map(((parts.data ?? []) as { profile_id: string; body: string }[]).map((p) => [p.profile_id, p.body]));
+  type Member = { id: string; display_name: string; job_title: string | null; company: string | null; github_username: string | null };
+  const members = ((roster.data ?? []) as unknown as { profiles: Member | null }[])
     .map((m) => m.profiles)
-    .filter((p): p is NonNullable<typeof p> => Boolean(p))
-    .map((p) => ({ name: p.display_name, detail: [p.job_title, p.company].filter(Boolean).join(" at ") || null }));
+    .filter((p): p is Member => Boolean(p))
+    .map((p) => ({
+      name: p.display_name,
+      detail: [p.job_title, p.company].filter(Boolean).join(" at ") || null,
+      github: normalizeGithubUsername(p.github_username),
+      contribution: partBy.get(p.id) ?? null,
+    }));
 
   return {
     entry: { ...entry, links: Array.isArray(entry.links) ? entry.links : [], team: teamName(entry as unknown as EntryRow) },

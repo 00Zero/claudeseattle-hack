@@ -230,8 +230,7 @@ export async function createFallbackEntry(_prev: RowState, formData: FormData): 
   const values = {
     title: fieldText(formData, "title", LIMITS.title),
     tagline: fieldText(formData, "tagline", LIMITS.tagline),
-    description_short: fieldText(formData, "description_short", LIMITS.description_short),
-    description_long: fieldText(formData, "description_long", LIMITS.description_long),
+    description: fieldText(formData, "description", LIMITS.description),
     video_url: fieldText(formData, "video_url", LIMITS.url),
     repo_url: fieldText(formData, "repo_url", LIMITS.url),
     links: [],
@@ -267,8 +266,7 @@ export async function createFallbackEntry(_prev: RowState, formData: FormData): 
       fallback_member_emails: emails,
       title: values.title,
       tagline: values.tagline || null,
-      description_short: values.description_short || null,
-      description_long: values.description_long || null,
+      description_long: values.description || null,
       video_url: values.video_url,
       repo_url: values.repo_url,
       checklist,
@@ -318,14 +316,22 @@ export async function generateNotes(_prev: RowState, formData: FormData): Promis
   const rosters = new Map<string, RosterForNotes>();
   if (keys.includes("teamwork")) {
     const teamIds = batch.map((e) => e.team_id).filter((t): t is string => Boolean(t));
-    const { data: members } = teamIds.length
-      ? await admin.from("team_members").select("team_id, profiles(display_name, job_title, company)").eq("status", "member").in("team_id", teamIds)
-      : { data: [] };
+    const [{ data: members }, { data: parts }] = teamIds.length
+      ? await Promise.all([
+          admin.from("team_members").select("team_id, profiles(id, display_name, job_title, company)").eq("status", "member").in("team_id", teamIds),
+          admin.from("judge_contributions").select("team_id, profile_id, body").in("team_id", teamIds),
+        ])
+      : [{ data: [] }, { data: [] }];
+    const partBy = new Map((parts ?? []).map((c) => [`${c.team_id}:${c.profile_id}`, c.body as string]));
     for (const m of members ?? []) {
-      const p = m.profiles as unknown as { display_name: string; job_title: string | null; company: string | null } | null;
+      const p = m.profiles as unknown as { id: string; display_name: string; job_title: string | null; company: string | null } | null;
       if (!p) continue;
       const list = rosters.get(m.team_id) ?? [];
-      list.push({ name: p.display_name, detail: [p.job_title, p.company].filter(Boolean).join(" at ") || null });
+      list.push({
+        name: p.display_name,
+        detail: [p.job_title, p.company].filter(Boolean).join(" at ") || null,
+        contribution: partBy.get(`${m.team_id}:${p.id}`) ?? null,
+      });
       rosters.set(m.team_id, list);
     }
   }

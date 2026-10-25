@@ -2,20 +2,24 @@ import "server-only";
 import { getCurrentAccess, type Access } from "@/lib/access";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/supabase/profile";
+import { ROLE_SHORT, type RoleBucket } from "@/lib/roles";
+import { normalizeGithubUsername } from "@/app/(teams)/teams/_lib/links";
 import { getEnabledCriteria } from "../../_lib/criteria";
 import type { Checklist } from "./checklist";
 import { entryValues } from "./merge";
+import { EMPTY_PART, loadParts, type Part } from "./parts";
 
 // docs/REQUIREMENTS.md, "Judging app": the entry form's fields and their limits.
 export const LIMITS = {
   title: 80,
   tagline: 140,
-  description_short: 500,
-  description_long: 5000,
+  // Room for an older entry's short and long descriptions read together.
+  description: 6000,
   url: 500,
   linkLabel: 60,
   links: 5,
   contributions: 1000,
+  contribution: 2000,
 };
 
 export type EntryLink = { label: string; url: string };
@@ -23,12 +27,12 @@ export type EntryLink = { label: string; url: string };
 export type EntryValues = {
   title: string;
   tagline: string;
-  description_short: string;
-  description_long: string;
+  description: string;
   video_url: string;
   repo_url: string;
   links: EntryLink[];
-  // "Who did what", for the Teamwork criterion; the form shows it only while Teamwork is on.
+  // The team's shared "who did what" from before each teammate wrote their own part
+  // (judge_contributions). The form keeps it as it is.
   contributions: string;
 };
 
@@ -37,6 +41,17 @@ export type Entry = EntryValues & {
   checklist: Checklist | null;
   last_saved_at: string | null;
   last_saved_by_name: string | null;
+};
+
+// A teammate's "who did what" section on /submit. Anyone on the team can write any teammate's
+// part and add a missing GitHub username.
+export type Teammate = {
+  id: string;
+  name: string;
+  role: string | null;
+  isLeader: boolean;
+  github: string | null;
+  part: Part;
 };
 
 export type LateSave = { saved_at: string; decision: "pending" | "accepted" | "rejected" };
@@ -53,7 +68,25 @@ export type SubmitContext =
       closesAt: string;
       isPast: boolean;
       teamwork: boolean;
+      me: string;
+      teammates: Teammate[];
     };
+
+type MemberProfile = {
+  id: string;
+  display_name: string;
+  first_name: string | null;
+  last_name: string | null;
+  github_username: string | null;
+  role_bucket: RoleBucket | null;
+  platform_role: string;
+};
+
+const STAFF_ROLE: Record<string, string> = { mentor: "Mentor", judge: "Judge", volunteer: "Volunteer", admin: "Organizer" };
+
+function memberRole(p: MemberProfile) {
+  return STAFF_ROLE[p.platform_role] ?? (p.role_bucket ? ROLE_SHORT[p.role_bucket] : null);
+}
 
 function blockedReason(role: string) {
   if (role === "mentor") return "Mentors help teams but don't submit. Your team's participants submit the entry.";
@@ -84,14 +117,15 @@ export async function getSubmitContext(): Promise<SubmitContext> {
   const supabase = await createClient();
   const { data: membership } = await supabase
     .from("team_members")
-    .select("teams(id, name, concept)")
+    .select("teams(id, name, concept, leader_id)")
     .eq("profile_id", profile.id)
     .eq("status", "member")
     .maybeSingle();
-  const team = membership?.teams as unknown as { id: string; name: string; concept: string | null } | null;
-  if (!team) return { kind: "blocked", reason: "Join or create a team first; each team submits one entry." };
+  const joined = membership?.teams as unknown as { id: string; name: string; concept: string | null; leader_id: string | null } | null;
+  if (!joined) return { kind: "blocked", reason: "Join or create a team first; each team submits one entry." };
+  const { leader_id: leaderId, ...team } = joined;
 
-  const [{ closesAt, isPast }, { data: row }, { data: late }, { keys }] = await Promise.all([
+  const [{ closesAt, isPast }, { data: row }, { data: late }, { keys }, { data: members }, parts] = await Promise.all([
     getSubmissionDeadline(),
     supabase
       .from("judge_entries")
@@ -106,7 +140,28 @@ export async function getSubmitContext(): Promise<SubmitContext> {
       .limit(1)
       .maybeSingle(),
     getEnabledCriteria(supabase),
+    supabase
+      .from("team_members")
+      .select("joined_at, profiles(id, display_name, first_name, last_name, github_username, role_bucket, platform_role)")
+      .eq("team_id", team.id)
+      .eq("status", "member")
+      .order("joined_at"),
+    loadParts(supabase, team.id),
   ]);
+
+  const teammates: Teammate[] = ((members ?? []) as unknown as { profiles: MemberProfile | null }[])
+    .map((m) => m.profiles)
+    .filter((p): p is MemberProfile => Boolean(p))
+    .map((p) => ({
+      id: p.id,
+      name: [p.first_name, p.last_name].filter(Boolean).join(" ") || p.display_name,
+      role: memberRole(p),
+      isLeader: p.id === leaderId,
+      github: normalizeGithubUsername(p.github_username),
+      part: parts.get(p.id) ?? EMPTY_PART,
+    }))
+    // The leader first, then the order people joined.
+    .sort((a, b) => Number(b.isLeader) - Number(a.isLeader));
 
   const entry: Entry | null = row
     ? {
@@ -118,5 +173,5 @@ export async function getSubmitContext(): Promise<SubmitContext> {
       }
     : null;
 
-  return { kind: "ready", team, entry, lateSave: (late as LateSave | null) ?? null, closesAt, isPast, teamwork: keys.includes("teamwork") };
+  return { kind: "ready", team, entry, lateSave: (late as LateSave | null) ?? null, closesAt, isPast, teamwork: keys.includes("teamwork"), me: profile.id, teammates };
 }
