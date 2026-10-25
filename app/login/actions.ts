@@ -59,31 +59,49 @@ type Kind =
 
 // What a typed email is. Links go only to "account" and "registered" emails, and only to the
 // email as typed: a link sent to another inbox looked like a slow email, so people asked again.
+// Throws if a lookup fails (for example a timeout), so a slow database never tells a registered
+// person they aren't registered.
 async function classify(email: string): Promise<Kind> {
   const admin = createAdminClient();
-  const { data: owner } = await admin
-    .from("profile_emails")
-    .select("profile_id")
-    .eq("email", email)
-    .eq("verified", true)
-    .maybeSingle();
+  const check = <T,>(result: { data: T; error: { message: string } | null }) => {
+    if (result.error) throw new Error(`login lookup failed: ${result.error.message}`);
+    return result.data;
+  };
+
+  const owner = check(
+    await admin.from("profile_emails").select("profile_id").eq("email", email).eq("verified", true).maybeSingle(),
+  );
   if (owner) {
-    const { data } = await admin.auth.admin.getUserById(owner.profile_id);
-    const authEmail = data.user?.email?.toLowerCase();
-    if (data.user && authEmail === email) return { kind: "account", user: data.user };
+    const { data, error } = await admin.auth.admin.getUserById(owner.profile_id);
+    if (error) throw new Error(`login lookup failed: ${error.message}`);
+    const user = data.user;
+    const authEmail = user?.email?.toLowerCase();
+    if (user && authEmail === email) return { kind: "account", user };
     if (authEmail) return { kind: "linked", authEmail };
   }
 
-  const { data: guest } = await admin.from("luma_guests").select("guest_id").eq("email", email).limit(1).maybeSingle();
+  const guest = check(await admin.from("luma_guests").select("guest_id").eq("email", email).limit(1).maybeSingle());
   if (guest) return { kind: "registered" };
 
-  const { data: guestId } = await admin.rpc("luma_guest_for_claude_email", { p_email: email });
+  const guestId = check(await admin.rpc("luma_guest_for_claude_email", { p_email: email }));
   if (typeof guestId === "string") {
-    const { data: g } = await admin.from("luma_guests").select("email").eq("guest_id", guestId).single();
+    const g = check(await admin.from("luma_guests").select("email").eq("guest_id", guestId).maybeSingle());
     if (g) return { kind: "claude", guestId, lumaEmail: g.email };
   }
   return { kind: "unregistered" };
 }
+
+// classify(), or null after logging when a lookup failed.
+async function tryClassify(email: string) {
+  try {
+    return await classify(email);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+    return null;
+  }
+}
+
+const LOOKUP_FAILED = "We couldn't check that email just now. Wait a few seconds and try again.";
 
 // Sends a magic link to the typed email if it has an account or is a Luma registration email.
 // Otherwise it says which email to use instead, and the page offers a sign-in request.
@@ -94,13 +112,15 @@ export async function sendMagicLink(_prev: LoginState, formData: FormData): Prom
     return { status: "error", message: "Enter a valid email address." };
   }
 
-  const what = await classify(typed);
+  const what = await tryClassify(typed);
+  if (!what) return { status: "error", message: LOOKUP_FAILED };
   if (what.kind === "linked" || what.kind === "claude" || what.kind === "unregistered") {
-    const { data: request } = await createAdminClient()
+    const { data: request, error } = await createAdminClient()
       .from("login_requests")
       .select("status")
       .eq("email", typed)
       .maybeSingle();
+    if (error) console.error("login lookup failed (login_requests):", error.message);
     const reason =
       request?.status === "pending" ? "requested" : request?.status === "declined" ? "declined" : what.kind;
     const useInstead =
@@ -183,7 +203,8 @@ export async function requestAccess(_prev: RequestState, formData: FormData): Pr
     return { status: "error", message: "Check the box to confirm you'll wait for an organizer's approval." };
   }
 
-  const what = await classify(email);
+  const what = await tryClassify(email);
+  if (!what) return { status: "error", message: LOOKUP_FAILED };
   if (what.kind === "account" || what.kind === "registered") {
     return { status: "error", message: "This email can already sign in. Go back and request a sign-in link." };
   }
