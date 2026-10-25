@@ -12,9 +12,9 @@ export const venue = { name: "thinkspace Seattle", address: "1700 Westlake Ave N
 export const audience =
   "For small-business owners who know the problems, working professionals and students who want to build with Claude, and the technical builders who team up with them. Teams of 3 to 5 ship one thing a real business could put to work the following week, then open-source it.";
 
-// Shown on the home page: judges, credit sponsors, and partners right under the hero; hosts and
-// ambassadors after the rubric. Each list can mix people and companies, and a section stays
-// hidden while its list is empty. Images go in public/ (people in public/people, logos in
+// Shown on the home page after the rubric: hosts, then judges, credit sponsors, partners, and
+// ambassadors. Each list can mix people and companies, and a section stays hidden while its
+// list is empty. Images go in public/ (people in public/people, logos in
 // public/partners) and are referenced from the site root, e.g. "/partners/acme.png".
 // A person without a photo gets their initials.
 export type Person = { name: string; photo?: string; lines: string[]; linkedin?: string };

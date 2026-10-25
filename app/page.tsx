@@ -203,14 +203,6 @@ export default async function Home() {
       <SkylineBand venueName={venue.name} />
 
       <div className="mx-auto max-w-3xl">
-        <Groups
-          groups={[
-            { id: "judges", call: "Agent(judges)", title: "Judges", entries: judges },
-            { id: "sponsors", call: "Grant(credits)", title: "Credit sponsors", entries: sponsors },
-            { id: "partners", call: "WebFetch(partners)", title: "Partners", entries: partners },
-          ]}
-        />
-
         <section className="grid gap-6 border-b border-line py-12">
           <Sig call="Read(theme.md)" title="What you'll build" />
           <p className="max-w-[60ch] text-fg-muted">
@@ -304,6 +296,9 @@ export default async function Home() {
         <Groups
           groups={[
             { id: "hosts", call: "Agent(hosts)", title: "Hosts", entries: hosts },
+            { id: "judges", call: "Agent(judges)", title: "Judges", entries: judges },
+            { id: "sponsors", call: "Grant(credits)", title: "Credit sponsors", entries: sponsors },
+            { id: "partners", call: "WebFetch(partners)", title: "Partners", entries: partners },
             { id: "ambassadors", call: "Agent(ambassadors)", title: "Ambassadors", entries: ambassadors },
           ]}
         />
