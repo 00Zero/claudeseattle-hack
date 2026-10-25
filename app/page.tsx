@@ -3,6 +3,8 @@ import Image from "next/image";
 import { audience, eventDate, eventCloseAt, eventName, eventOpenAt, ambassadors, hosts, judges, lumaCalendarUrl as defaultLumaUrl, openSourceNote, partners, prizes, rubric, sundaySchedule, saturdaySchedule, theme, venue as defaultVenue, type Entry } from "@/lib/event";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/supabase/profile";
+import { getEnabledCriteria } from "@/app/(judge)/_lib/criteria";
+import { countWord } from "@/app/(judge)/_lib/scoring";
 import { Agenda } from "@/components/home/agenda";
 import { ContextWindow } from "@/components/home/context-window";
 import { SkylineBand } from "@/components/home/skyline-band";
@@ -75,7 +77,7 @@ function Entries({ entries }: { entries: Entry[] }) {
 
 export default async function Home() {
   const supabase = await createClient();
-  const [{ data: settings }, profile] = await Promise.all([
+  const [{ data: settings }, profile, { criteria }] = await Promise.all([
     supabase
       .from("event_settings")
       .select(
@@ -84,6 +86,8 @@ export default async function Home() {
       .eq("id", 1)
       .single(),
     getCurrentProfile(),
+    // The criteria admins enabled for judging (event_settings.judging_criteria).
+    getEnabledCriteria(supabase),
   ]);
 
   // Deadlines come from event_settings; the schedule in lib/event.ts is the fallback.
@@ -209,13 +213,19 @@ export default async function Home() {
                 <span className="eyebrow sm:text-right">Winning team</span>
               </div>
             ))}
+            {prizes.topThree.map((prize) => (
+              <div key={prize} className="grid items-baseline gap-4 border-t border-line py-4 last:border-b sm:grid-cols-[1fr_auto]">
+                <span className="font-display text-2xl font-light leading-snug">{prize}</span>
+                <span className="eyebrow sm:text-right">Top 3 teams</span>
+              </div>
+            ))}
           </div>
         </section>
 
         <section className="grid gap-6 border-b border-line py-12" id="judging">
           <Sig call="Review(entry, rubric)" title="Judging criteria" />
           <p className="max-w-[60ch] text-fg-muted">
-            Four criteria, equal weight, each scored 1 to 8 with no middle. An entry&apos;s score is the mean of the four, to one decimal. Five judges each score about four entries over dinner and send one to the final; all five score the finalists on stage.
+            {countWord(criteria.length).replace(/^./, (c) => c.toUpperCase())} criteri{criteria.length === 1 ? "on" : "a"}, equal weight, each scored 1 to 8 with no middle. An entry&apos;s score is the mean across criteria, to one decimal. Five judges each score about four entries over dinner and send one to the final; all five score the finalists on stage.
           </p>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[700px] text-left text-sm">
@@ -230,9 +240,12 @@ export default async function Home() {
                 </tr>
               </thead>
               <tbody className="align-top">
-                {rubric.criteria.map((criterion) => (
-                  <tr key={criterion.name} className="border-b border-line">
-                    <td className="py-3 pr-3 font-medium">{criterion.name}</td>
+                {criteria.map((criterion) => (
+                  <tr key={criterion.key} className="border-b border-line">
+                    <td className="py-3 pr-3 font-medium">
+                      {criterion.name}
+                      {criterion.note && <span className="block text-xs font-normal text-fg-muted">{criterion.note}</span>}
+                    </td>
                     {criterion.anchors.map((anchor, i) => (
                       <td key={anchor} className={`py-3 pr-3 ${i === criterion.anchors.length - 1 ? "text-fg" : "text-fg-muted"}`}>
                         {anchor}

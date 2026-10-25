@@ -21,10 +21,10 @@ later schema changes to new migrations (never edit a merged one).
 
 | Table | Purpose | Who reads | Who writes |
 | --- | --- | --- | --- |
-| `judge_entries` | One entry per team: title, tagline, short and long description, video URL, repo URL, extra links, completeness checklist, last saved | Team members, judges, admins | Team members (participant or admin role) before the deadline; admin any time |
+| `judge_entries` | One entry per team: title, tagline, short and long description, video URL, repo URL, extra links, "who did what" (`contributions`), completeness checklist, last saved | Team members, judges, admins | Team members (participant or admin role) before the deadline; admin any time |
 | `judge_late_saves` | A save made after `submissions_close_at`, keyed on the team (works even if the team never saved before the deadline); kept apart until admin accepts (copied onto the entry, creating it if needed) or rejects | Team members, admins | Team members insert; admin decides |
 | `judge_assignments` | Prelim: entry → judge | The judge (own rows), admins | Admins |
-| `judge_scores` | One row per entry, judge, round (`prelim` / `final`); four criteria 1–8 in rubric order plus a comment | The judge (own rows), admins | Judges: prelim only for assigned entries, final only for finalists |
+| `judge_scores` | One row per entry, judge, round (`prelim` / `final`); scores 1–8 for the criteria keys in `criteria` (null = the default four), same order, plus a comment | The judge (own rows), admins | Judges: prelim only for assigned entries, final only for finalists |
 | `judge_ai_notes` | Claude's notes and draft scores per entry (nice-to-have) | Judges, admins | Server only (service role) |
 
 Views:
@@ -34,14 +34,17 @@ Views:
 
 Functions (`*_judge_access.sql`): `judge_finalists()` (judges only) and `judge_final_standings()` (judges only, and empty until the caller has scored every finalist).
 
-Rubric text stays in `lib/event.ts` (`rubric`); score columns are an array in the same order, so
-criteria names and anchors can change without a migration.
+Rubric text stays in `lib/event.ts` (`rubric`), each criterion with a stable `key` (`works`, `ease`,
+`impact`, `creativity`, `teamwork`). Admins pick the enabled keys (`event_settings.judging_criteria`,
+null = the default four; `*_shared_judging_criteria.sql`); each score stores the keys its array
+covers, so names and anchors can change without a migration and old scores stay valid. The
+setting locks once any real-world score exists; test-world scores don't lock it.
 
 ## Routes and work items
 
 ### 1. `/submit` (team members) — Wed
 - [x] Load the viewer's team (`team_members.status = 'member'`), entry pre-filled from `teams.concept`
-- [x] Form: title, tagline, short and long description, demo video URL (required), repo URL (required), extra links
+- [x] Form: title, tagline, short and long description, demo video URL (required), repo URL (required), extra links; "Who did what" while Teamwork is enabled
 - [x] Server action save: before deadline → upsert entry; after → insert `judge_late_saves`
 - [x] "Last saved" timestamp and deadline from `event_settings`; read-only after the deadline
 - [x] Completeness checklist on save: required fields, repo URL returns 200 and is a public GitHub repo, video URL loads (YouTube, Loom, Vimeo, or direct)
@@ -54,11 +57,12 @@ criteria names and anchors can change without a migration.
 - [x] Assign judge per entry; handle entries with no judge and judges with no entries
 - [x] Accept or reject late saves
 - [x] Publish toggles: `publish_finalists`, `publish_winners` (writes `event_settings` with the service role after `assertAdmin()`)
+- [x] Criteria: one checkbox per criterion (default the four, Teamwork off; at least one on); locked once a real score exists
 
 ### 3. `/judge` (judges, on a phone) — Wed (prelim), Thu (finals)
 - [x] My assigned entries with my score and status
 - [x] Entry page: embedded video on top, repo link, tagline, description, roster, collapsed AI notes
-- [x] Score form: four criteria 1–8 with anchors from `lib/event.ts`, optional comment
+- [x] Score form: the enabled criteria, 1–8 with anchors from `lib/event.ts`, optional comment
 - [x] Live ranking of my group by mean (one decimal); top = my finalist; flag exact ties ("adjust scores to break the tie")
 - [x] Final round tab: every finalist, same form, `round = 'final'`
 

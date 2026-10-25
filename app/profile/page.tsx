@@ -2,7 +2,9 @@ import { redirect } from "next/navigation";
 import { getCurrentAccess } from "@/lib/access";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/supabase/profile";
+import { getLinkedinPrefill } from "@/lib/linkedin-prefill";
 import { getNameTagSettings, nameTagRetryAt, nameTagRole, nameTagsStatus } from "@/lib/name-tags";
+import { getSuggestedTechnicalLevel, suggestTechnicalLevel } from "@/lib/technical-rating";
 import { AddEmailForm, MakeDefaultButton, ProfileForm, VerifyEmailButton } from "./forms";
 import { NameTagButton } from "./name-tag-button";
 
@@ -13,6 +15,8 @@ export default async function ProfilePage() {
   if ((await getCurrentAccess()) === "blocked") redirect("/declined");
 
   const nameTagsOpen = nameTagsStatus(await getNameTagSettings()).open;
+  // Admins see the name tag card even while printing is off for everyone else.
+  const isAdmin = profile.platform_role === "admin";
   const supabase = await createClient();
   const { data: emails } = await supabase
     .from("profile_emails")
@@ -21,6 +25,16 @@ export default async function ProfilePage() {
     .order("is_default", { ascending: false })
     .order("email");
 
+  // Until they save their own technical level, preselect Claude's suggestion. A missing one is
+  // computed now and streamed in (the form doesn't wait for it); the reason stays admin-only.
+  const technicalLevel = profile.technical_level ?? null;
+  const [stored, linkedin] = await Promise.all([
+    technicalLevel == null ? getSuggestedTechnicalLevel(profile.id) : null,
+    getLinkedinPrefill(profile.id),
+  ]);
+  const suggestedLevel =
+    technicalLevel != null ? Promise.resolve(null) : stored != null ? Promise.resolve(stored) : suggestTechnicalLevel(profile.id);
+
   return (
     <div className="space-y-10">
       <section className="space-y-4">
@@ -28,24 +42,26 @@ export default async function ProfilePage() {
         {!profile.profile_confirmed && (
           <p className="rounded border border-foreground/20 p-3 text-sm">
             {profile.luma_guest_id
-              ? "We filled this in from your Luma registration. Check it, answer the technical question, and confirm."
+              ? "We filled this in from your Luma registration. Check it, rate how hands-on you are with code, and confirm."
               : "Tell us about yourself so teams can find you, then confirm."}
           </p>
         )}
-        {nameTagsOpen && (
+        {(nameTagsOpen || isAdmin) && (
           <NameTagButton
+            isAdmin={isAdmin}
+            printingOff={!nameTagsOpen}
             preview={[
               [profile.first_name, profile.last_name].filter(Boolean).join(" "),
               profile.job_title,
               profile.company,
-              nameTagRole(profile),
+              await nameTagRole(profile),
             ]
               .filter(Boolean)
               .join(" · ")}
             initialRetryAt={await nameTagRetryAt(profile.id)}
           />
         )}
-        <ProfileForm profile={profile} />
+        <ProfileForm profile={{ ...profile, technical_level: technicalLevel }} suggestedLevel={suggestedLevel} linkedin={linkedin} />
       </section>
 
       <section className="space-y-4">
