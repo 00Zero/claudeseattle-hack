@@ -144,6 +144,9 @@ export default async function Home() {
                 <a href={lumaCalendarUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost">
                   Upcoming events
                 </a>
+                <Link href="/resources#upload-media" className="btn">
+                  Upload media
+                </Link>
               </>
             ) : (
               <>

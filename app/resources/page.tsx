@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentAccess } from "@/lib/access";
 import type { AttendeeOffer } from "@/lib/offers";
@@ -98,6 +99,11 @@ export default async function ResourcesPage() {
       <section id="upload-media" className="scroll-mt-20 space-y-3 border-t border-line pt-8">
         <h2 className="text-lg font-semibold">Upload photos and videos</h2>
         <p className="text-fg-muted">Share your photos and videos from the event. They go to the organizers; other attendees can&apos;t see them.</p>
+        <p className="rounded border border-line bg-bg-raised px-3 py-2 text-sm text-fg-muted">
+          By registering for this website or the event, or attending it, you agree that the hosts and their affiliates may use your
+          name, image, and likeness, and the photos and videos you upload, to publicize the event.{" "}
+          <Link href="/terms#media">Read the full terms</Link>.
+        </p>
         <UploadForm />
         {uploads && uploads.length > 0 && (
           <div className="space-y-2">
