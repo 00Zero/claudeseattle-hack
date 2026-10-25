@@ -5,7 +5,7 @@ import type { Offer, OfferClick, OfferCode, OfferLinkRow } from "@/lib/offers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPacific } from "@/lib/time";
 import { SubmitButton } from "../submit-button";
-import { deleteOfferLink, saveOfferLink, setOfferFlag } from "./actions";
+import { addOffer, deleteOfferLink, saveOffer, saveOfferLink, setOfferFlag } from "./actions";
 
 const input = "rounded border border-foreground/20 bg-background px-2 py-1";
 const button = "rounded bg-foreground px-3 py-1.5 text-sm text-background";
@@ -48,7 +48,10 @@ export default async function OffersAdminPage({ searchParams }: PageProps<"/admi
     { data: emails },
     { data: codeRows },
   ] = await Promise.all([
-    admin.from("offers").select("slug, provider, headline, sort_order, enabled, requires_checkin, personal_link_label").order("sort_order"),
+    admin
+      .from("offers")
+      .select("slug, provider, headline, about, details, steps, sort_order, enabled, requires_checkin, personal_link_label, show_code")
+      .order("sort_order"),
     admin.from("offer_links").select("id, offer_slug, label, url, code, sort_order").order("sort_order").order("label"),
     admin.from("offer_clicks").select("profile_id, offer_slug, link_id, link_label, kind, clicked_at").order("clicked_at"),
     admin.from("profiles").select("id, first_name, last_name, ticket_name, luma_status, platform_role, checked_in_at, is_test"),
@@ -271,14 +274,17 @@ export default async function OffersAdminPage({ searchParams }: PageProps<"/admi
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Switches and links</h2>
+        <h2 className="text-lg font-semibold">Offers, switches and links</h2>
         <p className="text-sm text-foreground/70">
           Turn each offer on or off, and choose whether people must be checked in to see its links (until then they see
-          the offer, locked). Admins always see the links. A link with a promo code copies the code when an attendee clicks
-          it, then opens the page. The first link is the main button.
+          the offer, locked). Admins always see the links. With promo codes shown, a link with a code copies it when an
+          attendee clicks, then opens the page; hide them when the link applies the code itself. The first link is the
+          main button. Edit an offer&apos;s text under &ldquo;Edit the text&rdquo;.
         </p>
         {offers.map((o) => {
           const offerLinks = links.filter((l) => l.offer_slug === o.slug);
+          const hasCodes = o.personal_link_label != null || offerLinks.some((l) => l.code);
+          const showCode = o.show_code !== false;
           return (
             <div key={o.slug} className="space-y-3 rounded border border-foreground/20 p-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -307,8 +313,63 @@ export default async function OffersAdminPage({ searchParams }: PageProps<"/admi
                       {o.requires_checkin ? "Don't require check-in" : "Require check-in"}
                     </SubmitButton>
                   </form>
+                  {hasCodes && (
+                    <>
+                      <span className={`ml-2 rounded px-2 py-0.5 ${showCode ? "bg-foreground/10" : "bg-sky-500/15 text-sky-700"}`}>
+                        {showCode ? "Promo codes shown" : "Promo codes hidden"}
+                      </span>
+                      <form action={setOfferFlag}>
+                        <input type="hidden" name="slug" value={o.slug} />
+                        <input type="hidden" name="flag" value="show_code" />
+                        <input type="hidden" name="value" value={showCode ? "false" : "true"} />
+                        <SubmitButton className="rounded border border-foreground/20 px-3 py-1.5 text-sm">
+                          {showCode ? "Hide promo codes" : "Show promo codes"}
+                        </SubmitButton>
+                      </form>
+                    </>
+                  )}
                 </div>
               </div>
+              <details className="rounded bg-foreground/5 p-2 text-sm">
+                <summary className="cursor-pointer font-medium">Edit the text</summary>
+                {/* Keyed by the saved values so the inputs show them after React resets the form. */}
+                <form key={JSON.stringify(o)} action={saveOffer} className="mt-2 grid gap-2 sm:grid-cols-2">
+                  <input type="hidden" name="slug" value={o.slug} />
+                  <label className="space-y-1">
+                    <span className="block text-foreground/70">Provider</span>
+                    <input name="provider" required maxLength={60} defaultValue={o.provider} className={`${input} w-full`} />
+                  </label>
+                  <label className="space-y-1">
+                    <span className="block text-foreground/70">Headline: what they get</span>
+                    <input name="headline" required maxLength={120} defaultValue={o.headline} className={`${input} w-full`} />
+                  </label>
+                  <label className="space-y-1 sm:col-span-2">
+                    <span className="block text-foreground/70">What the provider does</span>
+                    <textarea name="about" required rows={2} defaultValue={o.about} className={`${input} w-full`} />
+                  </label>
+                  <label className="space-y-1">
+                    <span className="block text-foreground/70">What you get (one per line)</span>
+                    <textarea name="details" rows={4} defaultValue={o.details.join("\n")} className={`${input} w-full`} />
+                  </label>
+                  <label className="space-y-1">
+                    <span className="block text-foreground/70">How to redeem (one step per line)</span>
+                    <textarea name="steps" rows={4} defaultValue={o.steps.join("\n")} className={`${input} w-full`} />
+                  </label>
+                  {o.personal_link_label != null && (
+                    <label className="space-y-1">
+                      <span className="block text-foreground/70">Personal link button</span>
+                      <input name="personal_link_label" required maxLength={80} defaultValue={o.personal_link_label} className={`${input} w-full`} />
+                    </label>
+                  )}
+                  <label className="space-y-1">
+                    <span className="block text-foreground/70">Order (lower comes first)</span>
+                    <input name="sort_order" type="number" step="1" defaultValue={o.sort_order} className={`${input} w-24`} />
+                  </label>
+                  <SubmitButton className={`${button} sm:col-span-2 sm:w-fit`} pendingText="Saving…">
+                    Save text
+                  </SubmitButton>
+                </form>
+              </details>
               {o.personal_link_label != null && (
                 <p className="text-sm text-foreground/70">
                   Personal codes: each checked-in attendee gets their own link, shown first as &ldquo;{o.personal_link_label}
@@ -384,6 +445,22 @@ export default async function OffersAdminPage({ searchParams }: PageProps<"/admi
             </div>
           );
         })}
+        {/* Keyed by the count so the form clears after an add. */}
+        <form key={offers.length} action={addOffer} className="grid gap-2 rounded border border-dashed border-foreground/30 p-3 text-sm sm:grid-cols-2">
+          <span className="font-medium sm:col-span-2">Add an offer</span>
+          <p className="text-foreground/70 sm:col-span-2">
+            It starts turned off, so you can add its links (and choose check-in and promo codes) before attendees see it.
+            Personal one-per-person codes are loaded with the service role.
+          </p>
+          <input name="provider" required maxLength={60} placeholder="Provider, e.g. Vercel" className={input} />
+          <input name="headline" required maxLength={120} placeholder="Headline, e.g. $50 in credits" className={input} />
+          <textarea name="about" required rows={2} placeholder="What the provider does" className={`${input} sm:col-span-2`} />
+          <textarea name="details" rows={3} placeholder="What you get, one per line" className={input} />
+          <textarea name="steps" rows={3} placeholder="How to redeem, one step per line" className={input} />
+          <SubmitButton className={`${button} sm:col-span-2 sm:w-fit`} pendingText="Adding…">
+            Add offer
+          </SubmitButton>
+        </form>
       </section>
     </div>
   );
