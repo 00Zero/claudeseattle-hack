@@ -7,6 +7,7 @@ import { getEnabledCriteria } from "@/app/(judge)/_lib/criteria";
 import { countWord } from "@/app/(judge)/_lib/scoring";
 import { Agenda } from "@/components/home/agenda";
 import { ContextWindow } from "@/components/home/context-window";
+import { PresentButton } from "@/components/site/present-button";
 import { SkylineBand } from "@/components/home/skyline-band";
 import { Wifi } from "@/components/home/wifi";
 
@@ -147,6 +148,7 @@ export default async function Home() {
                 <Link href="/resources#upload-media" className="btn">
                   Upload media
                 </Link>
+                {profile.platform_role === "admin" && profile.is_super_admin && <PresentButton variant="button" />}
               </>
             ) : (
               <>

@@ -18,6 +18,13 @@ export async function requireAdminPage() {
   return profile;
 }
 
+// For super-admin pages (the kickoff deck at /slides): signed out -> /login; anyone else -> 404.
+export async function requireSuperAdminPage() {
+  const profile = await requireAdminPage();
+  if (!profile.is_super_admin) notFound();
+  return profile;
+}
+
 // For admin server actions.
 export async function assertAdmin() {
   const profile = await getAdminProfile();
