@@ -4,6 +4,7 @@ import { getCurrentAccess } from "@/lib/access";
 import type { AttendeeOffer } from "@/lib/offers";
 import { isDriveFolder, RESOURCE_SECTIONS, type Resource } from "@/lib/resources";
 import { createClient } from "@/lib/supabase/server";
+import { FloorPlan, OFF_LIMITS_HATCH, offLimitsList } from "@/components/venue/floor-plan";
 import { DriveFolderCard } from "./drive-folder-card";
 import { OfferCard } from "./offer-card";
 import { UploadForm } from "./upload-form";
@@ -118,6 +119,17 @@ export default async function ResourcesPage() {
             </ul>
           </div>
         )}
+      </section>
+      <section id="floor-plan" className="scroll-mt-20 space-y-3 border-t border-line pt-8">
+        <h2 className="text-lg font-semibold">Floor plan: bottom floor</h2>
+        <p className="text-fg-muted">
+          The hackathon is on thinkspace Seattle&apos;s bottom floor (level 1). Rooms {offLimitsList} are off limits; please don&apos;t work in them.
+        </p>
+        <FloorPlan labelClassName="text-[10px] sm:text-xs" compactOnPhones />
+        <p className="flex items-center gap-2 text-sm text-fg-muted">
+          <span className={`inline-block h-4 w-4 shrink-0 rounded-sm ring-2 ${OFF_LIMITS_HATCH}`} />
+          Off limits
+        </p>
       </section>
     </div>
   );
