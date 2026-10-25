@@ -13,9 +13,9 @@ function PresentIcon() {
   );
 }
 
-// Super admins only (the layout and home page decide): opens the kickoff deck at /slides in
+// Super admins only (the layout decides): opens the kickoff deck at /slides in
 // full screen. The deck remembers its slide, so this picks up where the last run left off.
-export function PresentButton({ variant = "icon" }: { variant?: "icon" | "button" }) {
+export function PresentButton() {
   const router = useRouter();
 
   function present() {
@@ -26,14 +26,6 @@ export function PresentButton({ variant = "icon" }: { variant?: "icon" | "button
     router.push("/slides");
   }
 
-  if (variant === "button") {
-    return (
-      <button type="button" onClick={present} className="btn btn-ghost">
-        <PresentIcon />
-        Present
-      </button>
-    );
-  }
   return (
     <button
       type="button"
