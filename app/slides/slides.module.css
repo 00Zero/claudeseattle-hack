@@ -75,7 +75,34 @@
   }
 }
 
-/* Terminal cursor on the vibe coding slide. */
+/* "vibe coding" gets struck through, then "agentic coding" appears after it. */
+.struck {
+  position: relative;
+  display: inline-block;
+  color: var(--fg-muted);
+}
+.struck::after {
+  content: "";
+  position: absolute;
+  left: -0.05em;
+  right: -0.05em;
+  top: 55%;
+  height: 0.08em;
+  background: var(--accent);
+  transform-origin: left;
+  animation: strike 0.45s cubic-bezier(0.65, 0, 0.35, 1) 0.5s both;
+}
+@keyframes strike {
+  from {
+    transform: scaleX(0);
+  }
+}
+.replacement {
+  display: inline-block;
+  animation: rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) 1s both;
+}
+
+/* Terminal cursor on the agentic coding slide. */
 .cursor {
   animation: blink 1s steps(1) infinite;
 }
@@ -90,7 +117,9 @@
   .stagger > *,
   .bar,
   .draw,
-  .cursor {
+  .cursor,
+  .struck::after,
+  .replacement {
     animation: none;
   }
   .draw {
