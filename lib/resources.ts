@@ -17,3 +17,9 @@ export type Resource = {
   sort_order: number;
   visible: boolean;
 };
+
+// A Google Drive folder link gets its own card on /resources (app/resources/drive-folder-card.tsx).
+// Lives here, not in that client component, because the server page calls it.
+export function isDriveFolder(url: string) {
+  return /^https:\/\/drive\.google\.com\/drive\/(u\/\d+\/)?folders\//.test(url);
+}

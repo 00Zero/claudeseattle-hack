@@ -2,7 +2,9 @@ import { redirect } from "next/navigation";
 import { getCurrentAccess } from "@/lib/access";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/supabase/profile";
+import { getNameTagSettings, nameTagRetryAt, nameTagRole, nameTagsStatus } from "@/lib/name-tags";
 import { AddEmailForm, MakeDefaultButton, ProfileForm, VerifyEmailButton } from "./forms";
+import { NameTagButton } from "./name-tag-button";
 
 // Scaffolded by Adam; Dev A extends it (see app/(teams)/CLAUDE.md).
 export default async function ProfilePage() {
@@ -10,6 +12,9 @@ export default async function ProfilePage() {
   if (!profile) redirect("/login");
   if ((await getCurrentAccess()) === "blocked") redirect("/declined");
 
+  const nameTagsOpen = nameTagsStatus(await getNameTagSettings()).open;
+  // Admins see the name tag card even while printing is off for everyone else.
+  const isAdmin = profile.platform_role === "admin";
   const supabase = await createClient();
   const { data: emails } = await supabase
     .from("profile_emails")
@@ -28,6 +33,21 @@ export default async function ProfilePage() {
               ? "We filled this in from your Luma registration. Check it, answer the technical question, and confirm."
               : "Tell us about yourself so teams can find you, then confirm."}
           </p>
+        )}
+        {(nameTagsOpen || isAdmin) && (
+          <NameTagButton
+            isAdmin={isAdmin}
+            printingOff={!nameTagsOpen}
+            preview={[
+              [profile.first_name, profile.last_name].filter(Boolean).join(" "),
+              profile.job_title,
+              profile.company,
+              await nameTagRole(profile),
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+            initialRetryAt={await nameTagRetryAt(profile.id)}
+          />
         )}
         <ProfileForm profile={profile} />
       </section>
