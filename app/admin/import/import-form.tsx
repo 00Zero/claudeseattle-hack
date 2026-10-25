@@ -10,7 +10,13 @@ export function ImportForm() {
   return (
     <div className="space-y-4">
       <form action={formAction} className="flex flex-wrap items-center gap-3">
-        <input type="file" name="file" accept=".csv,text/csv" required className="text-sm" />
+        <input
+          type="file"
+          name="file"
+          accept=".csv,text/csv"
+          required
+          className="cursor-pointer rounded border border-dashed border-foreground/40 p-2 text-sm hover:border-foreground file:mr-3 file:cursor-pointer file:rounded file:border file:border-foreground/40 file:bg-background file:px-3 file:py-1.5 file:font-medium file:text-foreground hover:file:bg-foreground/5"
+        />
         <button type="submit" disabled={pending} className="rounded bg-foreground px-4 py-2 text-background disabled:opacity-50">
           {pending ? "Importing…" : "Import"}
         </button>
