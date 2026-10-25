@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { getLinkedinPrefill } from "@/lib/linkedin-prefill";
 import { getNameTagSettings, nameTagRetryAt, nameTagRole, nameTagsStatus } from "@/lib/name-tags";
+import { onStandby } from "@/lib/standby";
 import { getSuggestedTechnicalLevel, suggestTechnicalLevel } from "@/lib/technical-rating";
 import { AddEmailForm, MakeDefaultButton, ProfileForm, VerifyEmailButton } from "./forms";
 import { NameTagButton } from "./name-tag-button";
@@ -12,9 +13,11 @@ import { NameTagButton } from "./name-tag-button";
 export default async function ProfilePage() {
   const profile = await getCurrentProfile();
   if (!profile) redirect("/login");
-  if ((await getCurrentAccess()) === "blocked") redirect("/declined");
+  const access = await getCurrentAccess();
+  if (access === "blocked") redirect("/declined");
 
-  const nameTagsOpen = nameTagsStatus(await getNameTagSettings()).open;
+  // Standby guests print a name tag once they're let in.
+  const nameTagsOpen = nameTagsStatus(await getNameTagSettings()).open && !onStandby(profile, access);
   // Admins see the name tag card even while printing is off for everyone else.
   const isAdmin = profile.platform_role === "admin";
   const supabase = await createClient();

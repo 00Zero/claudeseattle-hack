@@ -2,6 +2,7 @@
 
 import { getCurrentAccess } from "@/lib/access";
 import { getNameTagSettings, nameTagRetryAt, nameTagRole, nameTagsStatus, NAME_TAG_COOLDOWN_MS } from "@/lib/name-tags";
+import { onStandby } from "@/lib/standby";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 
@@ -16,7 +17,9 @@ export type NameTagState =
 export async function requestNameTag(): Promise<NameTagState> {
   const profile = await getCurrentProfile();
   if (!profile) return { status: "error", message: "Sign in to print your name tag." };
-  if ((await getCurrentAccess()) === "blocked") return { status: "error", message: "Name tags aren't available for this account." };
+  const access = await getCurrentAccess();
+  if (access === "blocked") return { status: "error", message: "Name tags aren't available for this account." };
+  if (onStandby(profile, access)) return { status: "error", message: "You can print a name tag once you're off standby." };
   if (!profile.first_name?.trim()) return { status: "error", message: "Add your first name to your profile first." };
 
   // Admins can print any time, even with printing off or the event over, and reprint a bad tag at once.

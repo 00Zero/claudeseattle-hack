@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentAccess } from "@/lib/access";
 import { sundaySchedule } from "@/lib/event";
+import { STANDBY_TICKET } from "@/lib/standby";
+import { getCurrentProfile } from "@/lib/supabase/profile";
 import { SignOutButton } from "@/app/auth/sign-out-button";
 
 export default async function PendingPage() {
@@ -9,6 +11,8 @@ export default async function PendingPage() {
   if (!access) redirect("/login");
   if (access === "full") redirect("/");
   if (access === "blocked") redirect("/declined");
+  // Standby guests check in on the site instead of on Luma.
+  if ((await getCurrentProfile())?.ticket_name === STANDBY_TICKET) redirect("/check-in");
 
   return (
     <div className="space-y-6">
