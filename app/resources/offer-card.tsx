@@ -116,7 +116,11 @@ export function OfferCard({ offer }: { offer: AttendeeOffer }) {
             </span>
           </p>
         ) : offer.links.length === 0 ? (
-          <p className="text-sm text-fg-muted">The link is on its way. Check back soon.</p>
+          <p className="text-sm text-fg-muted">
+            {offer.personal
+              ? "Personal links go to attendees who have checked in. Checked in already? Refresh this page in a little while, or ask an organizer."
+              : "The link is on its way. Check back soon."}
+          </p>
         ) : (
           <>
             {codeLinks.map((link) => (
@@ -139,7 +143,7 @@ export function OfferCard({ offer }: { offer: AttendeeOffer }) {
             <div className="flex flex-wrap gap-2">
               {offer.links.map((link, i) => (
                 <a
-                  key={link.id}
+                  key={link.id ?? link.url}
                   href={link.url}
                   target="_blank"
                   rel="noopener noreferrer"

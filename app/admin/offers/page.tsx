@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/lib/admin";
 import { accessFromRules, type AccessRule } from "@/lib/access";
-import type { Offer, OfferClick, OfferLinkRow } from "@/lib/offers";
+import type { Offer, OfferClick, OfferCode, OfferLinkRow } from "@/lib/offers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPacific } from "@/lib/time";
 import { SubmitButton } from "../submit-button";
@@ -38,20 +38,30 @@ export default async function OffersAdminPage({ searchParams }: PageProps<"/admi
   await requireAdminPage();
   const { offer: offerParam } = await searchParams;
   const admin = createAdminClient();
-  const [{ data: offerRows }, { data: linkRows }, { data: clickRows }, { data: peopleRows }, { data: rules }, { data: standby }, { data: emails }] =
-    await Promise.all([
-      admin.from("offers").select("slug, provider, headline, sort_order, enabled, requires_checkin").order("sort_order"),
-      admin.from("offer_links").select("id, offer_slug, label, url, code, sort_order").order("sort_order").order("label"),
-      admin.from("offer_clicks").select("profile_id, offer_slug, link_id, link_label, kind, clicked_at").order("clicked_at"),
-      admin.from("profiles").select("id, first_name, last_name, ticket_name, luma_status, platform_role, checked_in_at, is_test"),
-      admin.from("access_rules").select("ticket_name, approval_status, access, default_role"),
-      admin.from("standby_checkins").select("profile_id").not("approved_at", "is", null),
-      admin.from("profile_emails").select("profile_id, email").eq("is_default", true),
-    ]);
+  const [
+    { data: offerRows },
+    { data: linkRows },
+    { data: clickRows },
+    { data: peopleRows },
+    { data: rules },
+    { data: standby },
+    { data: emails },
+    { data: codeRows },
+  ] = await Promise.all([
+    admin.from("offers").select("slug, provider, headline, sort_order, enabled, requires_checkin, personal_link_label").order("sort_order"),
+    admin.from("offer_links").select("id, offer_slug, label, url, code, sort_order").order("sort_order").order("label"),
+    admin.from("offer_clicks").select("profile_id, offer_slug, link_id, link_label, kind, clicked_at").order("clicked_at"),
+    admin.from("profiles").select("id, first_name, last_name, ticket_name, luma_status, platform_role, checked_in_at, is_test"),
+    admin.from("access_rules").select("ticket_name, approval_status, access, default_role"),
+    admin.from("standby_checkins").select("profile_id").not("approved_at", "is", null),
+    admin.from("profile_emails").select("profile_id, email").eq("is_default", true),
+    admin.from("offer_codes").select("code, offer_slug, profile_id, assigned_at"),
+  ]);
   const offers = (offerRows ?? []) as Offer[];
   const links = (linkRows ?? []) as OfferLinkRow[];
   const clicks = (clickRows ?? []) as OfferClick[];
   const people = (peopleRows ?? []) as Person[];
+  const codes = (codeRows ?? []) as OfferCode[];
   const personOf = new Map(people.map((p) => [p.id, p]));
   const emailOf = new Map((emails ?? []).map((e) => [e.profile_id as string, e.email as string]));
   const standbyApproved = new Set((standby ?? []).map((s) => s.profile_id as string));
@@ -73,7 +83,14 @@ export default async function OffersAdminPage({ searchParams }: PageProps<"/admi
       any: tally(mine),
       link: tally(linkClicks),
       code: tally(mine.filter((c) => c.kind === "code")),
-      hasCode: links.some((l) => l.offer_slug === o.slug && l.code),
+      hasCode: o.personal_link_label != null || links.some((l) => l.offer_slug === o.slug && l.code),
+      codes:
+        o.personal_link_label == null
+          ? null
+          : {
+              assigned: codes.filter((c) => c.offer_slug === o.slug && c.assigned_at).length,
+              total: codes.filter((c) => c.offer_slug === o.slug).length,
+            },
       // By link id, so a renamed link keeps its count; deleted links fall back to the saved label.
       byLink: [...Map.groupBy(linkClicks, (c) => c.link_id ?? `label:${c.link_label}`)].map(([key, list]) => ({
         key,
@@ -157,6 +174,11 @@ export default async function OffersAdminPage({ searchParams }: PageProps<"/admi
                         {s.offer.provider}
                       </Link>
                       {!s.offer.enabled && <span className="ml-2 rounded bg-foreground/10 px-1.5 text-xs">Off</span>}
+                      {s.codes && (
+                        <span className="block text-xs text-foreground/60">
+                          Personal codes: {s.codes.assigned} assigned, {s.codes.total - s.codes.assigned} left
+                        </span>
+                      )}
                       {s.byLink.length > 0 && (
                         <ul className="mt-1 text-xs text-foreground/60">
                           {s.byLink.map((l) => (
@@ -287,7 +309,16 @@ export default async function OffersAdminPage({ searchParams }: PageProps<"/admi
                   </form>
                 </div>
               </div>
-              {offerLinks.length === 0 && <p className="text-sm text-amber-700">No links yet: attendees see &ldquo;The link is on its way.&rdquo;</p>}
+              {o.personal_link_label != null && (
+                <p className="text-sm text-foreground/70">
+                  Personal codes: each checked-in attendee gets their own link, shown first as &ldquo;{o.personal_link_label}
+                  &rdquo;. Codes are loaded with the service role (offer_codes); people who check in later get one when they
+                  open the Resources page, while any are left. Links below are extra, the same for everyone.
+                </p>
+              )}
+              {offerLinks.length === 0 && o.personal_link_label == null && (
+                <p className="text-sm text-amber-700">No links yet: attendees see &ldquo;The link is on its way.&rdquo;</p>
+              )}
               {offerLinks.length > 0 && (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
