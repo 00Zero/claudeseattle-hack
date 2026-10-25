@@ -34,7 +34,9 @@ function put(url: string, body: Blob | null, contentRange: string, onProgress?: 
     xhr.open("PUT", url);
     xhr.setRequestHeader("Content-Range", contentRange);
     if (onProgress) xhr.upload.onprogress = (e) => onProgress(e.loaded);
-    xhr.onload = () => resolve({ status: xhr.status, range: xhr.getResponseHeader("Range"), body: xhr.responseText });
+    // Drive lets the page read Range only on 308 ("got part of it") answers; asking on others logs an error.
+    xhr.onload = () =>
+      resolve({ status: xhr.status, range: xhr.status === 308 ? xhr.getResponseHeader("Range") : null, body: xhr.responseText });
     xhr.onerror = () => reject(new Error("connection dropped"));
     xhr.send(body);
   });
