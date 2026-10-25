@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type MouseEvent } from "react";
 import type { AttendeeOffer, OfferLink } from "@/lib/offers";
 import { logOfferClick } from "./actions";
 
@@ -21,6 +21,25 @@ function LockIcon() {
     </svg>
   );
 }
+
+// A check that draws itself in a circle that pops in: shown on a redeem button for a moment after
+// its code is copied, before the page opens. CSS keyframes, so it runs without JS timing; instant
+// with reduced motion (globals.css shortens every animation).
+function CopiedCheck() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <style>{`
+        @keyframes offer-check-pop { from { transform: scale(0.4); opacity: 0 } to { transform: scale(1); opacity: 1 } }
+        @keyframes offer-check-draw { from { stroke-dashoffset: 15 } to { stroke-dashoffset: 0 } }
+      `}</style>
+      <circle cx="12" cy="12" r="10" strokeWidth="2" style={{ transformOrigin: "center", animation: "offer-check-pop 200ms ease-out both" }} />
+      <path d="M7.5 12.5l3 3 6-6.5" strokeWidth="2.5" strokeDasharray="15" style={{ animation: "offer-check-draw 300ms ease-out 120ms both" }} />
+    </svg>
+  );
+}
+
+// How long the redeem button shows the check before the page opens.
+const COPIED_PAUSE_MS = 550;
 
 // Copies synchronously first (a hidden textarea and execCommand), because a redeem link opens a
 // new tab right after the click and the async Clipboard API can fail once this page loses focus.
@@ -49,24 +68,43 @@ async function copyText(text: string) {
   }
 }
 
-// One sponsor offer. A link with a promo code copies the code when clicked, then opens the
-// redemption page in a new tab, so the code is ready to paste there. The code also shows on the
+// One sponsor offer. A link with a promo code copies the code when clicked, shows a check on the
+// button for a moment, then opens the redemption page in a new tab, so the code is ready to paste
+// there (well within the browser's allowance for opening a tab after a click). The code also shows on the
 // card with its own copy button. Locked offers (check-in required) show what they are, not the links.
 // Each click is logged for the admin stats, in the background.
 export function OfferCard({ offer }: { offer: AttendeeOffer }) {
   const [copied, setCopied] = useState<string | null>(null);
+  // The redeem button waiting to open, and whether its code made it to the clipboard.
+  const [opening, setOpening] = useState<{ key: string; copied: boolean } | null>(null);
 
   async function copy(code: string) {
-    if (await copyText(code)) setCopied(code);
+    const ok = await copyText(code);
+    if (ok) setCopied(code);
+    return ok;
   }
 
   function log(link: OfferLink, kind: "link" | "code") {
     logOfferClick(offer.slug, link.id, kind).catch(() => {});
   }
 
-  function openLink(link: OfferLink) {
-    if (link.code) copy(link.code);
+  function openLink(event: MouseEvent<HTMLAnchorElement>, link: OfferLink) {
     log(link, "link");
+    if (!link.code) return;
+    const copying = copy(link.code);
+    // A modified click (new window, background tab) opens right away, as usual.
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+    // Hold the tab back long enough to see the check.
+    event.preventDefault();
+    const key = link.id ?? link.url;
+    setOpening({ key, copied: false });
+    copying.then((ok) => setOpening((o) => (o?.key === key ? { key, copied: ok } : o)));
+    setTimeout(() => {
+      const tab = window.open(link.url, "_blank");
+      if (tab) tab.opener = null;
+      else window.location.href = link.url; // pop-up blocked: open it here instead
+      setOpening((o) => (o?.key === key ? null : o));
+    }, COPIED_PAUSE_MS);
   }
 
   // One chip per distinct code, logged against the first link that carries it.
@@ -147,10 +185,21 @@ export function OfferCard({ offer }: { offer: AttendeeOffer }) {
                   href={link.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  onClick={() => openLink(link)}
+                  onClick={(e) => openLink(e, link)}
                   className={i === 0 ? "btn" : "btn btn-ghost"}
                 >
-                  {link.label} ↗
+                  {opening?.key === (link.id ?? link.url) ? (
+                    opening.copied ? (
+                      <>
+                        <CopiedCheck />
+                        Code copied
+                      </>
+                    ) : (
+                      "Opening…"
+                    )
+                  ) : (
+                    <>{link.label} ↗</>
+                  )}
                 </a>
               ))}
             </div>

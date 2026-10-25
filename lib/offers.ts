@@ -24,10 +24,15 @@ export type Offer = {
   slug: string;
   provider: string;
   headline: string;
+  about: string;
+  details: string[];
+  steps: string[];
   sort_order: number;
   enabled: boolean;
   requires_checkin: boolean;
   personal_link_label: string | null;
+  // NULL counts as true. When false, attendee_offers() leaves the codes out of the links.
+  show_code: boolean | null;
 };
 
 // A personal code (offer_codes). profile_id is null when unassigned, or when the profile was
@@ -48,5 +53,5 @@ export type OfferClick = {
   clicked_at: string;
 };
 
-export const OFFER_FLAGS = ["enabled", "requires_checkin"] as const;
+export const OFFER_FLAGS = ["enabled", "requires_checkin", "show_code"] as const;
 export type OfferFlag = (typeof OFFER_FLAGS)[number];
