@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties } from "react";
 import { getEnabledCriteria } from "@/app/(judge)/_lib/criteria";
 import { countWord } from "@/app/(judge)/_lib/scoring";
 import { ThinkingDots } from "@/components/site/thinking-dots";
@@ -11,6 +11,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { EVENT_TIME_ZONE } from "@/lib/time";
 import { AgendaSlide, type AgendaItem } from "./agenda-slide";
+import { Check, Eyebrow, Sig } from "./parts";
 import { Deck, type Slide } from "./deck";
 import { SiteTour } from "./site-tour";
 import styles from "./slides.module.css";
@@ -22,30 +23,6 @@ export const metadata: Metadata = { robots: { index: false } };
 // opens it in full screen). Intro slides follow Adam's "Claude Impact Lab" deck; event details
 // follow the Luma blasts and the spec. Deadlines, Wi-Fi, and criteria are read live, so the deck
 // stays right if they change in Settings.
-
-// Section header styled as a Claude Code tool call, like the home page's.
-function Sig({ call, title }: { call: string; title: ReactNode }) {
-  return (
-    <div>
-      <p className="font-mono text-[22px] text-fg-faint">
-        <span className="text-accent">⏺</span> {call}
-      </p>
-      <h2 className="mt-3 font-display text-[68px] font-light leading-[1.02] tracking-[-0.01em]">{title}</h2>
-    </div>
-  );
-}
-
-function Eyebrow({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <p className={`font-sans text-[18px] font-semibold uppercase tracking-[0.16em] text-fg-muted ${className}`}>{children}</p>;
-}
-
-function Check() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-7 w-7 shrink-0 text-accent" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M4 12.5l5 5L20 6.5" />
-    </svg>
-  );
-}
 
 const pacificTime = new Intl.DateTimeFormat("en-US", { timeZone: EVENT_TIME_ZONE, hour: "numeric", minute: "2-digit" });
 const clock = (iso: string) => pacificTime.format(new Date(iso)).replace(" AM", " am").replace(" PM", " pm");

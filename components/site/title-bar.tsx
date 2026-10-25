@@ -53,8 +53,9 @@ export function TitleBar({ signedIn, isAdmin, isSuperAdmin = false, isJudge = fa
             )}
           </div>
           <div className="flex items-center gap-x-1 sm:gap-x-2">
-            {/* Super admins: present the kickoff deck (/slides) in full screen. */}
+            {/* Super admins: present the kickoff deck (/slides) or the awards deck (/slides/awards) in full screen. */}
             {isSuperAdmin && <PresentButton />}
+            {isSuperAdmin && <PresentButton deck="awards" />}
             <AuthLink initialSignedIn={signedIn} />
             {/* Phones: the page links are hidden, so signed-in people get them (and /logout) in a menu. */}
             {signedIn && <MobileMenu pages={isAdmin ? [...visible, { href: "/admin", label: "admin" }] : visible} />}

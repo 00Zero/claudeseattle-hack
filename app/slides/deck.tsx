@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import styles from "./slides.module.css";
 import { enterFullscreen, exitFullscreen, isFullscreen, readIndex, readReturnPath, subscribeFullscreen, subscribeIndex, writeIndex } from "./slide-store";
 
-export type Slide = { title: string; tone: "light" | "dark"; content: ReactNode };
+// still: no entrance animation for the whole slide, for reveal steps where only the new part moves.
+export type Slide = { title: string; tone: "light" | "dark"; content: ReactNode; still?: boolean };
 
 // Slides are laid out on a fixed 1600×900 canvas and scaled to fit the screen, so they look the
 // same on a laptop and a projector.
@@ -25,9 +26,9 @@ function isEditable(target: EventTarget | null) {
   return target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
 }
 
-export function Deck({ slides }: { slides: Slide[] }) {
+export function Deck({ slides, storageKey = "slides:index", label = "Kickoff slides" }: { slides: Slide[]; storageKey?: string; label?: string }) {
   const router = useRouter();
-  const stored = useSyncExternalStore(subscribeIndex, readIndex, () => null);
+  const stored = useSyncExternalStore(subscribeIndex, () => readIndex(storageKey), () => null);
   const viewport = useSyncExternalStore(subscribeResize, readViewport, () => null);
   const full = useSyncExternalStore(subscribeFullscreen, isFullscreen, () => false);
   const [controls, setControls] = useState(true);
@@ -47,13 +48,13 @@ export function Deck({ slides }: { slides: Slide[] }) {
   }, [full, router]);
 
   useEffect(() => {
-    const go = (delta: number) => writeIndex(Math.max(0, Math.min(last, Math.min(readIndex(), last) + delta)));
+    const go = (delta: number) => writeIndex(storageKey, Math.max(0, Math.min(last, Math.min(readIndex(storageKey), last) + delta)));
     function onKey(event: KeyboardEvent) {
       if (isEditable(event.target) || event.metaKey || event.ctrlKey || event.altKey) return;
       if (NEXT_KEYS.has(event.key)) go(1);
       else if (PREV_KEYS.has(event.key)) go(-1);
-      else if (event.key === "Home") writeIndex(0);
-      else if (event.key === "End") writeIndex(last);
+      else if (event.key === "Home") writeIndex(storageKey, 0);
+      else if (event.key === "End") writeIndex(storageKey, last);
       else if (event.key === "f") (isFullscreen() ? exitFullscreen : enterFullscreen)();
       else if (event.key === "Escape") {
         if (isFullscreen()) exitFullscreen();
@@ -63,7 +64,7 @@ export function Deck({ slides }: { slides: Slide[] }) {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [last, router]);
+  }, [last, router, storageKey]);
 
   // No page scrollbars behind the deck.
   useEffect(() => {
@@ -84,7 +85,7 @@ export function Deck({ slides }: { slides: Slide[] }) {
   }
 
   function go(to: number) {
-    writeIndex(Math.max(0, Math.min(last, to)));
+    writeIndex(storageKey, Math.max(0, Math.min(last, to)));
   }
 
   function end() {
@@ -107,7 +108,7 @@ export function Deck({ slides }: { slides: Slide[] }) {
       onMouseMove={showControls}
       role="region"
       aria-roledescription="slide deck"
-      aria-label="Kickoff slides"
+      aria-label={label}
     >
       {slide && index != null && (
         <div
@@ -118,7 +119,7 @@ export function Deck({ slides }: { slides: Slide[] }) {
           <div className="absolute inset-x-0 top-0 h-1.5 bg-line">
             <div className="h-full bg-accent transition-[width] duration-500" style={{ width: `${((index + 1) / slides.length) * 100}%` }} />
           </div>
-          <div key={index} className={`${styles.enter} absolute inset-0 px-24 pb-24 pt-20`} aria-live="polite">
+          <div key={slide.still ? "still" : index} className={`${slide.still ? "" : styles.enter} absolute inset-0 px-24 pb-24 pt-20`} aria-live="polite">
             {slide.content}
           </div>
           <div className="absolute inset-x-24 bottom-9 flex items-center justify-between font-mono text-lg text-fg-faint">
