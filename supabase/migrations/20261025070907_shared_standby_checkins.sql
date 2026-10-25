@@ -37,6 +37,7 @@ create index standby_checkins_order_idx on standby_checkins (checked_in_at);
 
 alter table standby_checkins enable row level security;
 create policy standby_checkins_admin on standby_checkins for all using (is_admin()) with check (is_admin());
+revoke all on standby_checkins from anon;
 
 alter table event_settings add column standby_can_see_teams boolean;
 
