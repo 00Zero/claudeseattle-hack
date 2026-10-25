@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { audience, eventDate, eventCloseAt, eventName, eventOpenAt, ambassadors, hosts, judges, lumaCalendarUrl as defaultLumaUrl, openSourceNote, partners, prizes, rubric, sundaySchedule, saturdaySchedule, theme, venue as defaultVenue, type Entry } from "@/lib/event";
+import { audience, eventDate, eventCloseAt, eventName, eventOpenAt, ambassadors, hosts, judges, lumaCalendarUrl as defaultLumaUrl, openSourceNote, partners, prizes, sponsors, rubric, sundaySchedule, saturdaySchedule, theme, venue as defaultVenue, type Entry } from "@/lib/event";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { getEnabledCriteria } from "@/app/(judge)/_lib/criteria";
@@ -50,8 +50,16 @@ function Entries({ entries }: { entries: Entry[] }) {
           <li key={entry.name} className="flex items-center gap-4">
             {company ? (
               <Image src={entry.logo} alt={`${entry.name} logo`} width={192} height={192} className="h-24 w-24 shrink-0 rounded-lg border border-line bg-white object-contain p-2" />
-            ) : (
+            ) : entry.photo ? (
               <Image src={entry.photo} alt={entry.name} width={192} height={192} className="h-24 w-24 shrink-0 rounded-full border border-line object-cover" />
+            ) : (
+              <span aria-hidden="true" className="grid h-24 w-24 shrink-0 place-items-center rounded-full border border-line bg-accent-soft font-display text-3xl font-light">
+                {entry.name
+                  .split(" ")
+                  .map((part) => part[0])
+                  .slice(0, 2)
+                  .join("")}
+              </span>
             )}
             <div className="grid gap-0.5">
               <span className="flex items-center gap-2 font-display text-xl font-light leading-snug">
@@ -73,6 +81,18 @@ function Entries({ entries }: { entries: Entry[] }) {
       })}
     </ul>
   );
+}
+
+// One section per non-empty list.
+function Groups({ groups }: { groups: { id: string; call: string; title: string; entries: Entry[] }[] }) {
+  return groups
+    .filter((group) => group.entries.length > 0)
+    .map((group) => (
+      <section key={group.id} className="grid gap-6 border-b border-line py-12" id={group.id}>
+        <Sig call={group.call} title={group.title} />
+        <Entries entries={group.entries} />
+      </section>
+    ));
 }
 
 export default async function Home() {
@@ -181,6 +201,14 @@ export default async function Home() {
       <SkylineBand venueName={venue.name} />
 
       <div className="mx-auto max-w-3xl">
+        <Groups
+          groups={[
+            { id: "judges", call: "Agent(judges)", title: "Judges", entries: judges },
+            { id: "sponsors", call: "Grant(credits)", title: "Credit sponsors", entries: sponsors },
+            { id: "partners", call: "WebFetch(partners)", title: "Partners", entries: partners },
+          ]}
+        />
+
         <section className="grid gap-6 border-b border-line py-12">
           <Sig call="Read(theme.md)" title="What you'll build" />
           <p className="max-w-[60ch] text-fg-muted">
@@ -271,19 +299,12 @@ export default async function Home() {
           </div>
         </section>
 
-        {[
-          { id: "hosts", call: "Agent(hosts)", title: "Hosts", entries: hosts },
-          { id: "partners", call: "WebFetch(partners)", title: "Partners", entries: partners },
-          { id: "judges", call: "Agent(judges)", title: "Judges", entries: judges },
-          { id: "ambassadors", call: "Agent(ambassadors)", title: "Ambassadors", entries: ambassadors },
-        ]
-          .filter((group) => group.entries.length > 0)
-          .map((group) => (
-            <section key={group.id} className="grid gap-6 border-b border-line py-12" id={group.id}>
-              <Sig call={group.call} title={group.title} />
-              <Entries entries={group.entries} />
-            </section>
-          ))}
+        <Groups
+          groups={[
+            { id: "hosts", call: "Agent(hosts)", title: "Hosts", entries: hosts },
+            { id: "ambassadors", call: "Agent(ambassadors)", title: "Ambassadors", entries: ambassadors },
+          ]}
+        />
 
         <section className="grid gap-6 py-12" id="venue">
           <Sig call="Bash(open maps)" title="Venue" />
