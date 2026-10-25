@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Mark, PageHeader, Sig, StatusPanel } from "../_components/ui";
-import { formatScore, mean } from "../_lib/scoring";
+import { getEnabledCriteria } from "../_lib/criteria";
+import { countWord, formatScore, mean } from "../_lib/scoring";
 import { getFinalRound, getJudgeViewer, getMyGroup } from "./_lib/judge";
 
 // /judge: my assigned entries ranked by my mean score (the top one is my finalist), then the
@@ -14,7 +15,7 @@ export default async function JudgePage() {
   if (viewer.kind === "signed_out") redirect("/login");
   if (viewer.kind === "not_judge") notFound();
 
-  const [group, final] = await Promise.all([getMyGroup(viewer.id), getFinalRound(viewer.id)]);
+  const [group, final, { criteria }] = await Promise.all([getMyGroup(viewer.id), getFinalRound(viewer.id), getEnabledCriteria()]);
   if (!group.ok || !final.ok) {
     return (
       <PageHeader eyebrow="Judging" title="Not set up" italic="yet">
@@ -31,7 +32,10 @@ export default async function JudgePage() {
     <div className="space-y-12">
       <div className="grid gap-8 md:grid-cols-[1fr_minmax(0,18rem)] md:items-end">
         <PageHeader eyebrow={`Judging · ${viewer.name}`} title="Your" italic="judging">
-          <p>Score each entry on four criteria, 1–8 each. Your entry score is the mean; your highest-scored entry goes to the final.</p>
+          <p>
+            Score each entry on {countWord(criteria.length)} criteri{criteria.length === 1 ? "on" : "a"} ({criteria.map((c) => c.name).join(", ")}), 1–8
+            each. Your entry score is the mean; your highest-scored entry goes to the final.
+          </p>
         </PageHeader>
         <StatusPanel
           label="Where you are"
