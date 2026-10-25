@@ -213,6 +213,12 @@ export default async function Home() {
                 <span className="eyebrow sm:text-right">Winning team</span>
               </div>
             ))}
+            {prizes.topThree.map((prize) => (
+              <div key={prize} className="grid items-baseline gap-4 border-t border-line py-4 last:border-b sm:grid-cols-[1fr_auto]">
+                <span className="font-display text-2xl font-light leading-snug">{prize}</span>
+                <span className="eyebrow sm:text-right">Top 3 teams</span>
+              </div>
+            ))}
           </div>
         </section>
 

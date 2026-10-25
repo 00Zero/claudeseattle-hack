@@ -32,7 +32,7 @@ Numbers as of Oct 17: 498 Luma registrations, 83 approved, 391 pending, 4 waitli
 
 Theme: build AI tools, workflows, and playbooks that small businesses can adopt. All projects are open-sourced on GitHub, which is why team and entry pages are public.
 
-Prizes, for the home page and results page: every participant gets $100 in Claude API credits; the winning team gets one month of Claude Max 20x per person, tickets to the Seattle AI Week AI Summit (courtesy of WTIA), and a one-year WTIA membership. Venue: thinkspace Seattle, 1700 Westlake Ave N #200.
+Prizes, for the home page and results page: every participant gets $100 in Claude API credits; the winning team gets one month of Claude Max 20x per person, tickets to the Seattle AI Week AI Summit (courtesy of WTIA), and a one-year WTIA membership; the top 3 teams get Anthropic swag. Venue: thinkspace Seattle, 1700 Westlake Ave N #200.
 
 ## Shared foundation (Adam, before kickoff)
 
