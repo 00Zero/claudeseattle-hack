@@ -12,11 +12,12 @@ export const venue = { name: "thinkspace Seattle", address: "1700 Westlake Ave N
 export const audience =
   "For small-business owners who know the problems, working professionals and students who want to build with Claude, and the technical builders who team up with them. Teams of 3 to 5 ship one thing a real business could put to work the following week, then open-source it.";
 
-// Shown on the home page after the rubric: hosts, then partners, judges, and ambassadors.
-// Each list can mix people and companies, and a section stays hidden while its list is empty.
-// Images go in public/ (people in public/people, logos in public/partners) and are referenced
-// from the site root, e.g. "/partners/acme.png".
-export type Person = { name: string; photo: string; lines: string[]; linkedin?: string };
+// Shown on the home page: judges, credit sponsors, and partners right under the hero; hosts and
+// ambassadors after the rubric. Each list can mix people and companies, and a section stays
+// hidden while its list is empty. Images go in public/ (people in public/people, logos in
+// public/partners) and are referenced from the site root, e.g. "/partners/acme.png".
+// A person without a photo gets their initials.
+export type Person = { name: string; photo?: string; lines: string[]; linkedin?: string };
 export type Company = { name: string; logo: string; description: string; website: string };
 export type Entry = Person | Company;
 // Example entries:
@@ -25,8 +26,26 @@ export type Entry = Person | Company;
 export const hosts: Entry[] = [
   { name: "Adam Burgh", photo: "/people/adam-burgh.jpg", lines: ["Founder, We Build With AI", "Seattle Claude Ambassador"], linkedin: "https://www.linkedin.com/in/adamburgh" },
 ];
-export const partners: Entry[] = [];
-export const judges: Entry[] = [];
+export const judges: Entry[] = [
+  { name: "Shrey Shah", photo: "/people/shrey-shah.jpg", lines: ["AI Engineer, Microsoft", "Claude Ambassador"], linkedin: "https://www.linkedin.com/in/shreyshahh" },
+  { name: "Peter Chee", photo: "/people/peter-chee.jpg", lines: ["Founder and CEO, thinkspace", "Entrepreneur and investor"], linkedin: "https://www.linkedin.com/in/pchee" },
+  { name: "Amelia Marckworth", lines: ["Director of Programs, Innovation & Entrepreneurship, WTIA", "Professor, Seattle University"], linkedin: "https://www.linkedin.com/in/ameliamarckworth" },
+  { name: "Darambazar Amgalan", lines: ["Founder, Milaclan"], linkedin: "https://www.linkedin.com/in/darambazar" },
+  { name: "Adi Nemmaluri", lines: ["VP, AI & Engineering, Ladder", "Ex-DoorDash, ex-Ethos"], linkedin: "https://www.linkedin.com/in/aditya-nemmaluri" },
+  { name: "Nishaanth Reddy", lines: ["Senior Machine Learning Engineer, Apple", "Ex-Amazon"], linkedin: "https://www.linkedin.com/in/nishaanthreddy" },
+  { name: "Nishant Revur", photo: "/people/nishant-revur.jpg", lines: ["Software Engineer, Amazon Just Walk Out", "Co-built this platform"], linkedin: "https://www.linkedin.com/in/nishantrevur" },
+  { name: "Rajasuba Subramanian", photo: "/people/rajasuba-subramanian.jpg", lines: ["Software Engineer, Amazon", "Co-built this platform"], linkedin: "https://www.linkedin.com/in/rajasuba" },
+];
+// The companies behind the credits on /resources.
+export const sponsors: Entry[] = [
+  { name: "Anthropic", logo: "/partners/anthropic.png", description: "$100 in Claude API credits for every participant, plus Claude Max 20x for the winning team.", website: "https://www.anthropic.com" },
+  { name: "Tavily", logo: "/partners/tavily.svg", description: "8,000 free API credits for web search and extraction built for AI agents.", website: "https://www.tavily.com" },
+  { name: "Wispr Flow", logo: "/partners/wispr-flow.svg", description: "Free months of Wispr Flow Pro: AI voice dictation that works in every app.", website: "https://wisprflow.ai" },
+];
+export const partners: Entry[] = [
+  { name: "thinkspace", logo: "/partners/thinkspace.svg", description: "Our venue: offices, coworking, and a startup community in South Lake Union.", website: "https://thinkspace.com" },
+  { name: "WTIA", logo: "/partners/wtia.png", description: "Washington Technology Industry Association. A one-year membership for the winners and Seattle AI Week tickets for the top three.", website: "https://www.washingtontechnology.org" },
+];
 export const ambassadors: Entry[] = [];
 
 export const prizes = {
