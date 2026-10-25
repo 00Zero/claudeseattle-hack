@@ -29,10 +29,10 @@ export const hosts: Entry[] = [
 export const judges: Entry[] = [
   { name: "Shrey Shah", photo: "/people/shrey-shah.jpg", lines: ["AI Engineer, Microsoft", "Claude Ambassador"], linkedin: "https://www.linkedin.com/in/shreyshahh" },
   { name: "Peter Chee", photo: "/people/peter-chee.jpg", lines: ["Founder and CEO, thinkspace", "Entrepreneur and investor"], linkedin: "https://www.linkedin.com/in/pchee" },
-  { name: "Amelia Marckworth", lines: ["Director of Programs, Innovation & Entrepreneurship, WTIA", "Professor, Seattle University"], linkedin: "https://www.linkedin.com/in/ameliamarckworth" },
-  { name: "Darambazar Amgalan", lines: ["Founder, Milaclan"], linkedin: "https://www.linkedin.com/in/darambazar" },
-  { name: "Adi Nemmaluri", lines: ["VP, AI & Engineering, Ladder", "Ex-DoorDash, ex-Ethos"], linkedin: "https://www.linkedin.com/in/aditya-nemmaluri" },
-  { name: "Nishaanth Reddy", lines: ["Senior Machine Learning Engineer, Apple", "Ex-Amazon"], linkedin: "https://www.linkedin.com/in/nishaanthreddy" },
+  { name: "Amelia Marckworth", photo: "/people/amelia-marckworth.jpg", lines: ["Director of Programs, Innovation & Entrepreneurship, WTIA", "Professor, Seattle University"], linkedin: "https://www.linkedin.com/in/ameliamarckworth" },
+  { name: "Darambazar Amgalan", photo: "/people/darambazar-amgalan.jpg", lines: ["Founder, Milaclan"], linkedin: "https://www.linkedin.com/in/darambazar" },
+  { name: "Adi Nemmaluri", photo: "/people/adi-nemmaluri.jpg", lines: ["VP, AI & Engineering, Ladder", "Ex-DoorDash, ex-Ethos"], linkedin: "https://www.linkedin.com/in/aditya-nemmaluri" },
+  { name: "Nishaanth Reddy", photo: "/people/nishaanth-reddy.jpg", lines: ["Senior Machine Learning Engineer, Apple", "Ex-Amazon"], linkedin: "https://www.linkedin.com/in/nishaanthreddy" },
   { name: "Nishant Revur", photo: "/people/nishant-revur.jpg", lines: ["Software Engineer, Amazon Just Walk Out", "Co-built this platform"], linkedin: "https://www.linkedin.com/in/nishantrevur" },
   { name: "Rajasuba Subramanian", photo: "/people/rajasuba-subramanian.jpg", lines: ["Software Engineer, Amazon", "Co-built this platform"], linkedin: "https://www.linkedin.com/in/rajasuba" },
 ];
