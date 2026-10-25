@@ -177,40 +177,44 @@ export async function saveEntry(formData: FormData): Promise<SaveState> {
   return { status: "error", message: "Teammates are saving at the same moment. Wait a few seconds and save again." };
 }
 
-// part: the saved version after this save, or (conflict) the teammate's version it ran into.
-export type PartState = { status: "idle" | "ok" | "error"; message?: string; part?: Part; conflict?: boolean };
+// One teammate's edited part, as the form sends it: base_at is when the version it started from
+// was saved (null = never written).
+export type PartEdit = { profile_id: string; body: string; base_at: string | null };
 
-// Save one teammate's "who did what" (judge_contributions; RLS: a team member who may submit,
-// before the deadline). Anyone on the team can write anyone's part. Each part saves on its own and
-// only if nobody saved it since the editor's form last had it (base_at); otherwise the form shows
-// both versions to pick from, so nobody's writing is lost.
-export async function saveContribution(formData: FormData): Promise<PartState> {
+// ok: saved (part is the new version). conflict: someone saved it since the form had it (part is
+// theirs, by is their name). error: not saved (message says why).
+export type PartResult = { profile_id: string; status: "ok" | "conflict" | "error"; part?: Part; by?: string; message?: string };
+
+// PartState: what a GitHub username add returns.
+export type PartState = { status: "idle" | "ok" | "error"; message?: string };
+
+// Save teammates' "who did what" parts (judge_contributions; RLS: a team member who may submit,
+// before the deadline). Anyone on the team can write anyone's part. Each part is written on its
+// own and only if nobody saved it since the form last had it; otherwise the form shows both
+// versions to pick from, so nobody's writing is lost. The form calls this alongside saveEntry.
+export async function saveContributions(edits: PartEdit[]): Promise<PartResult[]> {
   const ctx = await getSubmitContext();
-  if (ctx.kind === "signed_out") return { status: "error", message: "Your session expired. Log in again." };
-  if (ctx.kind === "no_access") return { status: "error", message: "Your registration is awaiting approval." };
-  if (ctx.kind === "blocked") return { status: "error", message: ctx.reason };
-  if (ctx.isPast) return { status: "error", message: "Submissions closed, so this can't change now. Find an organizer." };
-
-  const teammate = ctx.teammates.find((t) => t.id === formData.get("profile_id"));
-  if (!teammate) return { status: "error", message: "That person isn't on your team anymore. Reload the page." };
-  const body = text(formData, "contribution", LIMITS.contribution);
-  const baseAt = text(formData, "base_at", 100) || null;
+  const refuse = (message: string) => edits.map((e) => ({ profile_id: e.profile_id, status: "error" as const, message }));
+  if (ctx.kind === "signed_out") return refuse("Your session expired. Log in again.");
+  if (ctx.kind !== "ready") return refuse("You can't edit this team's entry.");
+  if (ctx.isPast) return refuse("Submissions closed, so who did what can't change now. Find an organizer.");
 
   const supabase = await createClient();
-  const { saved, failed } = await writePart(supabase, ctx.team.id, teammate.id, baseAt, body);
-  if (failed) return { status: "error", message: "We couldn't save that. Try again." };
-  if (!saved) {
-    const current = await loadPart(supabase, ctx.team.id, teammate.id);
-    const who = ctx.teammates.find((t) => t.id === current.by)?.name ?? "A teammate";
-    return {
-      status: "error",
-      conflict: true,
-      part: current,
-      message: `${who} saved ${teammate.name}'s part${current.at ? ` at ${formatPacific(current.at)}` : ""} while you were editing it, so your save didn't go through. Your text is still here: pick a version, then save again.`,
-    };
-  }
-  revalidatePath("/submit");
-  return { status: "ok", message: body ? "Saved." : "Cleared.", part: saved };
+  const results = await Promise.all(
+    edits.slice(0, 20).map(async (edit): Promise<PartResult> => {
+      const teammate = ctx.teammates.find((t) => t.id === edit.profile_id);
+      if (!teammate) return { profile_id: edit.profile_id, status: "error", message: "That person isn't on your team anymore. Reload the page." };
+      const body = String(edit.body ?? "").trim().slice(0, LIMITS.contribution);
+      const baseAt = typeof edit.base_at === "string" && edit.base_at ? edit.base_at : null;
+      const { saved, failed } = await writePart(supabase, ctx.team.id, teammate.id, baseAt, body);
+      if (failed) return { profile_id: teammate.id, status: "error", message: `We couldn't save ${teammate.name}'s part. Try again.` };
+      if (saved) return { profile_id: teammate.id, status: "ok", part: saved };
+      const current = await loadPart(supabase, ctx.team.id, teammate.id);
+      return { profile_id: teammate.id, status: "conflict", part: current, by: ctx.teammates.find((t) => t.id === current.by)?.name ?? "A teammate" };
+    }),
+  );
+  if (results.some((r) => r.status === "ok")) revalidatePath("/submit");
+  return results;
 }
 
 // Add a GitHub username for a teammate whose profile has none. It's kept on the team's

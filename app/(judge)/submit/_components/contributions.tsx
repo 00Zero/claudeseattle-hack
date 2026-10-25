@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useEffectEvent, useImperativeHandle, useLayoutEffect, useRef, useState, useTransition, type Ref } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatPacific } from "@/lib/time";
-import type { PartState } from "../actions";
+import type { PartEdit, PartResult, PartState } from "../actions";
 import type { Teammate } from "../_lib/entry";
 import { loadParts, type Part } from "../_lib/parts";
 
@@ -24,6 +24,11 @@ function newer(a: Part, b: Part | undefined) {
   return Date.parse(b.at) > Date.parse(a.at) ? b : a;
 }
 
+// What the entry form's Save asks of this section: the edited parts to send, and where to put
+// what came back.
+export type ContributionsHandle = { collect: () => PartEdit[]; apply: (results: PartResult[]) => void };
+type PartHandle = { edit: () => PartEdit | null; apply: (result: PartResult) => void };
+
 // GitHub's mark (Octicons mark-github), for the username tag.
 function GitHubMark() {
   return (
@@ -33,70 +38,78 @@ function GitHubMark() {
   );
 }
 
-function Message({ state }: { state: PartState }) {
-  if (!state.message) return null;
-  return (
-    <p className={`text-sm ${state.status === "error" ? "text-red-600" : "text-fg-muted"}`} role={state.status === "error" ? "alert" : "status"}>
-      {state.message}
-    </p>
-  );
-}
-
-// A missing GitHub username, highlighted, with a field anyone on the team can fill in.
+// A missing GitHub username, highlighted, with a field anyone on the team can fill in. Not a form
+// (it sits inside the entry form), so Add and Enter call the action directly.
 function AddGithub({ teammate, closed, action }: { teammate: Teammate; closed: boolean; action: (formData: FormData) => Promise<PartState> }) {
+  const [value, setValue] = useState("");
   const [state, setState] = useState(idle);
   const [pending, startTransition] = useTransition();
+  function add() {
+    if (!value.trim()) return;
+    const data = new FormData();
+    data.set("profile_id", teammate.id);
+    data.set("github", value);
+    startTransition(async () => setState(await action(data)));
+  }
   return (
     <div className="space-y-1 rounded border border-clay bg-accent-soft px-3 py-2 text-sm">
       <p className="font-medium text-clay">No GitHub username</p>
       {closed ? (
         <p className="text-fg-muted">Judges won&apos;t be able to find {teammate.name}&apos;s commits.</p>
       ) : (
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            const data = new FormData(event.currentTarget);
-            startTransition(async () => setState(await action(data)));
-          }}
-          className="flex flex-wrap gap-2 sm:flex-nowrap"
-        >
-          <input type="hidden" name="profile_id" value={teammate.id} />
+        <div className="flex flex-wrap gap-2 sm:flex-nowrap">
           <input
-            name="github"
-            required
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            onKeyDown={(event) => {
+              // Enter adds the username instead of saving the whole entry.
+              if (event.key === "Enter") {
+                event.preventDefault();
+                add();
+              }
+            }}
             maxLength={300}
             aria-label={`GitHub username for ${teammate.name}`}
             placeholder="username or github.com/username"
             className={input}
             disabled={pending}
           />
-          <button type="submit" disabled={pending} className="btn btn-ghost shrink-0 disabled:opacity-50">
+          <button type="button" onClick={add} disabled={pending || !value.trim()} className="btn btn-ghost shrink-0 disabled:opacity-50">
             {pending ? "Adding…" : "Add"}
           </button>
-        </form>
+        </div>
       )}
-      <Message state={state} />
+      {state.message && (
+        <p className={state.status === "error" ? "text-red-600" : "text-fg-muted"} role={state.status === "error" ? "alert" : "status"}>
+          {state.message}
+        </p>
+      )}
     </div>
   );
 }
 
 // One teammate's part, editable by anyone on the team: a textarea that grows to show all of it
-// while you're in it, saved on its own. `remote` is the newest saved version this page has seen.
+// while you're in it. The entry form's Save sends it when it's changed. `remote` is the newest
+// saved version this page has seen.
 function PartEditor({
+  ref,
   teammate,
   remote,
   mine,
   nameOf,
   limit,
-  action,
+  disabled,
+  onDirty,
   onSaved,
 }: {
+  ref: Ref<PartHandle>;
   teammate: Teammate;
   remote: Part;
   mine: boolean;
   nameOf: (id: string | null) => string;
   limit: number;
-  action: (formData: FormData) => Promise<PartState>;
+  disabled: boolean;
+  onDirty: (id: string, dirty: boolean) => void;
   onSaved: (part: Part) => void;
 }) {
   const [value, setValue] = useState(remote.body);
@@ -108,8 +121,6 @@ function PartEditor({
   const [seenAt, setSeenAt] = useState(remote.at);
   const [focused, setFocused] = useState(false);
   const textarea = useRef<HTMLTextAreaElement>(null);
-  const [state, setState] = useState(idle);
-  const [pending, startTransition] = useTransition();
   const dirty = norm(value) !== norm(base.body);
 
   // A newer save landed: take it if this editor hasn't changed anything, otherwise offer it.
@@ -126,14 +137,26 @@ function PartEditor({
     }
   }
 
-  function pick(useTheirs: boolean) {
-    if (!theirs) return;
-    if (useTheirs) setValue(theirs.body);
-    // Keep mine: the next save replaces theirs, on purpose.
-    setBase(theirs);
-    setTheirs(null);
-    setState(idle);
-  }
+  useImperativeHandle(
+    ref,
+    () => ({
+      // Not sent while a teammate's version is waiting to be picked.
+      edit: () => (dirty && !theirs ? { profile_id: teammate.id, body: value, base_at: base.at } : null),
+      apply: (result) => {
+        if (result.status === "ok" && result.part) {
+          setBase(result.part);
+          setTheirs(null);
+          onSaved(result.part);
+        } else if (result.status === "conflict" && result.part) {
+          setTheirs(result.part);
+        }
+      },
+    }),
+    [dirty, theirs, teammate.id, value, base.at, onSaved],
+  );
+
+  const reportDirty = useEffectEvent((next: boolean) => onDirty(teammate.id, next));
+  useEffect(() => reportDirty(dirty), [dirty]);
 
   // Focused: as tall as the text (so nothing written is hidden). Otherwise back to its four rows.
   useLayoutEffect(() => {
@@ -143,47 +166,31 @@ function PartEditor({
     if (focused) el.style.height = `${Math.min(el.scrollHeight + 2, MAX_HEIGHT_PX)}px`;
   }, [focused, value]);
 
+  function pick(useTheirs: boolean) {
+    if (!theirs) return;
+    if (useTheirs) setValue(theirs.body);
+    // Keep mine: the next save replaces theirs, on purpose.
+    setBase(theirs);
+    setTheirs(null);
+  }
+
   const id = `part-${teammate.id}`;
   const firstName = teammate.name.split(" ")[0];
   return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault();
-        const data = new FormData(event.currentTarget);
-        data.set("base_at", base.at ?? "");
-        startTransition(async () => {
-          const result = await action(data);
-          setState(result);
-          if (result.conflict && result.part) setTheirs(result.part);
-          else if (result.status === "ok" && result.part) {
-            setBase(result.part);
-            setTheirs(null);
-            onSaved(result.part);
-          }
-        });
-      }}
-      // Clicking Save (or a version to keep) mustn't blur the textarea first: it would shrink, the
-      // button would move up, and the click would miss it.
-      onMouseDown={(event) => {
-        if ((event.target as HTMLElement).closest("button, summary")) event.preventDefault();
-      }}
-      className="space-y-2"
-    >
-      <input type="hidden" name="profile_id" value={teammate.id} />
+    <div className="space-y-2">
       <label htmlFor={id} className="block text-sm font-medium">
         {mine ? "What you worked on" : `What ${firstName} worked on`}
       </label>
       <textarea
         ref={textarea}
         id={id}
-        name="contribution"
         rows={4}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         maxLength={limit}
         value={value}
         onChange={(event) => setValue(event.target.value)}
-        disabled={pending}
+        disabled={disabled}
         placeholder={
           mine
             ? "e.g. Talked to the bakery owner about the problem, designed the order flow, built the Claude prompt that drafts replies."
@@ -210,46 +217,54 @@ function PartEditor({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <button type="submit" disabled={pending || !dirty || Boolean(theirs)} className="btn disabled:opacity-50">
-          {pending ? "Saving…" : "Save"}
-        </button>
-        <span className="text-xs text-fg-faint">
-          {value.length}/{limit}
-          {dirty ? " · not saved yet" : base.at ? ` · saved ${formatPacific(base.at)} by ${nameOf(base.by)}` : ""}
-        </span>
-      </div>
-      <Message state={state} />
-    </form>
+      <p className={`text-xs ${dirty ? "font-medium text-clay" : "text-fg-faint"}`}>
+        {value.length}/{limit}
+        {dirty ? " · not saved yet" : base.at ? ` · saved ${formatPacific(base.at)} by ${nameOf(base.by)}` : ""}
+      </p>
+    </div>
   );
 }
 
-// "Who did what": a section per teammate. Anyone on the team can write any teammate's part and add
-// a missing GitHub username; each part saves on its own, so nobody overwrites anyone else's.
+// "Who did what": a section per teammate, inside the entry form so its one Save covers it. Anyone
+// on the team can write any teammate's part and add a missing GitHub username; each part is saved
+// on its own, so nobody overwrites anyone else's.
 export function Contributions({
+  ref,
   teamId,
   teammates,
   me,
   closed,
+  disabled,
   legacy,
   limit,
-  saveAction,
   githubAction,
+  onDirty,
 }: {
+  ref: Ref<ContributionsHandle>;
   teamId: string;
   teammates: Teammate[];
   me: string;
   closed: boolean;
+  // While the form is saving.
+  disabled: boolean;
   // The shared "who did what" written before each teammate had their own part.
   legacy: string;
   limit: number;
-  saveAction: (formData: FormData) => Promise<PartState>;
   githubAction: (formData: FormData) => Promise<PartState>;
+  onDirty: (id: string, dirty: boolean) => void;
 }) {
   // Saves this page has seen since it loaded, from polling and from its own saves.
   const [seen, setSeen] = useState<Map<string, Part>>(() => new Map());
+  const editors = useRef(new Map<string, PartHandle>());
   const partOf = (t: Teammate) => newer(t.part, seen.get(t.id));
   const nameOf = (id: string | null) => (id === me ? "you" : (teammates.find((t) => t.id === id)?.name ?? "a teammate"));
+
+  useImperativeHandle(ref, () => ({
+    collect: () => [...editors.current.values()].map((editor) => editor.edit()).filter((edit): edit is PartEdit => Boolean(edit)),
+    apply: (results) => {
+      for (const result of results) editors.current.get(result.profile_id)?.apply(result);
+    },
+  }));
 
   // Reads run as the user in the browser, so they cost no server calls; RLS limits them to the team.
   const poll = useEffectEvent(async () => {
@@ -277,14 +292,14 @@ export function Contributions({
   const noGithub = teammates.filter((t) => !t.github).length;
 
   return (
-    <section className="space-y-4" aria-labelledby="contributions-heading">
+    <section className="space-y-4 pt-5" aria-labelledby="contributions-heading">
       <div className="space-y-1">
         <h2 id="contributions-heading" className="text-lg font-medium">
           Who did what
         </h2>
         <p className="text-sm text-fg-muted">
-          Judges score teamwork. Write what each person did; anyone on the team can fill in or edit any section, and each one saves on its own. Business, design, research, and
-          pitch work count as much as code.
+          Judges score teamwork. Write what each person did: anyone on the team can fill in any section, or all of them. Business, design, research, and pitch work count
+          as much as code.
         </p>
         <p className="font-mono text-xs text-fg-faint">
           {written} of {teammates.length} written
@@ -335,12 +350,17 @@ export function Contributions({
                 )
               ) : (
                 <PartEditor
+                  ref={(editor) => {
+                    if (editor) editors.current.set(t.id, editor);
+                    else editors.current.delete(t.id);
+                  }}
                   teammate={t}
                   remote={part}
                   mine={mine}
                   nameOf={nameOf}
                   limit={limit}
-                  action={saveAction}
+                  disabled={disabled}
+                  onDirty={onDirty}
                   onSaved={(saved) => setSeen((prev) => new Map(prev).set(t.id, saved))}
                 />
               )}

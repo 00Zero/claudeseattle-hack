@@ -3,8 +3,7 @@ import { redirect } from "next/navigation";
 import { formatPacific } from "@/lib/time";
 import { PageHeader } from "../_components/ui";
 import { VIDEO_HOSTS_HINT } from "../_lib/video";
-import { saveContribution, saveEntry, setTeammateGithub } from "./actions";
-import { Contributions } from "./_components/contributions";
+import { saveContributions, saveEntry, setTeammateGithub } from "./actions";
 import { EntryForm } from "./_components/entry-form";
 import type { CheckItem, Checklist } from "./_lib/checklist";
 import { getSubmitContext, LIMITS, type Entry, type EntryValues, type LateSave } from "./_lib/entry";
@@ -74,26 +73,19 @@ export default async function SubmitPage() {
 
       <EntryForm
         action={saveEntry}
+        partsAction={saveContributions}
         teamId={team.id}
         saved={{ values, savedAt: entry?.last_saved_at ?? null, savedBy: entry?.last_saved_by_name ?? null }}
         limits={LIMITS}
         videoHint={VIDEO_HOSTS_HINT}
         closesAt={closesAt}
+        // Teamwork is a judging criterion: the team says what each person did.
+        contributions={
+          teamwork
+            ? { teammates, me, closed: isPast, legacy: entry?.contributions ?? "", limit: LIMITS.contribution, githubAction: setTeammateGithub }
+            : null
+        }
       />
-
-      {/* Teamwork is a judging criterion: the team says what each person did. */}
-      {teamwork && (
-        <Contributions
-          teamId={team.id}
-          teammates={teammates}
-          me={me}
-          closed={isPast}
-          legacy={entry?.contributions ?? ""}
-          limit={LIMITS.contribution}
-          saveAction={saveContribution}
-          githubAction={setTeammateGithub}
-        />
-      )}
     </div>
   );
 }

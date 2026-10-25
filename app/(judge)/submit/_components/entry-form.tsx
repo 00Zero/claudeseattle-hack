@@ -1,10 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useEffectEvent, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useEffectEvent, useRef, useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatPacific } from "@/lib/time";
-import type { SaveState } from "../actions";
+import type { PartEdit, PartResult, PartState, SaveState } from "../actions";
+import type { Teammate } from "../_lib/entry";
+import { Contributions, type ContributionsHandle } from "./contributions";
 import type { EntryLink, EntryValues } from "../_lib/entry";
 import { cleanLinks, FIELDS, loadSavedEntry, same, withField, type Field, type SavedEntry } from "../_lib/merge";
 
@@ -55,8 +57,42 @@ function TheirVersion({ theirs, onUse, onKeep }: { theirs: Theirs; onUse: () => 
   );
 }
 
+// "Who did what", shown while Teamwork is a judging criterion.
+type ContributionsConfig = {
+  teammates: Teammate[];
+  me: string;
+  closed: boolean;
+  legacy: string;
+  limit: number;
+  githubAction: (formData: FormData) => Promise<PartState>;
+};
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+function names(list: string[]) {
+  return list.length > 1 ? `${list.slice(0, -1).join(", ")} and ${list.at(-1)}` : (list[0] ?? "");
+}
+
+// One message for a Save that wrote the entry and teammates' parts.
+function combined(entry: SaveState | null, parts: PartResult[], nameOf: (id: string) => string): SaveState {
+  const saved = parts.filter((r) => r.status === "ok").map((r) => nameOf(r.profile_id));
+  const conflicts = parts.filter((r) => r.status === "conflict").map((r) => nameOf(r.profile_id));
+  const errors = parts.filter((r) => r.status === "error").map((r) => r.message ?? "");
+  const messages = [
+    entry?.message,
+    saved.length > 0 && `Saved who did what for ${names(saved)}.`,
+    conflicts.length > 0 &&
+      `${names(conflicts)}'s part${conflicts.length === 1 ? " was" : "s were"} changed by a teammate meanwhile, so ${conflicts.length === 1 ? "it wasn't" : "they weren't"} saved: pick a version there, then save again.`,
+    errors[0],
+  ].filter(Boolean);
+  const failed = entry?.status === "error" || conflicts.length > 0 || errors.length > 0;
+  return { status: failed ? "error" : (entry?.status ?? "ok"), message: messages.join(" "), entry: entry?.entry };
+}
+
 export function EntryForm({
   action,
+  partsAction,
+  contributions,
   teamId,
   saved,
   limits,
@@ -70,6 +106,8 @@ export function EntryForm({
   videoHint: string;
   // After this, a save needs a confirm click first: it's kept but marked late.
   closesAt: string;
+  partsAction: (edits: PartEdit[]) => Promise<PartResult[]>;
+  contributions: ContributionsConfig | null;
 }) {
   const router = useRouter();
   const form = useRef<HTMLFormElement>(null);
@@ -78,6 +116,11 @@ export function EntryForm({
   // The form differs from the saved version it's in step with, and when that was saved.
   const [dirty, setDirty] = useState(false);
   const [lastSaved, setLastSaved] = useState(saved.savedAt);
+  // "Who did what" parts edited and not saved yet, by teammate.
+  const parts = useRef<ContributionsHandle>(null);
+  const [partsDirty, setPartsDirty] = useState<Record<string, boolean>>({});
+  const onPartDirty = useCallback((id: string, isDirty: boolean) => setPartsDirty((prev) => (Boolean(prev[id]) === isDirty ? prev : { ...prev, [id]: isDirty })), []);
+  const dirtyParts = Object.values(partsDirty).filter(Boolean).length;
   // Showing the "this save will be late" warning; confirmLate makes the next submit send it.
   const [askLate, setAskLate] = useState(false);
   const confirmLate = useRef(false);
@@ -199,8 +242,12 @@ export function EntryForm({
         event.preventDefault();
         const confirmed = confirmLate.current;
         confirmLate.current = false;
+        // Edited teammate parts go with the entry. The entry itself is saved when it changed, or
+        // when nothing else did (saving again rechecks its links).
+        const edits = parts.current?.collect() ?? [];
+        const withEntry = dirty || edits.length === 0;
         // Past the deadline by this browser's clock: ask before saving. The server checks too.
-        if (!confirmed && Date.now() >= Date.parse(closesAt)) {
+        if (withEntry && !confirmed && Date.now() >= Date.parse(closesAt)) {
           setAskLate(true);
           return;
         }
@@ -209,14 +256,15 @@ export function EntryForm({
         data.set("base", JSON.stringify(base.current));
         if (confirmed) data.set("confirm_late", "yes");
         startTransition(async () => {
-          const result = await action(data);
-          if (result.status === "confirm_late") {
+          const [entryResult, partResults] = await Promise.all([withEntry ? action(data) : Promise.resolve(null), edits.length ? partsAction(edits) : Promise.resolve([])]);
+          parts.current?.apply(partResults);
+          if (entryResult?.status === "confirm_late") {
             setAskLate(true);
             setState(idle);
             return;
           }
-          setState(result);
-          if (result.entry) receive(result.entry);
+          if (entryResult?.entry) receive(entryResult.entry);
+          setState(combined(entryResult, partResults, (id) => contributions?.teammates.find((t) => t.id === id)?.name ?? "a teammate"));
         });
       }}
       className="space-y-5"
@@ -299,9 +347,23 @@ export function EntryForm({
         <input type="hidden" name="contributions" defaultValue={saved.values.contributions} />
       </fieldset>
 
-      {/* Sticks to the bottom of the screen while the form is in view, then scrolls away with
-          it, so it's never mistaken for the Save on each "who did what" part below. Room on the
-          right for the /feedback button. */}
+      {contributions && (
+        <Contributions
+          ref={parts}
+          teamId={teamId}
+          teammates={contributions.teammates}
+          me={contributions.me}
+          closed={contributions.closed}
+          disabled={pending}
+          legacy={contributions.legacy}
+          limit={contributions.limit}
+          githubAction={contributions.githubAction}
+          onDirty={onPartDirty}
+        />
+      )}
+
+      {/* One Save for the entry and "who did what", stuck to the bottom of the screen while the
+          form is in view. Room on the right for the /feedback button. */}
       <div className="sticky bottom-0 z-30 space-y-2 border-t border-line bg-bg pt-3 pr-28 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         {state.message && (
           <p
@@ -338,12 +400,18 @@ export function EntryForm({
           </div>
         ) : (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <button type="submit" disabled={pending} className="btn disabled:opacity-50">
-              {pending ? "Saving and checking links…" : "Save entry"}
+            {/* Keeps focus where it is: blurring a "who did what" box shrinks it, which would move this
+                button out from under the click when the bar is at the end of the form. */}
+            <button type="submit" disabled={pending} onMouseDown={(event) => event.preventDefault()} className="btn disabled:opacity-50">
+              {pending ? "Saving…" : "Save"}
             </button>
             {!pending && (
-              <span className={`text-sm ${dirty ? "font-medium text-clay" : "text-fg-muted"}`} aria-live="polite">
-                {dirty ? "Unsaved changes" : lastSaved ? `Saved ${formatPacific(lastSaved)}` : "Not saved yet"}
+              <span className={`text-sm ${dirty || dirtyParts ? "font-medium text-clay" : "text-fg-muted"}`} aria-live="polite">
+                {dirty || dirtyParts
+                  ? `Unsaved changes${dirty && dirtyParts ? ` to the entry and ${plural(dirtyParts, "teammate")}` : dirtyParts ? ` for ${plural(dirtyParts, "teammate")}` : ""}`
+                  : lastSaved
+                    ? `Saved ${formatPacific(lastSaved)}`
+                    : "Not saved yet"}
               </span>
             )}
           </div>
