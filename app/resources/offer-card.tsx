@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { AttendeeOffer, OfferLink } from "@/lib/offers";
+import { logOfferClick } from "./actions";
 
 function CopyIcon() {
   return (
@@ -51,6 +52,7 @@ async function copyText(text: string) {
 // One sponsor offer. A link with a promo code copies the code when clicked, then opens the
 // redemption page in a new tab, so the code is ready to paste there. The code also shows on the
 // card with its own copy button. Locked offers (check-in required) show what they are, not the links.
+// Each click is logged for the admin stats, in the background.
 export function OfferCard({ offer }: { offer: AttendeeOffer }) {
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -58,7 +60,17 @@ export function OfferCard({ offer }: { offer: AttendeeOffer }) {
     if (await copyText(code)) setCopied(code);
   }
 
-  const codes = [...new Set(offer.links.map((l) => l.code).filter((c): c is string => !!c))];
+  function log(link: OfferLink, kind: "link" | "code") {
+    logOfferClick(offer.slug, link.id, kind).catch(() => {});
+  }
+
+  function openLink(link: OfferLink) {
+    if (link.code) copy(link.code);
+    log(link, "link");
+  }
+
+  // One chip per distinct code, logged against the first link that carries it.
+  const codeLinks = offer.links.filter((l, i, all) => l.code && all.findIndex((o) => o.code === l.code) === i);
 
   return (
     <article className="flex h-full flex-col gap-4 rounded-lg border border-line bg-bg-raised p-5">
@@ -107,28 +119,31 @@ export function OfferCard({ offer }: { offer: AttendeeOffer }) {
           <p className="text-sm text-fg-muted">The link is on its way. Check back soon.</p>
         ) : (
           <>
-            {codes.map((code) => (
-              <div key={code} className="flex flex-wrap items-center gap-2 text-sm">
+            {codeLinks.map((link) => (
+              <div key={link.code} className="flex flex-wrap items-center gap-2 text-sm">
                 <span className="text-fg-muted">Promo code</span>
                 <button
                   type="button"
-                  onClick={() => copy(code)}
+                  onClick={() => {
+                    copy(link.code!);
+                    log(link, "code");
+                  }}
                   className="inline-flex items-center gap-2 rounded border border-dashed border-line-strong bg-bg-sunken px-2.5 py-1 font-mono font-semibold tracking-wide hover:bg-fg/5"
-                  aria-label={`Copy promo code ${code}`}
+                  aria-label={`Copy promo code ${link.code}`}
                 >
-                  {code}
+                  {link.code}
                   <CopyIcon />
                 </button>
               </div>
             ))}
             <div className="flex flex-wrap gap-2">
-              {offer.links.map((link: OfferLink, i) => (
+              {offer.links.map((link, i) => (
                 <a
-                  key={link.url + link.label}
+                  key={link.id}
                   href={link.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  onClick={link.code ? () => copy(link.code!) : undefined}
+                  onClick={() => openLink(link)}
                   className={i === 0 ? "btn" : "btn btn-ghost"}
                 >
                   {link.label} ↗

@@ -8,8 +8,6 @@ import { SubmitButton } from "../submit-button";
 import { RESOURCE_SECTIONS, type Resource } from "@/lib/resources";
 import { addTicket, deleteTicket, saveEventSettings, saveTicketRules } from "./actions";
 import { deleteResource, saveResource } from "./resource-actions";
-import type { Offer, OfferLinkRow } from "@/lib/offers";
-import { deleteOfferLink, saveOfferLink, setOfferFlag } from "./offer-actions";
 import { removeAdminEmail } from "./admin-email-actions";
 import { AdminEmailForm } from "./admin-email-form";
 
@@ -46,13 +44,6 @@ export default async function SettingsPage() {
     admin.from("resources").select("id, section, title, description, url, sort_order, visible").order("section").order("sort_order"),
   ]);
   const resources = (resourceRows ?? []) as Resource[];
-  const [{ data: offerRows }, { data: offerLinkRows }, { count: checkedIn }] = await Promise.all([
-    admin.from("offers").select("slug, provider, headline, sort_order, enabled, requires_checkin").order("sort_order"),
-    admin.from("offer_links").select("id, offer_slug, label, url, code, sort_order").order("sort_order").order("label"),
-    admin.from("profiles").select("id", { count: "exact", head: true }).not("checked_in_at", "is", null),
-  ]);
-  const offers = (offerRows ?? []) as Offer[];
-  const offerLinks = (offerLinkRows ?? []) as OfferLinkRow[];
   const nameTags = nameTagsStatus(settings);
   const { data: recentTags } = await admin
     .from("name_tag_prints")
@@ -180,120 +171,10 @@ export default async function SettingsPage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Offers</h2>
-        <p className="text-sm text-foreground/70">
-          Sponsor credits and promo codes at the top of the Resources page, for approved attendees. Turn each one on or
-          off, and choose whether people must be checked in to see its links (until then they see the offer, locked).
-          Checked in means checked in on Luma, or a standby guest you approved; admins always see the links. Luma
-          check-ins reach the site when you re-import the Luma CSV (Import tab):{" "}
-          <span className="font-medium text-foreground">{checkedIn ?? 0} checked in so far</span>. A link with a promo
-          code copies the code when an attendee clicks it, then opens the page. The first link is the main button.
-        </p>
-        {offers.length === 0 && <p className="text-sm text-foreground/70">No offers yet: the offers migration hasn&apos;t run.</p>}
-        {offers.map((o) => {
-          const links = offerLinks.filter((l) => l.offer_slug === o.slug);
-          return (
-            <div key={o.slug} className="space-y-3 rounded border border-foreground/20 p-3">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="font-medium">{o.provider}</p>
-                  <p className="text-sm text-foreground/70">{o.headline}</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 text-sm">
-                  <span className={`rounded px-2 py-0.5 ${o.enabled ? "bg-green-600/15 text-green-700" : "bg-foreground/10"}`}>
-                    {o.enabled ? "On" : "Off"}
-                  </span>
-                  <form action={setOfferFlag}>
-                    <input type="hidden" name="slug" value={o.slug} />
-                    <input type="hidden" name="flag" value="enabled" />
-                    <input type="hidden" name="value" value={o.enabled ? "false" : "true"} />
-                    <SubmitButton className={button}>{o.enabled ? "Turn off" : "Turn on"}</SubmitButton>
-                  </form>
-                  <span className={`ml-2 rounded px-2 py-0.5 ${o.requires_checkin ? "bg-amber-500/15 text-amber-800" : "bg-foreground/10"}`}>
-                    {o.requires_checkin ? "Check-in required" : "No check-in needed"}
-                  </span>
-                  <form action={setOfferFlag}>
-                    <input type="hidden" name="slug" value={o.slug} />
-                    <input type="hidden" name="flag" value="requires_checkin" />
-                    <input type="hidden" name="value" value={o.requires_checkin ? "false" : "true"} />
-                    <SubmitButton className="rounded border border-foreground/20 px-3 py-1.5 text-sm">
-                      {o.requires_checkin ? "Don't require check-in" : "Require check-in"}
-                    </SubmitButton>
-                  </form>
-                </div>
-              </div>
-              {links.length === 0 && <p className="text-sm text-amber-700">No links yet: attendees see &ldquo;The link is on its way.&rdquo;</p>}
-              {links.length > 0 && (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead className="text-foreground/60">
-                      <tr>
-                        <th className="py-1 pr-2">Button label</th>
-                        <th className="py-1 pr-2">Link</th>
-                        <th className="py-1 pr-2">Promo code</th>
-                        <th className="py-1 pr-2">Order</th>
-                        <th className="py-1" />
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-foreground/10">
-                      {links.map((l) => {
-                        const formId = `offer-link-${l.id}`;
-                        return (
-                          // Keyed by the saved values so the inputs show them after React resets the form.
-                          <tr key={JSON.stringify(l)} className="align-top">
-                            <td className="py-1.5 pr-2">
-                              <form id={formId} action={saveOfferLink}>
-                                <input type="hidden" name="id" value={l.id} />
-                              </form>
-                              <input form={formId} name="label" required defaultValue={l.label} className={`${input} w-48`} />
-                            </td>
-                            <td className="py-1.5 pr-2">
-                              <input form={formId} name="url" type="url" required defaultValue={l.url} className={`${input} w-64`} />
-                            </td>
-                            <td className="py-1.5 pr-2">
-                              <input form={formId} name="code" defaultValue={l.code ?? ""} autoComplete="off" className={`${input} w-36 font-mono`} />
-                            </td>
-                            <td className="py-1.5 pr-2">
-                              <input form={formId} name="sort_order" type="number" step="1" defaultValue={l.sort_order} className={`${input} w-16`} />
-                            </td>
-                            <td className="flex gap-2 py-1.5">
-                              <button form={formId} className={button}>
-                                Save
-                              </button>
-                              <form action={deleteOfferLink}>
-                                <input type="hidden" name="id" value={l.id} />
-                                <SubmitButton className="rounded border border-foreground/20 px-3 py-1.5 text-sm" pendingText="Deleting…">
-                                  Delete
-                                </SubmitButton>
-                              </form>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              {/* Keyed by the count so the form clears after an add. */}
-              <form key={links.length} action={saveOfferLink} className="flex flex-wrap items-center gap-2">
-                <input type="hidden" name="offer_slug" value={o.slug} />
-                <input name="label" required placeholder="Button label, e.g. Claim credits" className={`${input} w-48`} />
-                <input name="url" type="url" required placeholder="https://…" className={`${input} w-64`} />
-                <input name="code" placeholder="Promo code (optional)" autoComplete="off" className={`${input} w-44 font-mono`} />
-                <input name="sort_order" type="number" step="1" defaultValue={links.length} aria-label="Order" className={`${input} w-16`} />
-                <SubmitButton className={button} pendingText="Adding…">
-                  Add link
-                </SubmitButton>
-              </form>
-            </div>
-          );
-        })}
-      </section>
-
-      <section className="space-y-3">
         <h2 className="text-lg font-semibold">Resources</h2>
         <p className="text-sm text-foreground/70">
-          Links on the Resources page (/resources): credits, the name tag form, the small business data folder. Only
+          Links on the Resources page (/resources): credits, the name tag form, the small business data folder. Sponsor
+          offers with promo codes are on the Offers tab. Only
           approved attendees see them, and only the visible ones. Each link is the same for everyone. Lower order numbers
           come first within a section.
         </p>

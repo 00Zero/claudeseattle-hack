@@ -2,13 +2,17 @@
 -- Sponsor offers on /resources: free credits and promo codes (Claude API, Tavily, Wispr Flow).
 -- Owned by Adam. Changes require both devs' review.
 -- - offers: one row per provider. The copy is seeded here; admins switch each one on or off and
---   choose whether attendees must be checked in to see its links, in /admin/settings.
+--   choose whether attendees must be checked in to see its links, in /admin/offers.
 -- - offer_links: the redemption links and promo codes. They are not in this file (the repo is
---   public); admins add them in /admin/settings.
+--   public); admins add them in /admin/offers.
 -- - Checked in: the Luma check-in (profiles.checked_in_at, updated by the Luma CSV import) or a
 --   standby check-in an admin approved. Admins count as checked in.
 -- - Attendees read through attendee_offers(), not the tables: it returns enabled offers to people
 --   with full access, and the links only once the offer is unlocked for them.
+-- - offer_clicks: one row per click on a redemption link ('link') or on a promo code to copy it
+--   ('code'), for the stats on /admin/offers. Written only by log_offer_click(), which records the
+--   caller's own clicks on offers unlocked for them; admins read it. link_label keeps the button
+--   label as it was, so old clicks still read right after a link is edited or deleted.
 
 create table offers (
   slug              text primary key check (slug ~ '^[a-z0-9-]+$'),
@@ -59,7 +63,7 @@ language sql stable security definer set search_path = public as $$
   select o.slug, o.provider, o.headline, o.about, o.details, o.steps, o.requires_checkin,
          (not o.requires_checkin or me.checked_in),
          case when not o.requires_checkin or me.checked_in then
-           coalesce((select jsonb_agg(jsonb_build_object('label', l.label, 'url', l.url, 'code', l.code)
+           coalesce((select jsonb_agg(jsonb_build_object('id', l.id, 'label', l.label, 'url', l.url, 'code', l.code)
                                       order by l.sort_order, l.label)
                        from offer_links l where l.offer_slug = o.slug), '[]'::jsonb)
          else '[]'::jsonb end
@@ -69,6 +73,41 @@ language sql stable security definer set search_path = public as $$
 $$;
 revoke execute on function attendee_offers() from public, anon;
 grant execute on function attendee_offers() to authenticated;
+
+create table offer_clicks (
+  id          bigint generated always as identity primary key,
+  profile_id  uuid not null references profiles (id) on delete cascade,
+  offer_slug  text not null references offers (slug) on update cascade on delete cascade,
+  link_id     uuid references offer_links (id) on delete set null,
+  link_label  text,
+  kind        text not null check (kind in ('link', 'code')),
+  clicked_at  timestamptz not null default now()
+);
+create index offer_clicks_offer_idx on offer_clicks (offer_slug, clicked_at);
+create index offer_clicks_profile_idx on offer_clicks (profile_id);
+
+alter table offer_clicks enable row level security;
+create policy offer_clicks_admin on offer_clicks for select using (is_admin());
+revoke all on offer_clicks from anon;
+
+create or replace function log_offer_click(p_slug text, p_link uuid, p_kind text) returns void
+language plpgsql security definer set search_path = public as $$
+declare v_label text;
+begin
+  if auth.uid() is null or not can_browse() or p_kind not in ('link', 'code') then return; end if;
+  if not exists (select 1 from offers
+                  where slug = p_slug and enabled and (not requires_checkin or is_checked_in())) then
+    return;
+  end if;
+  if p_link is not null then
+    select label into v_label from offer_links where id = p_link and offer_slug = p_slug;
+    if not found then return; end if;
+  end if;
+  insert into offer_clicks (profile_id, offer_slug, link_id, link_label, kind)
+  values (auth.uid(), p_slug, p_link, v_label, p_kind);
+end $$;
+revoke execute on function log_offer_click(text, uuid, text) from public, anon;
+grant execute on function log_offer_click(text, uuid, text) to authenticated;
 
 insert into offers (slug, provider, headline, about, details, steps, sort_order, requires_checkin) values
   ('claude', 'Claude by Anthropic', '$100 in Claude API credits',

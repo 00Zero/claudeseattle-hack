@@ -11,7 +11,7 @@ function field(formData: FormData, key: string) {
 }
 
 function revalidate() {
-  revalidatePath("/admin/settings");
+  revalidatePath("/admin/offers");
   revalidatePath("/resources");
 }
 
