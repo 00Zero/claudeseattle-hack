@@ -219,6 +219,7 @@ export default async function Home() {
                 <span className="eyebrow sm:text-right">Top 3 teams</span>
               </div>
             ))}
+            <p className="text-sm text-fg-muted">{prizes.winnersValue}</p>
           </div>
         </section>
 
