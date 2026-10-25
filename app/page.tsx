@@ -101,7 +101,7 @@ export default async function Home() {
     supabase
       .from("event_settings")
       .select(
-        "team_formation_closes_at, submissions_close_at, event_starts_at, event_ends_at, venue_name, venue_address, venue_neighborhood, venue_lat, venue_lon, luma_calendar_url, wifi_network, wifi_password",
+        "team_formation_closes_at, submissions_close_at, event_starts_at, event_ends_at, venue_name, venue_address, venue_neighborhood, venue_lat, venue_lon, luma_calendar_url, wifi_network, wifi_password, audience_voting",
       )
       .eq("id", 1)
       .single(),
@@ -155,6 +155,12 @@ export default async function Home() {
           <div className="mt-6 flex flex-wrap gap-3">
             {profile ? (
               <>
+                {/* Opened from the awards deck; /vote checks who may vote. */}
+                {settings?.audience_voting === "open" && (
+                  <Link href="/vote" className="btn">
+                    Vote for the audience choice
+                  </Link>
+                )}
                 <Link href="/teams" className="btn">
                   Browse teams
                 </Link>
