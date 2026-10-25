@@ -130,12 +130,14 @@ async function readInputs(admin: SupabaseClient, profileIds?: string[]): Promise
   return (m.data as (MatchingProfile & { is_test: boolean })[]).map((row) => ({ ...row, github_username: github.get(row.profile_id) ?? null }));
 }
 
-async function suggestFor(admin: SupabaseClient, inputs: Inputs, storedHash: string | undefined) {
+type Outcome = { outcome: "current" | "suggested"; level: number } | { outcome: "failed"; level: null };
+
+async function suggestFor(admin: SupabaseClient, inputs: Inputs, stored: { level: number; input_hash: string } | undefined): Promise<Outcome> {
   const fields = payload(inputs);
   const inputHash = hashOf(fields);
-  if (storedHash === inputHash) return "current" as const;
+  if (stored?.input_hash === inputHash) return { outcome: "current", level: stored.level };
   const result = await askModel(fields);
-  if (!result) return "failed" as const;
+  if (!result) return { outcome: "failed", level: null };
   const { error } = await admin.from("profile_technical_ai").upsert({
     profile_id: inputs.profile_id,
     level: result.level,
@@ -145,7 +147,7 @@ async function suggestFor(admin: SupabaseClient, inputs: Inputs, storedHash: str
     created_at: new Date().toISOString(),
   });
   if (error) throw new Error(`Couldn't store the technical suggestion: ${error.message}`);
-  return "suggested" as const;
+  return { outcome: "suggested", level: result.level };
 }
 
 // The stored suggestion's number, for the person's own profile form. Never the reason.
@@ -165,11 +167,12 @@ export async function suggestTechnicalLevel(profileId: string): Promise<number |
   try {
     const [[inputs], { data: stored }] = await Promise.all([
       readInputs(admin, [profileId]),
-      admin.from("profile_technical_ai").select("input_hash").eq("profile_id", profileId).maybeSingle(),
+      admin.from("profile_technical_ai").select("level, input_hash").eq("profile_id", profileId).maybeSingle(),
     ]);
     if (!inputs) return null;
-    if ((await suggestFor(admin, inputs, stored?.input_hash)) === "failed") return null;
-    return await getSuggestedTechnicalLevel(profileId);
+    // Return the level itself rather than reading it back: Next.js dedupes identical requests
+    // within a render, so a re-read would return the page's earlier "no suggestion yet" answer.
+    return (await suggestFor(admin, inputs, stored ?? undefined)).level;
   } catch (error) {
     console.error("Technical rating failed", error);
     return null;
@@ -186,12 +189,14 @@ export async function suggestTechnicalLevels(world: "real" | "test", budgetMs = 
   const started = Date.now();
   const [all, { data: stored, error }] = await Promise.all([
     readInputs(admin),
-    admin.from("profile_technical_ai").select("profile_id, input_hash"),
+    admin.from("profile_technical_ai").select("profile_id, level, input_hash"),
   ]);
   if (error) throw new Error(`Couldn't read technical suggestions: ${error.message}`);
-  const hashes = new Map((stored ?? []).map((row) => [row.profile_id as string, row.input_hash as string]));
+  const saved = new Map(
+    (stored ?? []).map((row) => [row.profile_id as string, { level: row.level as number, input_hash: row.input_hash as string }]),
+  );
   const inWorld = all.filter((p) => p.is_test === (world === "test"));
-  const people = inWorld.filter((p) => hashes.get(p.profile_id) !== hashOf(payload(p)));
+  const people = inWorld.filter((p) => saved.get(p.profile_id)?.input_hash !== hashOf(payload(p)));
 
   const result: BulkResult = { suggested: 0, current: inWorld.length - people.length, failed: 0, left: 0 };
   const queue = [...people];
@@ -202,9 +207,8 @@ export async function suggestTechnicalLevels(world: "real" | "test", budgetMs = 
         return;
       }
       try {
-        const outcome = await suggestFor(admin, next, hashes.get(next.profile_id));
-        if (outcome === "failed") result.failed += 1;
-        else result[outcome] += 1;
+        const { outcome } = await suggestFor(admin, next, saved.get(next.profile_id));
+        result[outcome] += 1;
       } catch (e) {
         console.error("Technical rating failed", e);
         result.failed += 1;
