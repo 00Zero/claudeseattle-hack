@@ -24,6 +24,8 @@ Spec: `docs/REQUIREMENTS.md`, "Teams app (Dev A)", plus the access table in "Sha
 - Apply: insert your own `team_members` row with `status = 'applied'`; requires `can_join_teams()`.
 - Leader (`is_team_leader(team_id)`): update a row's `status` to `member`, `rejected`, or `removed`, and set `joined_at` when accepting. Only `status` and `joined_at` are updatable.
 - Leave: update your own row to `status = 'left'`.
+- Disband: the leader calls `disband_team(team_id)` (`shared_disband_team`), which deletes the team with its memberships, invites, and notes. It refuses a team with a judging entry or late save. Leaders can't leave otherwise.
+- No minimum on leaving or removing: a leader can remove down to just themself, and a member of a pair can leave. The page warns below 2.
 - Team size: full at 5 for leaders and invites; only admins can add a 6th. The app checks first, and triggers enforce it (`shared_team_cap_five`). The 3–5 warning is app logic.
 - No apply button, with a reason: `current_access() = 'profile_only'` (pending), or `platform_role` is `volunteer` or `judge`.
 - Mentor badge: `platform_role = 'mentor'`. Mentors don't count toward balance. Balance = owner, professional, student (`role_bucket`) and at least one `is_technical` among members.
