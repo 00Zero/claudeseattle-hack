@@ -35,7 +35,7 @@ const time = (iso: string) =>
 // Pick people, approve them here, and copy their Luma emails to approve them on Luma.
 export function StandbyTable({ rows }: { rows: StandbyRow[] }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [onlyWaiting, setOnlyWaiting] = useState(true);
+  const [onlyWaiting, setOnlyWaiting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [state, formAction, pending] = useActionState<ApproveState, FormData>(async (prev, data) => {
     const result = await approveStandby(prev, data);
@@ -137,7 +137,10 @@ export function StandbyTable({ rows }: { rows: StandbyRow[] }) {
                   {!r.profileId ? (
                     <span className="block text-xs text-foreground/50">hasn&apos;t signed in</span>
                   ) : (
-                    !r.profileConfirmed && <span className="block text-xs text-foreground/50">profile not confirmed</span>
+                    <>
+                      {!r.checkedInAt && <span className="block text-xs text-amber-700">signed in, not checked in</span>}
+                      {!r.profileConfirmed && <span className="block text-xs text-foreground/50">profile not confirmed</span>}
+                    </>
                   )}
                 </td>
                 <td className={td}>
