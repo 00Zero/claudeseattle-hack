@@ -18,10 +18,13 @@ type Item = {
 // dropped connection from costing more than a few seconds of upload.
 const CHUNK_BYTES = 8 * 1024 * 1024;
 const MAX_RETRIES = 8;
-// The time-left estimate shows once there's this much upload to go by and this much left.
-const ESTIMATE_AFTER_MS = 3_000;
+// Time left comes from this file's own upload speed over the last 15 seconds, recalculated on
+// every progress event, so it follows the connection as it speeds up or slows down. It shows only
+// after 10 seconds of uploading, so the speed is measured rather than guessed, and only while more
+// than 15 seconds remain.
+const ESTIMATE_AFTER_MS = 10_000;
+const SPEED_WINDOW_MS = 15_000;
 const ESTIMATE_OVER_S = 15;
-const SPEED_WINDOW_MS = 10_000;
 
 class UploadFailed extends Error {}
 
@@ -107,8 +110,8 @@ function formatTimeLeft(seconds: number) {
   return `about ${Math.floor(minutes / 60)} hr ${minutes % 60} min left`;
 }
 
-// Turns progress events into a time-left label, from the upload speed over the last few seconds.
-// Blank until the estimate has a few seconds to go by, and when 15 seconds or less are left.
+// Turns progress events into a time-left label: bytes left divided by the bytes sent per second
+// over the last SPEED_WINDOW_MS. Blank for the first ESTIMATE_AFTER_MS and when 15 seconds or less are left.
 function timeLeftTracker(size: number) {
   const started = Date.now();
   const samples: { at: number; bytes: number }[] = [];
