@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AuthLink } from "@/app/auth/auth-link";
 import { MobileMenu } from "@/components/site/mobile-menu";
+import { PresentButton } from "@/components/site/present-button";
 import { ThinkingDots } from "@/components/site/thinking-dots";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
@@ -23,7 +24,7 @@ const publicPages = [{ href: "/results", label: "results" }];
 // Its links don't prefetch: every page view would otherwise render all of them on the server at
 // once, and when the session's hour-long access token had expired those requests all tried to
 // refresh it together (Supabase rejects the extras, so the header rendered signed out).
-export function TitleBar({ signedIn, isAdmin, isJudge = false }: { signedIn: boolean; isAdmin: boolean; isJudge?: boolean }) {
+export function TitleBar({ signedIn, isAdmin, isSuperAdmin = false, isJudge = false }: { signedIn: boolean; isAdmin: boolean; isSuperAdmin?: boolean; isJudge?: boolean }) {
   const visible = [...pages, ...(signedIn ? signedInPages : []), ...(isJudge || isAdmin ? judgePages : []), ...publicPages];
   return (
     <header className="sticky top-0 z-20 border-b border-line bg-bg/90 backdrop-blur">
@@ -47,6 +48,8 @@ export function TitleBar({ signedIn, isAdmin, isJudge = false }: { signedIn: boo
               <span className="text-accent">/</span>admin
             </Link>
           )}
+          {/* Super admins: present the kickoff deck (/slides) in full screen. */}
+          {isSuperAdmin && <PresentButton />}
           <AuthLink initialSignedIn={signedIn} />
           {/* Phones: the page links above are hidden, so signed-in people get them (and /logout) in a menu. */}
           {signedIn && <MobileMenu pages={isAdmin ? [...visible, { href: "/admin", label: "admin" }] : visible} />}
