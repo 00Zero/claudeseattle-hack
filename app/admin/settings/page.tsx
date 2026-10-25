@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPacific, isoToPacificInput } from "@/lib/time";
 import { nameTagsStatus } from "@/lib/name-tags";
 import { setNameTagsEnabled } from "./name-tag-actions";
+import { feedbackAudience, slackWebhookConfigured } from "@/lib/feedback";
+import { setFeedbackAudience } from "./feedback-actions";
 import { SubmitButton } from "../submit-button";
 import { RESOURCE_SECTIONS, type Resource } from "@/lib/resources";
 import { addTicket, deleteTicket, saveEventSettings, saveTicketRules } from "./actions";
@@ -28,6 +30,11 @@ const TEXT_FIELDS: { name: string; label: string; type?: "url" | "number" }[] = 
   { name: "wifi_network", label: "Wi-Fi network" },
   { name: "wifi_password", label: "Wi-Fi password" },
 ];
+const FEEDBACK_AUDIENCE_OPTIONS = [
+  { value: "approved", label: "Approved attendees only (and admins)" },
+  { value: "signed_in", label: "Everyone signed in, including pending and declined" },
+  { value: "off", label: "Off" },
+];
 const input = "rounded border border-foreground/20 bg-background px-2 py-1";
 const button = "rounded bg-foreground px-3 py-1.5 text-sm text-background";
 
@@ -45,6 +52,7 @@ export default async function SettingsPage() {
   ]);
   const resources = (resourceRows ?? []) as Resource[];
   const nameTags = nameTagsStatus(settings);
+  const feedback = feedbackAudience(settings?.feedback_audience);
   const { data: recentTags } = await admin
     .from("name_tag_prints")
     .select("id, first_name, last_name, requested_at")
@@ -168,6 +176,27 @@ export default async function SettingsPage() {
             </ul>
           </div>
         )}
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">Feedback</h2>
+        <p className="text-sm text-foreground/70">
+          A &ldquo;/feedback&rdquo; button at the bottom right of every page. Messages go straight to the organizers&apos;
+          Slack channel with the sender&apos;s name, email and page, starting with the site label
+          ({process.env.FEEDBACK_SITE_LABEL || "ClaudeSEA"}). Nothing is saved here.
+        </p>
+        {!slackWebhookConfigured() && (
+          <p className="text-sm text-red-600">SLACK_FEEDBACK_WEBHOOK_URL isn&apos;t set, so messages can&apos;t be sent.</p>
+        )}
+        <form action={setFeedbackAudience} className="space-y-2">
+          {FEEDBACK_AUDIENCE_OPTIONS.map((option) => (
+            <label key={option.value} className="flex items-center gap-2 text-sm">
+              <input type="radio" name="audience" value={option.value} defaultChecked={feedback === option.value} />
+              {option.label}
+            </label>
+          ))}
+          <SubmitButton className={button}>Save feedback setting</SubmitButton>
+        </form>
       </section>
 
       <section className="space-y-3">

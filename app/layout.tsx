@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Newsreader } from "next/font/google";
 import { getCurrentProfile } from "@/lib/supabase/profile";
+import { FEEDBACK_MAX_LENGTH, getFeedbackSender } from "@/lib/feedback";
+import { FeedbackButton } from "@/components/site/feedback-button";
 import { TestAccountBanner } from "@/components/site/test-account-banner";
 import { TitleBar } from "@/components/site/title-bar";
 import { ThemeSync } from "@/components/theme/theme-sync";
@@ -40,6 +42,7 @@ export default async function RootLayout({
   // error and app/error.tsx shows "try again" below it.
   const profile = await getCurrentProfile().catch(() => null);
   const isAdmin = profile?.platform_role === "admin";
+  const showFeedback = profile ? Boolean(await getFeedbackSender().catch(() => null)) : false;
 
   return (
     // suppressHydrationWarning: the inline script below sets data-theme before React hydrates.
@@ -52,6 +55,7 @@ export default async function RootLayout({
         <TitleBar signedIn={Boolean(profile)} isAdmin={isAdmin} isJudge={profile?.platform_role === "judge"} />
         <ThemeSync />
         <main className="mx-auto max-w-4xl px-4 py-8">{children}</main>
+        {showFeedback && <FeedbackButton maxLength={FEEDBACK_MAX_LENGTH} />}
       </body>
     </html>
   );
