@@ -139,7 +139,10 @@ export async function removeGroupMember(_prev: RowState, formData: FormData): Pr
   const judgeId = id(formData, "judge_id");
   if (!groupId || !judgeId) return { status: "error", message: "Bad request." };
   const admin = createAdminClient();
-  const others = (await groupMembers(admin, groupId)).filter((j) => j !== judgeId);
+  const members = await groupMembers(admin, groupId);
+  // A stale page (another admin moved them) mustn't clear the entries they have elsewhere now.
+  if (!members.includes(judgeId)) return { status: "error", message: "That judge isn't in this group any more. Reload the page." };
+  const others = members.filter((j) => j !== judgeId);
   if (others.length) {
     const { error } = await admin.from("judge_assignments").delete().eq("judge_id", judgeId);
     if (error) return { status: "error", message: error.message };
