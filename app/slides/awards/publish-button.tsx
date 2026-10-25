@@ -31,11 +31,11 @@ export function PublishButton({ field, published, disabledReason, label }: { fie
             else setError(result.message);
           });
         }}
-        className="rounded-full bg-accent px-7 py-4 text-[22px] font-semibold text-accent-fg transition-transform hover:-translate-y-px disabled:opacity-40"
+        className="shrink-0 whitespace-nowrap rounded-full bg-accent px-7 py-4 text-[22px] font-semibold text-accent-fg transition-transform hover:-translate-y-px disabled:opacity-40"
       >
         {pending ? "Publishing…" : label}
       </button>
-      {(disabledReason || error) && <span className="text-[19px] text-fg-muted">{error ?? disabledReason}</span>}
+      {(disabledReason || error) && <span className="max-w-[24ch] text-[19px] leading-snug text-fg-muted">{error ?? disabledReason}</span>}
     </div>
   );
 }

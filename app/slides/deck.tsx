@@ -6,7 +6,9 @@ import styles from "./slides.module.css";
 import { enterFullscreen, exitFullscreen, isFullscreen, readIndex, readReturnPath, subscribeFullscreen, subscribeIndex, writeIndex } from "./slide-store";
 
 // still: no entrance animation for the whole slide, for reveal steps where only the new part moves.
-export type Slide = { title: string; tone: "light" | "dark"; content: ReactNode; still?: boolean };
+// strip: a full-width band along the bottom of the screen, drawn at screen size rather than on the
+// scaled canvas (the pixel skyline sizes itself to the window). The slide leaves room for it.
+export type Slide = { title: string; tone: "light" | "dark"; content: ReactNode; still?: boolean; strip?: ReactNode };
 
 // Slides are laid out on a fixed 1600×900 canvas and scaled to fit the screen, so they look the
 // same on a laptop and a projector.
@@ -122,7 +124,7 @@ export function Deck({ slides, storageKey = "slides:index", label = "Kickoff sli
           <div key={slide.still ? "still" : index} className={`${slide.still ? "" : styles.enter} absolute inset-0 px-24 pb-24 pt-20`} aria-live="polite">
             {slide.content}
           </div>
-          <div className="absolute inset-x-24 bottom-9 flex items-center justify-between font-mono text-lg text-fg-faint">
+          <div className={`absolute inset-x-24 bottom-9 flex items-center justify-between font-mono text-lg text-fg-faint ${slide.strip ? "hidden" : ""}`}>
             <span>
               <span className="text-accent">⏺</span> claude seattle <span className="opacity-70">~/impact-lab</span>
             </span>
@@ -132,6 +134,8 @@ export function Deck({ slides, storageKey = "slides:index", label = "Kickoff sli
           </div>
         </div>
       )}
+
+      {slide?.strip && <div className="absolute inset-x-0 bottom-0 flex h-[17vh] items-end overflow-hidden">{slide.strip}</div>}
 
       {/* Mouse controls; they fade when the mouse rests. Keys: arrows, space, PageUp/PageDown (clickers), F, Esc. */}
       <div

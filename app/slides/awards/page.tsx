@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { countWord } from "@/app/(judge)/_lib/scoring";
+import { SkylineBand } from "@/components/home/skyline-band";
 import { ThinkingDots } from "@/components/site/thinking-dots";
 import { requireSuperAdminPage } from "@/lib/admin";
-import { eventName, prizes } from "@/lib/event";
+import { eventName, prizes, venue } from "@/lib/event";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Deck, type Slide } from "../deck";
 import { Eyebrow, Sig } from "../parts";
@@ -270,29 +271,43 @@ export default async function AwardsPage({ searchParams }: PageProps<"/slides/aw
     {
       title: "Winners",
       tone: "light",
+      strip: <SkylineBand venueName={venue.name} />,
       content: (
-        <div className="flex h-full flex-col gap-8">
-          <Sig call="Read(winners.md)" title="Congratulations" />
+        <div className="flex h-full flex-col gap-6 pb-[110px]">
+          <div className="flex items-center gap-10">
+            <span className="inline-block origin-left scale-[2.4]">
+              <ThinkingDots />
+            </span>
+            <Eyebrow className="text-[20px] text-accent">Claude Community Seattle · Seattle AI Week</Eyebrow>
+          </div>
+          <div>
+            <h2 className="font-display text-[100px] font-light leading-[0.95] tracking-[-0.01em]">Congratulations</h2>
+            <p className="mt-2 font-display text-[40px] font-light italic text-fg-muted">{eventName} · Seattle</p>
+          </div>
           {ready && podium.length > 0 ? (
             <ol className={`${styles.stagger} grid`}>
               {[...podium].reverse().map((group) => (
-                <li key={group.place} className="grid grid-cols-[300px_1fr] items-baseline gap-8 border-t border-line py-5 last:border-b">
-                  <span className={`font-display text-[40px] font-light italic ${group.place === 1 ? "text-accent" : "text-fg-muted"}`}>{placeLabel(group.place, group.teams.length > 1)}</span>
-                  <span className="font-display text-[44px] font-light leading-tight">{group.teams.map((f) => f.team).join(" & ")}</span>
+                <li key={group.place} className="grid grid-cols-[300px_1fr] items-baseline gap-8 border-t border-line py-3 last:border-b">
+                  <span className={`font-display text-[36px] font-light italic ${group.place === 1 ? "text-accent" : "text-fg-muted"}`}>{placeLabel(group.place, group.teams.length > 1)}</span>
+                  <span className="font-display text-[40px] font-light leading-tight">{group.teams.map((f) => f.team).join(" & ")}</span>
                 </li>
               ))}
             </ol>
           ) : (
             <p className="text-[28px] text-fg-muted">The winners show here once the judges&apos; scores are in.</p>
           )}
-          <p className="text-[24px] text-fg-muted">Thank you to every team. Every entry is open source at hack.claudeseattle.org/entries.</p>
-          <div className="mt-auto">
+          <div className="mt-auto flex items-end justify-between gap-10">
             <PublishButton
               field="publish_winners"
               published={Boolean(settings?.publish_winners)}
               disabledReason={testNote ?? (ready && podium.length > 0 ? undefined : "Available once the scores are in.")}
               label="Publish winners to the website"
             />
+            <p className="shrink-0 text-right font-mono text-[18px] leading-relaxed text-fg-faint">
+              Thank you to every team
+              <br />
+              {venue.name} · October 25, 2026
+            </p>
           </div>
         </div>
       ),
