@@ -277,9 +277,9 @@ export default async function OffersAdminPage({ searchParams }: PageProps<"/admi
         <h2 className="text-lg font-semibold">Offers, switches and links</h2>
         <p className="text-sm text-foreground/70">
           Turn each offer on or off, and choose whether people must be checked in to see its links (until then they see
-          the offer, locked). Admins always see the links. With promo codes shown, a link with a code copies it when an
-          attendee clicks, then opens the page; hide them when the link applies the code itself. The first link is the
-          main button. Edit an offer&apos;s text under &ldquo;Edit the text&rdquo;.
+          the offer, locked). Admins always see the links. A link with a promo code copies it when an attendee clicks,
+          shows &ldquo;Code copied&rdquo;, then opens the page. &ldquo;Hide promo codes&rdquo; only takes the code off
+          the card (for links that apply it themselves); clicking still copies it. The first link is the main button. Edit an offer&apos;s text under &ldquo;Edit the text&rdquo;.
         </p>
         {offers.map((o) => {
           const offerLinks = links.filter((l) => l.offer_slug === o.slug);
