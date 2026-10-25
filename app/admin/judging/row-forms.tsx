@@ -94,12 +94,8 @@ export function FallbackEntryForm() {
           <input name="repo_url" type="url" required className={field} />
         </label>
         <label className="space-y-1 sm:col-span-2">
-          <span className="font-medium">Short description</span>
-          <textarea name="description_short" rows={3} maxLength={500} className={field} />
-        </label>
-        <label className="space-y-1 sm:col-span-2">
-          <span className="font-medium">Long description</span>
-          <textarea name="description_long" rows={5} maxLength={5000} className={field} />
+          <span className="font-medium">Description</span>
+          <textarea name="description" rows={6} maxLength={6000} className={field} />
         </label>
         <div className="flex items-center gap-3 sm:col-span-2">
           <button type="submit" disabled={pending} className={button}>

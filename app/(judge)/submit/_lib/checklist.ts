@@ -118,8 +118,7 @@ export async function checkEntry(values: EntryValues, previous: PreviousCheck = 
     items: [
       filled("title", "Title", values.title, true, "Add a title."),
       filled("tagline", "One-line tagline", values.tagline, false, "A one-liner helps judges skim."),
-      filled("description_short", "Short description", values.description_short, true, "Say what it does and for which small business."),
-      filled("description_long", "Long description", values.description_long, false, "Cover the problem, how it works, and how a business sets it up."),
+      filled("description", "Description", values.description, true, "Cover the problem, the small business, how it works, and how a business sets it up."),
       video,
       repo,
     ],

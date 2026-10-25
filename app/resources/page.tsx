@@ -32,6 +32,8 @@ export default async function ResourcesPage() {
   }
 
   const supabase = await createClient();
+  // Hands a checked-in person their personal codes (OpenRouter) before the offers are read.
+  await supabase.rpc("claim_offer_codes");
   const [{ data }, { data: offerRows }] = await Promise.all([
     supabase
       .from("resources")

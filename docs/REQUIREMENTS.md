@@ -23,7 +23,7 @@ Team formation closes Sunday 10:30 am; submissions close Sunday 5:30 pm; prelim 
 | Sat Oct 24, 4:30–6:30 pm | Team formation happy hour (optional) | Teams app in heavy use on phones; roster pre-seeded from Luma |
 | Sun 9:00–9:45 am | Check-in, breakfast, team formation for anyone unmatched | Teams app still open; Luma re-import marks who checked in |
 | Sun 10:30 am | Start building | Team formation deadline; team edits still allowed but shown as past-deadline |
-| Sun 5:30 pm | Submission deadline | Entry form goes read-only; late saves flagged, not blocked |
+| Sun 5:30 pm | Submission deadline | Entry form stays open, but each save asks for confirmation and is flagged late, not blocked |
 | Sun 5:30–6:30 pm | Prelim judging during dinner | Each judge reviews \~4 entries from the entry page: embedded demo video, repo link, description. Default is no presentations; if team count and time allow, teams may give a 3-minute pitch to their judge, so the judge view must work with the judge's phone in hand. |
 | Sun 6:30–7:30 pm | Finals on stage | Five finalists each give a 5-minute live demo (slides optional, demo is the focus) plus 2 minutes Q\&A; all five judges score each on their phone between presentations |
 | Sun 7:30 pm | Winners announced | Admin flips "publish winners"; results page goes public |
@@ -139,7 +139,7 @@ Teams submit an entry by 5:30 pm Sunday; five judges each score about four entri
 
 **Must-have**
 
-- [ ] Entry form at `/submit`, one per team, editable by any member until the deadline: title, one-line tagline, description (short and long), demo video URL (required), repo URL (required), additional links. Pre-filled from the team's concept. Shows "Last saved" timestamp and the deadline. After 5:30 pm the form is read-only; a save after the deadline is still stored but flagged `late` for admin to accept or reject.
+- [ ] Entry form at `/submit`, one per team, editable by any member until the deadline: title, one-line tagline, one description, demo video URL (required, 3 minutes or less), repo URL (required), additional links. Pre-filled from the team's concept. Shows "Last saved" timestamp and the deadline. After 5:30 pm the form stays open, starting from the team's pending late save if any: a save first warns that it will mark the project as submitted late and needs a confirm click, then is stored as a late save for admin to accept or reject. "Who did what" is read-only after the deadline.
 - [ ] Completeness check on every save: required fields filled, repo URL returns 200 and looks public, video URL loads. Shown to the team as a checklist, so they fix it before 5:30.
 - [ ] Admin: assign entries to judges (manual, table of entries with a judge dropdown; must handle an entry with no judge and a judge with no entries).
 - [ ] Judge view at `/judge`: only my assigned entries. Entry page shows video embedded at the top, repo link, tagline, description, team roster, then a collapsed AI-notes section. Score form: the enabled criteria (four by default), each 1–8 with no middle, one optional comment. Live ranking of my group by mean score; the top one is my finalist. Exact ties must be broken by adjusting scores.
@@ -167,7 +167,7 @@ Teams submit an entry by 5:30 pm Sunday; five judges each score about four entri
 | Creativity of the solution | Generic chatbot or template | Sensible but predictable | A fresh angle on a known problem | Something judges hadn't thought of |
 | Teamwork (off by default) | One person did essentially everything, or no sign of who did what | One or two people did most of it; other roles unclear | Clear roles; most members visibly contributed (code, design, business, research, or pitch) | Every member had a distinct, visible role, and the team shows how they worked together |
 
-Teamwork: not everyone needs to write code; business, design, research, and pitch roles count. While it's on, `/submit` shows an optional "Who did what" field (judges and AI notes see it; public pages don't).
+Teamwork: not everyone needs to write code; business, design, research, and pitch roles count. While it's on, `/submit` shows a "Who did what" section per teammate (`judge_contributions`): name, role, team lead, and GitHub username, where anyone on the team can write or edit any teammate's part and fill in a missing GitHub username. The page's one Save (stuck to the bottom of the screen) saves the entry and every edited part; each part is written on its own, and one that a teammate saved meanwhile shows both versions to pick from. Judges and AI notes see it; public pages don't.
 
 **Out of scope.** Scores out of 1000, AI ranking teams against each other, messaging, prizes management, check-in (comes from the Luma import).
 

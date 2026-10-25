@@ -21,7 +21,7 @@ later schema changes to new migrations (never edit a merged one).
 
 | Table | Purpose | Who reads | Who writes |
 | --- | --- | --- | --- |
-| `judge_entries` | One entry per team: title, tagline, short and long description, video URL, repo URL, extra links, "who did what" (`contributions`), completeness checklist, last saved | Team members, judges, admins | Team members (participant or admin role) before the deadline; admin any time |
+| `judge_entries` | One entry per team: title, tagline, description (in `description_long`; `description_short` is cleared on save, older entries show both together), video URL, repo URL, extra links, the old shared "who did what" (`contributions`), completeness checklist, last saved | Team members, judges, admins | Team members (participant or admin role) before the deadline; admin any time |
 | `judge_late_saves` | A save made after `submissions_close_at`, keyed on the team (works even if the team never saved before the deadline); kept apart until admin accepts (copied onto the entry, creating it if needed) or rejects | Team members, admins | Team members insert; admin decides |
 | `judge_assignments` | Prelim: entry → judge | The judge (own rows), admins | Admins |
 | `judge_scores` | One row per entry, judge, round (`prelim` / `final`); scores 1–8 for the criteria keys in `criteria` (null = the default four), same order, plus a comment | The judge (own rows), admins | Judges: prelim only for assigned entries, final only for finalists |
@@ -44,9 +44,9 @@ setting locks once any real-world score exists; test-world scores don't lock it.
 
 ### 1. `/submit` (team members) — Wed
 - [x] Load the viewer's team (`team_members.status = 'member'`), entry pre-filled from `teams.concept`
-- [x] Form: title, tagline, short and long description, demo video URL (required), repo URL (required), extra links; "Who did what" while Teamwork is enabled
+- [x] Form: title, tagline, one description, demo video URL (required, 3 minutes or less), repo URL (required), extra links; "Who did what" per teammate (`judge_contributions`) while Teamwork is enabled
 - [x] Server action save: before deadline → upsert entry; after → insert `judge_late_saves`
-- [x] "Last saved" timestamp and deadline from `event_settings`; read-only after the deadline
+- [x] "Last saved" timestamp and deadline from `event_settings`; after the deadline a save warns, needs a confirm click, and is kept as a late save
 - [x] Completeness checklist on save: required fields, repo URL returns 200 and is a public GitHub repo, video URL loads (YouTube, Loom, Vimeo, or direct)
 - [x] Mentors, judges, volunteers, and pending users see why they can't submit
 - [ ] Fallback if a team isn't on the Teams app: free-text team name + member emails (admin-created)

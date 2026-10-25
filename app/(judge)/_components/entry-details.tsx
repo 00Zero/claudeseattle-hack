@@ -1,3 +1,4 @@
+import { joinDescription } from "../_lib/description";
 import { parseVideo } from "../_lib/video";
 
 // One entry as judges and the public see it: video on top, then tagline, links, descriptions,
@@ -11,13 +12,15 @@ export type EntryDetailsData = {
   video_url: string | null;
   repo_url: string | null;
   links: { label: string; url: string }[] | null;
-  // "Who did what", for the Teamwork criterion. Judges only; public pages don't pass it.
+  // The team's shared "who did what" from before each member wrote their own part. Judges only;
+  // public pages don't pass it.
   contributions?: string | null;
 };
 
 const PROVIDER_NAMES = { youtube: "YouTube", loom: "Loom", vimeo: "Vimeo", drive: "Google Drive" } as const;
 
-export type RosterMember = { name: string; detail?: string | null };
+// github and contribution ("who did what", one per member): judges only.
+export type RosterMember = { name: string; detail?: string | null; github?: string | null; contribution?: string | null };
 
 // Links were checked on save, but render only http(s) anyway.
 function safeHref(url: string | null | undefined) {
@@ -43,6 +46,7 @@ export function EntryDetails({ entry, roster }: { entry: EntryDetailsData; roste
   const videoHref = safeHref(entry.video_url);
   const repoHref = safeHref(entry.repo_url);
   const links = (entry.links ?? []).map((l) => ({ ...l, href: safeHref(l.url) })).filter((l) => l.href);
+  const description = joinDescription(entry.description_short, entry.description_long);
 
   return (
     <div className="space-y-5">
@@ -92,11 +96,28 @@ export function EntryDetails({ entry, roster }: { entry: EntryDetailsData; roste
         ))}
       </ul>
 
-      {entry.description_short && <p className="whitespace-pre-wrap">{entry.description_short}</p>}
-      {entry.description_long && (
+      {description && <p className="whitespace-pre-wrap">{description}</p>}
+
+      {roster && roster.length > 0 && (
         <div className="space-y-1">
-          <h3 className="eyebrow">More detail</h3>
-          <p className="whitespace-pre-wrap text-fg-muted">{entry.description_long}</p>
+          <h3 className="eyebrow">Team</h3>
+          <ul className="space-y-2 text-sm text-fg-muted">
+            {roster.map((m, i) => (
+              <li key={i}>
+                <span className="text-fg">{m.name}</span>
+                {m.detail ? `, ${m.detail}` : ""}
+                {m.github && (
+                  <>
+                    {" · "}
+                    <a href={`https://github.com/${m.github}`} target="_blank" rel="noopener noreferrer nofollow" className="font-mono underline">
+                      @{m.github}
+                    </a>
+                  </>
+                )}
+                {m.contribution?.trim() && <span className="block whitespace-pre-wrap">{m.contribution}</span>}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -104,20 +125,6 @@ export function EntryDetails({ entry, roster }: { entry: EntryDetailsData; roste
         <div className="space-y-1">
           <h3 className="eyebrow">Who did what</h3>
           <p className="whitespace-pre-wrap text-fg-muted">{entry.contributions}</p>
-        </div>
-      )}
-
-      {roster && roster.length > 0 && (
-        <div className="space-y-1">
-          <h3 className="eyebrow">Team</h3>
-          <ul className="text-sm text-fg-muted">
-            {roster.map((m, i) => (
-              <li key={i}>
-                {m.name}
-                {m.detail ? `, ${m.detail}` : ""}
-              </li>
-            ))}
-          </ul>
         </div>
       )}
     </div>

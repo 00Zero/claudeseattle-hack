@@ -2,6 +2,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { githubFetch, parseGitHubRepo } from "./github";
 import { SCORE_MAX, SCORE_MIN, type Criterion } from "./scoring";
+import { joinDescription } from "./description";
 
 // AI notes for judges (docs/REQUIREMENTS.md, "Judging app", nice-to-have 1): Claude reads an
 // entry's text and its GitHub README (it doesn't watch the video, read code, or open the live
@@ -43,7 +44,7 @@ export type EntryForNotes = {
 };
 
 // Read by the notes only when Teamwork is enabled: who is on the team, as judges see it.
-export type RosterForNotes = { name: string; detail: string | null }[];
+export type RosterForNotes = { name: string; detail: string | null; contribution?: string | null }[];
 
 // Stored in judge_ai_notes.notes: what to focus on first, one note per enabled criterion in rubric
 // order (key is missing on notes written before criteria were configurable), and what the AI
@@ -127,17 +128,24 @@ function schema(criteria: Criterion[]) {
 function entryText(entry: EntryForNotes, readmeText: string | null, roster: RosterForNotes | null) {
   const links = (entry.links ?? []).map((l) => `- ${l.label}: ${l.url}`).join("\n");
   const team = roster?.map((m) => `- ${m.name}${m.detail ? `, ${m.detail}` : ""}`).join("\n");
+  const description = joinDescription(entry.description_short, entry.description_long);
+  // Each member's own part, then the shared text teams wrote before they had one.
+  const whoDidWhat = [
+    ...(roster ?? []).filter((m) => m.contribution?.trim()).map((m) => `- ${m.name}: ${m.contribution!.trim()}`),
+    entry.contributions?.trim(),
+  ]
+    .filter(Boolean)
+    .join("\n");
   return [
     `<entry>`,
     `Title: ${entry.title}`,
     entry.tagline && `Tagline: ${entry.tagline}`,
-    entry.description_short && `Short description:\n${entry.description_short}`,
-    entry.description_long && `Long description:\n${entry.description_long}`,
+    description && `Description:\n${description}`,
     `Demo video: ${entry.video_url ?? "none"}`,
     `GitHub repo: ${entry.repo_url ?? "none"}`,
     links && `Other links:\n${links}`,
     roster && `Team (${roster.length}):\n${team || "unknown"}`,
-    roster && `Who did what:\n${entry.contributions?.trim() || "not given"}`,
+    roster && `Who did what:\n${whoDidWhat || "not given"}`,
     `</entry>`,
     `<readme>`,
     readmeText ?? "No README could be read from the repo (missing, private, or not on GitHub).",
