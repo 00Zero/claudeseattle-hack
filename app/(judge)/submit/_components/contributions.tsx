@@ -310,7 +310,7 @@ export function Contributions({
                     href={`https://github.com/${t.github}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    title={`${t.name}'s GitHub profile`}
+                    title={t.githubByTeam ? `${t.name}'s GitHub profile, added by a teammate` : `${t.name}'s GitHub profile`}
                     className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-black px-2 py-0.5 font-mono text-xs text-white no-underline hover:bg-neutral-800"
                   >
                     <GitHubMark />@{t.github}

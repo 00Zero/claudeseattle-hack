@@ -51,6 +51,8 @@ export type Teammate = {
   role: string | null;
   isLeader: boolean;
   github: string | null;
+  // github was added by a teammate (judge_contributions), not set by them on /profile.
+  githubByTeam: boolean;
   part: Part;
 };
 
@@ -157,7 +159,8 @@ export async function getSubmitContext(): Promise<SubmitContext> {
       name: [p.first_name, p.last_name].filter(Boolean).join(" ") || p.display_name,
       role: memberRole(p),
       isLeader: p.id === leaderId,
-      github: normalizeGithubUsername(p.github_username),
+      github: normalizeGithubUsername(p.github_username) ?? parts.get(p.id)?.github ?? null,
+      githubByTeam: !normalizeGithubUsername(p.github_username) && Boolean(parts.get(p.id)?.github),
       part: parts.get(p.id) ?? EMPTY_PART,
     }))
     // The leader first, then the order people joined.

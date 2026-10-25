@@ -97,7 +97,7 @@ export async function getEntryForJudge(judgeId: string, entryId: string, round: 
           .eq("status", "member")
       : Promise.resolve({ data: [] }),
     entry.team_id
-      ? supabase.from("judge_contributions").select("profile_id, body").eq("team_id", entry.team_id)
+      ? supabase.from("judge_contributions").select("profile_id, body, github_username").eq("team_id", entry.team_id)
       : Promise.resolve({ data: [] }),
     supabase.from("judge_ai_notes").select("notes, model").eq("entry_id", entryId).maybeSingle(),
     getEnabledCriteria(supabase),
@@ -105,7 +105,8 @@ export async function getEntryForJudge(judgeId: string, entryId: string, round: 
 
   const isFinalist = ((finalists.data ?? []) as { entry_id: string }[]).some((f) => f.entry_id === entryId);
   const canScore = round === "prelim" ? Boolean(assigned.data) : isFinalist;
-  const partBy = new Map(((parts.data ?? []) as { profile_id: string; body: string }[]).map((p) => [p.profile_id, p.body]));
+  // github_username there: added by a teammate for someone whose profile has none.
+  const partBy = new Map(((parts.data ?? []) as { profile_id: string; body: string; github_username: string | null }[]).map((p) => [p.profile_id, p]));
   type Member = { id: string; display_name: string; job_title: string | null; company: string | null; github_username: string | null };
   const members = ((roster.data ?? []) as unknown as { profiles: Member | null }[])
     .map((m) => m.profiles)
@@ -113,8 +114,8 @@ export async function getEntryForJudge(judgeId: string, entryId: string, round: 
     .map((p) => ({
       name: p.display_name,
       detail: [p.job_title, p.company].filter(Boolean).join(" at ") || null,
-      github: normalizeGithubUsername(p.github_username),
-      contribution: partBy.get(p.id) ?? null,
+      github: normalizeGithubUsername(p.github_username) ?? partBy.get(p.id)?.github_username ?? null,
+      contribution: partBy.get(p.id)?.body ?? null,
     }));
 
   return {

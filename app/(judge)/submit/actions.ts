@@ -7,7 +7,7 @@ import { formatPacific } from "@/lib/time";
 import { checkEntry, type Checklist } from "./_lib/checklist";
 import { getSubmissionDeadline, getSubmitContext, LIMITS, type EntryLink, type EntryValues } from "./_lib/entry";
 import { fieldList, FIELDS, loadSavedEntry, mergeValues, writeEntry, type SavedEntry } from "./_lib/merge";
-import { loadPart, writePart, type Part } from "./_lib/parts";
+import { loadPart, writeGithub, writePart, type Part } from "./_lib/parts";
 
 // entry: the saved version after this save, or the teammate's version it conflicted with.
 export type SaveState = { status: "idle" | "ok" | "late" | "error"; message?: string; entry?: SavedEntry };
@@ -198,21 +198,23 @@ export async function saveContribution(formData: FormData): Promise<PartState> {
   return { status: "ok", message: body ? "Saved." : "Cleared.", part: saved };
 }
 
-// Fill in a teammate's missing GitHub username (judge_set_teammate_github only sets a blank one).
+// Add a GitHub username for a teammate whose profile has none. It's kept on the team's
+// judge_contributions row (RLS: a team member who may submit, before the deadline), so profiles
+// stays edited only by its owner.
 export async function setTeammateGithub(formData: FormData): Promise<PartState> {
   const ctx = await getSubmitContext();
   if (ctx.kind !== "ready") return { status: "error", message: "Reload the page and try again." };
+  if (ctx.isPast) return { status: "error", message: "Submissions closed, so this can't change now. Find an organizer." };
   const teammate = ctx.teammates.find((t) => t.id === formData.get("profile_id"));
   if (!teammate) return { status: "error", message: "That person isn't on your team." };
-  if (teammate.github) return { status: "error", message: `${teammate.name} already has a GitHub username.` };
+  if (teammate.github) return { status: "error", message: `${teammate.name} already has a GitHub username. Reload the page.` };
 
   const raw = text(formData, "github", 300);
   const github = normalizeGithubUsername(raw);
   if (!github) return { status: "error", message: raw ? `“${raw}” isn't a GitHub username.` : "Add a GitHub username." };
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("judge_set_teammate_github", { p_profile: teammate.id, p_username: github });
-  if (error) return { status: "error", message: "We couldn't save it. Try again." };
-  if (!data) return { status: "error", message: "Someone already added one. Reload the page." };
+  if (!(await writeGithub(await createClient(), ctx.team.id, teammate.id, github))) {
+    return { status: "error", message: "We couldn't save it. Try again." };
+  }
   revalidatePath("/submit");
   return { status: "ok", message: `Added @${github}.` };
 }
