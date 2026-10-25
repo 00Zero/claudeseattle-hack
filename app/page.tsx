@@ -163,6 +163,15 @@ export default async function Home() {
         <div className="grid min-w-0 gap-3">
           <ContextWindow openAt={openAt} closeAt={closeAt} moments={moments} slots={slots} />
           {hasWifi && <Wifi openAt={openAt} closeAt={closeAt} />}
+          {/* Signed-in people; the upload section on /resources checks approval. */}
+          {profile && (
+            <section aria-label="Upload photos and videos" className="grid gap-2 rounded-lg border border-line bg-bg-raised p-4 font-mono text-xs text-fg-muted">
+              <span className="text-fg-faint">Photos and videos from the event</span>
+              <Link href="/resources#upload-media" className="btn justify-self-start font-sans">
+                Upload media
+              </Link>
+            </section>
+          )}
         </div>
       </section>
 

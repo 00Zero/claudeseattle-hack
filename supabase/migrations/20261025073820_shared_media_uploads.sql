@@ -1,10 +1,10 @@
 -- 20261025073820_shared_media_uploads.sql
--- Photos and videos attendees upload on /media. The files live in a restricted Google Drive
+-- Photos and videos attendees upload at the bottom of /resources. The files live in a restricted Google Drive
 -- folder; the browser sends each one straight to Google with a one-time upload link from the
 -- Apps Script in scripts/apps-script/media-upload.gs. This table is the log: who uploaded what,
 -- for a later gallery. It never holds the folder's ID or link.
 -- - team_id: the uploader's team at upload time, if any.
--- - Written only by the /media server action (service role) after the Apps Script confirms the
+-- - Written only by the upload server action (service role) after the Apps Script confirms the
 --   file is in the folder, so there is no insert policy. People read their own rows; admins all.
 
 create table media_uploads (

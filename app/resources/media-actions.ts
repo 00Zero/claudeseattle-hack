@@ -10,7 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 
 type Result<T> = ({ ok: true } & T) | { ok: false; message: string };
 
-// Approved attendees only, like /resources.
+// Approved attendees only, like the rest of /resources.
 async function uploader() {
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
@@ -70,6 +70,6 @@ export async function recordMediaUpload(fileId: string): Promise<Result<object>>
     console.error("Media upload log failed", error.message);
     return { ok: false, message: "Uploaded, but it couldn't be logged. Tell an organizer." };
   }
-  revalidatePath("/media");
+  revalidatePath("/resources");
   return { ok: true };
 }
