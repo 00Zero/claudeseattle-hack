@@ -1,23 +1,22 @@
-// Where the presenter is in the deck, kept in localStorage so leaving and re-entering
-// /slides picks up on the same slide. Also where to go back to when the presentation ends.
+// Where the presenter is in each deck, kept in localStorage so leaving and re-entering picks up
+// on the same slide. Also where to go back to when the presentation ends.
 // Storage can throw (private windows, blocked site data); then the deck starts at the top.
 
-const INDEX_KEY = "slides:index";
 const RETURN_KEY = "slides:return";
 const EVENT = "slides:index";
 
-export function readIndex(): number {
+export function readIndex(key: string): number {
   try {
-    const value = Number(localStorage.getItem(INDEX_KEY));
+    const value = Number(localStorage.getItem(key));
     return Number.isInteger(value) && value >= 0 ? value : 0;
   } catch {
     return 0;
   }
 }
 
-export function writeIndex(index: number) {
+export function writeIndex(key: string, index: number) {
   try {
-    localStorage.setItem(INDEX_KEY, String(index));
+    localStorage.setItem(key, String(index));
   } catch {}
   window.dispatchEvent(new Event(EVENT));
 }
