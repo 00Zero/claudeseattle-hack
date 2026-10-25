@@ -9,6 +9,7 @@ import {
   cancelInvite,
   declineApplicant,
   declineInvite,
+  deleteTeam,
   leaveTeam,
   removeMember,
 } from "../actions";
@@ -22,7 +23,7 @@ import { DeadlineBanner } from "../_components/deadline-banner";
 import { SharePanel } from "../_components/share-panel";
 import { WhyYouFit, WhyYouFitLoading } from "../_components/why-you-fit";
 import { PERSON_COLUMNS, PersonDetails, personFromProfile, titleAtCompany, type Person, type ProfileRow } from "../_components/person";
-import { balanceOf, getViewer, IDEAL_MAX, IDEAL_MIN, MAX_APPLICATIONS, TEAM_MAX, TEAM_MIN, type Viewer } from "../_lib/teams";
+import { balanceOf, getFormationDeadline, getViewer, IDEAL_MAX, IDEAL_MIN, MAX_APPLICATIONS, TEAM_MAX, TEAM_MIN, type Viewer } from "../_lib/teams";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -344,6 +345,9 @@ function ViewerPanel({ viewer, team, teamId, size }: { viewer: Viewer; team: Tea
           <Link href={`/teams/${teamId}/edit`} className="text-sm text-fg-muted underline">
             Edit name, concept, or who you&apos;re looking for
           </Link>
+          <Suspense>
+            <DeleteTeamButton teamId={teamId} teamName={team.name} />
+          </Suspense>
         </div>
       </div>
     );
@@ -451,5 +455,20 @@ function ViewerPanel({ viewer, team, teamId, size }: { viewer: Viewer; team: Tea
         {viewer.openApplications ? ` (you've applied to ${viewer.openApplications})` : ""}.
       </p>
     </div>
+  );
+}
+
+// Leaders can delete their team until team formation closes; after that, organizers can.
+async function DeleteTeamButton({ teamId, teamName }: { teamId: string; teamName: string }) {
+  if ((await getFormationDeadline()).isPast) return null;
+  return (
+    <ActionButton
+      action={deleteTeam}
+      fields={{ team_id: teamId }}
+      label="Delete team"
+      pendingLabel="Deleting…"
+      confirm={`Delete ${teamName}? Everyone on it, you included, will be free to join other teams, and its applications and invites will be closed. This can't be undone.`}
+      variant="link"
+    />
   );
 }
