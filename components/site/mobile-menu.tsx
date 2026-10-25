@@ -53,7 +53,7 @@ export function MobileMenu({ pages }: { pages: { href: string; label: string }[]
           <ul>
             {pages.map((page) => (
               <li key={page.href}>
-                <Link href={page.href} className={item} aria-current={pathname.startsWith(page.href) ? "page" : undefined}>
+                <Link href={page.href} prefetch={false} className={item} aria-current={pathname.startsWith(page.href) ? "page" : undefined}>
                   <span className="text-accent">/</span>
                   {page.label}
                 </Link>

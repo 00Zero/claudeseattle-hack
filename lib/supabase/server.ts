@@ -1,6 +1,7 @@
 import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { fetchWithTimeout } from "./fetch-timeout";
 
 // Server client for Server Components, server actions, and route handlers.
 // Runs as the logged-in user; RLS applies. Create one per request.
@@ -11,6 +12,7 @@ export async function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      global: { fetch: fetchWithTimeout(10_000) },
       cookies: {
         getAll() {
           return cookieStore.getAll();

@@ -36,7 +36,9 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const profile = await getCurrentProfile();
+  // If the profile read fails, render the header signed out; the page's own call throws the same
+  // error and app/error.tsx shows "try again" below it.
+  const profile = await getCurrentProfile().catch(() => null);
   const isAdmin = profile?.platform_role === "admin";
 
   return (
