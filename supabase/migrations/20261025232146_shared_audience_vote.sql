@@ -1,8 +1,10 @@
 -- 20261025232146_shared_audience_vote.sql
 -- Audience choice: checked-in guests rank the finalists on /vote, first to third. First place
 -- gets 3 points, second 2, third 1; the most points wins, ties broken by first-place votes.
--- - event_settings.audience_voting: NULL = not open yet, 'open', 'closed'. Super admins switch
---   it from the awards deck (/slides/awards).
+-- - event_settings.audience_voting_enabled: the feature switch in /admin/settings. NULL (the
+--   default) counts as off: /vote is a 404, the ballot is empty, and nobody can vote.
+-- - event_settings.audience_voting: NULL = not open yet, 'open', 'closed'. Switched from the
+--   awards deck (/slides/awards) or /admin/settings, once the feature is on.
 -- - audience_votes: one ballot per person, changeable while voting is open. Written only by
 --   cast_audience_vote(); people read their own row.
 -- - Guests can't vote for their own team: it isn't on their ballot, and they rank as many of
@@ -10,8 +12,18 @@
 -- - Test accounts vote on the test world's finalists without checking in, for rehearsals.
 -- - audience_vote_results: points per finalist. Service role only (the awards deck).
 
+alter table event_settings add column audience_voting_enabled boolean;
 alter table event_settings add column audience_voting text
   check (audience_voting in ('open', 'closed'));
+
+-- 'off' while the feature is switched off, else 'not_open', 'open' or 'closed'.
+create or replace function audience_voting_state() returns text
+language sql stable security definer set search_path = public as $$
+  select case when not coalesce(audience_voting_enabled, false) then 'off'
+              else coalesce(audience_voting, 'not_open') end
+    from event_settings where id = 1
+$$;
+revoke execute on function audience_voting_state() from public, anon, authenticated;
 
 create table audience_votes (
   voter_id      uuid primary key references profiles (id) on delete cascade,
@@ -48,16 +60,16 @@ $$;
 revoke execute on function audience_vote_options() from public, anon, authenticated;
 
 -- Everything /vote needs in one call: the voting state, whether the caller may vote, and, once
--- voting has opened, the finalists and the caller's ballot.
+-- voting has opened, the finalists and the caller's ballot. Nothing else while it's off.
 create or replace function audience_ballot() returns jsonb
 language plpgsql stable security definer set search_path = public as $$
 declare
-  v_state text := (select audience_voting from event_settings where id = 1);
+  v_state text := audience_voting_state();
   v_eligible boolean := auth.uid() is not null and (is_checked_in() or viewer_is_test());
   v_vote audience_votes;
 begin
-  if not v_eligible or v_state is null then
-    return jsonb_build_object('state', coalesce(v_state, 'not_open'), 'eligible', v_eligible,
+  if not v_eligible or v_state in ('off', 'not_open') then
+    return jsonb_build_object('state', v_state, 'eligible', v_eligible,
                               'finalists', '[]'::jsonb, 'ranking', '[]'::jsonb);
   end if;
   select * into v_vote from audience_votes where voter_id = auth.uid();
@@ -82,10 +94,13 @@ declare
   v_options uuid[];
   v_needed int;
 begin
+  if audience_voting_state() = 'off' then
+    raise exception 'Audience voting isn''t running.';
+  end if;
   if auth.uid() is null or not (is_checked_in() or viewer_is_test()) then
     raise exception 'Only checked-in guests can vote.';
   end if;
-  if (select audience_voting from event_settings where id = 1) is distinct from 'open' then
+  if audience_voting_state() <> 'open' then
     raise exception 'Voting isn''t open.';
   end if;
   select coalesce(array_agg(entry_id), '{}') into v_options
