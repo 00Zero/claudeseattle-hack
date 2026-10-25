@@ -10,7 +10,13 @@ import { fieldList, FIELDS, loadSavedEntry, mergeValues, writeEntry, type SavedE
 import { loadPart, writeGithub, writePart, type Part } from "./_lib/parts";
 
 // entry: the saved version after this save, or the teammate's version it conflicted with.
-export type SaveState = { status: "idle" | "ok" | "late" | "error"; message?: string; entry?: SavedEntry };
+// confirm_late: the deadline has passed and the editor hasn't confirmed saving late yet.
+export type SaveState = { status: "idle" | "ok" | "late" | "confirm_late" | "error"; message?: string; entry?: SavedEntry };
+
+const CONFIRM_LATE: SaveState = {
+  status: "confirm_late",
+  message: "Submissions closed. Saving now marks your project as submitted late.",
+};
 
 function text(formData: FormData, key: string, max: number) {
   const value = formData.get(key);
@@ -120,8 +126,18 @@ export async function saveEntry(formData: FormData): Promise<SaveState> {
     revalidatePath("/submit");
     return {
       status: "late",
-      message: "Submissions closed, so this save is marked late. An organizer will accept or reject it.",
+      message: "Saved, and marked as submitted late. An organizer will accept or reject it.",
     };
+  }
+
+  // After the deadline the editor confirms first (the form asks), then the save is kept as is:
+  // there's no merging with the on-time entry, since the form started from the team's latest save.
+  const confirmedLate = formData.get("confirm_late") === "yes";
+  if (ctx.isPast) {
+    if (!confirmedLate) return CONFIRM_LATE;
+    const problem = invalid(mine);
+    if (problem) return { status: "error", message: problem };
+    return saveLate(mine, await checkEntry(mine, ctx.entry));
   }
 
   let current: SavedEntry | null = ctx.entry
@@ -134,7 +150,7 @@ export async function saveEntry(formData: FormData): Promise<SaveState> {
     const problem = invalid(values);
     if (problem) return { status: "error", message: problem };
     const who = current?.savedBy ?? "A teammate";
-    if (current && conflicts.length && !ctx.isPast) {
+    if (current && conflicts.length) {
       return {
         status: "error",
         message: `${who} also changed ${fieldList(conflicts)}${current.savedAt ? ` at ${formatPacific(current.savedAt)}` : ""}, so your save didn't go through. Your edits are still here: pick a version under ${conflicts.length === 1 ? "that field" : "each of those fields"}, then save again.`,
@@ -143,7 +159,6 @@ export async function saveEntry(formData: FormData): Promise<SaveState> {
     }
 
     const checklist = await checkEntry(values, ctx.entry);
-    if (ctx.isPast) return saveLate(values, checklist);
 
     const { saved, error } = await writeEntry(supabase, teamId, current, { ...entryRow(values), checklist });
     if (saved) {
@@ -154,7 +169,7 @@ export async function saveEntry(formData: FormData): Promise<SaveState> {
     }
     // The deadline passed while this save was running, so RLS refused it: store it as a late save
     // rather than dropping it.
-    if ((await getSubmissionDeadline()).isPast) return saveLate(values, checklist);
+    if ((await getSubmissionDeadline()).isPast) return confirmedLate ? saveLate(values, checklist) : CONFIRM_LATE;
     // 23505: a teammate created the entry first. No error: a teammate saved since `current`.
     if (error && error.code !== "23505") return { status: "error", message: "We couldn't save your entry. Try again." };
     current = await loadSavedEntry(supabase, teamId);

@@ -56,7 +56,9 @@ export type Teammate = {
   part: Part;
 };
 
-export type LateSave = { saved_at: string; decision: "pending" | "accepted" | "rejected" };
+// The team's latest save after the deadline; values are what it saved (its payload holds
+// judge_entries' columns).
+export type LateSave = { saved_at: string; decision: "pending" | "accepted" | "rejected"; values: EntryValues };
 
 export type SubmitContext =
   | { kind: "signed_out" }
@@ -136,7 +138,7 @@ export async function getSubmitContext(): Promise<SubmitContext> {
       .maybeSingle(),
     supabase
       .from("judge_late_saves")
-      .select("saved_at, decision")
+      .select("saved_at, decision, payload")
       .eq("team_id", team.id)
       .order("saved_at", { ascending: false })
       .limit(1)
@@ -176,5 +178,5 @@ export async function getSubmitContext(): Promise<SubmitContext> {
       }
     : null;
 
-  return { kind: "ready", team, entry, lateSave: (late as LateSave | null) ?? null, closesAt, isPast, teamwork: keys.includes("teamwork"), me: profile.id, teammates };
+  return { kind: "ready", team, entry, lateSave: late ? { saved_at: late.saved_at, decision: late.decision, values: entryValues(late.payload ?? {}) } : null, closesAt, isPast, teamwork: keys.includes("teamwork"), me: profile.id, teammates };
 }

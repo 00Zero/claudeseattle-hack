@@ -30,7 +30,10 @@ export default async function SubmitPage() {
   }
 
   const { team, entry, lateSave, closesAt, isPast, teamwork, me, teammates } = ctx;
-  const values: EntryValues = entry
+  // After the deadline, a pending late save is the team's latest version: start from it.
+  const values: EntryValues = lateSave?.decision === "pending"
+    ? lateSave.values
+    : entry
     ? {
         title: entry.title,
         tagline: entry.tagline,
@@ -69,21 +72,14 @@ export default async function SubmitPage() {
 
       {entry?.checklist && <ChecklistView checklist={entry.checklist} />}
 
-      {isPast ? (
-        entry ? (
-          <ReadOnlyEntry entry={entry} />
-        ) : (
-          <p className="text-fg-muted">Your team didn&apos;t submit an entry before the deadline. Find an organizer.</p>
-        )
-      ) : (
-        <EntryForm
-          action={saveEntry}
-          teamId={team.id}
-          saved={{ values, savedAt: entry?.last_saved_at ?? null, savedBy: entry?.last_saved_by_name ?? null }}
-          limits={LIMITS}
-          videoHint={VIDEO_HOSTS_HINT}
-        />
-      )}
+      <EntryForm
+        action={saveEntry}
+        teamId={team.id}
+        saved={{ values, savedAt: entry?.last_saved_at ?? null, savedBy: entry?.last_saved_by_name ?? null }}
+        limits={LIMITS}
+        videoHint={VIDEO_HOSTS_HINT}
+        closesAt={closesAt}
+      />
 
       {/* Teamwork is a judging criterion: the team says what each person did. */}
       {teamwork && (
@@ -105,7 +101,7 @@ export default async function SubmitPage() {
 function Deadline({ closesAt, isPast }: { closesAt: string; isPast: boolean }) {
   return isPast ? (
     <p className="rounded border border-accent bg-accent-soft px-3 py-2 text-sm" role="status">
-      <strong>Submissions closed</strong> {formatPacific(closesAt)}. Your entry is read-only now.
+      <strong>Submissions closed</strong> {formatPacific(closesAt)}. You can still save, but your project will be marked as submitted late.
     </p>
   ) : (
     <p className="rounded border border-line px-3 py-2 text-sm text-fg-muted">
@@ -166,47 +162,5 @@ function ChecklistView({ checklist }: { checklist: Checklist }) {
       </ul>
       <p className="border-t border-dashed border-line pt-2 text-fg-faint">checked {formatPacific(checklist.checkedAt)}, when the entry was last saved</p>
     </section>
-  );
-}
-
-function ReadOnlyEntry({ entry }: { entry: Entry }) {
-  const rows: [string, React.ReactNode][] = [
-    ["Title", entry.title],
-    ["Tagline", entry.tagline],
-    ["Description", entry.description],
-    ["Demo video", entry.video_url && <ExternalLink href={entry.video_url} />],
-    ["GitHub repo", entry.repo_url && <ExternalLink href={entry.repo_url} />],
-  ];
-  return (
-    <dl className="space-y-4">
-      {rows.map(([label, value]) => (
-        <div key={label}>
-          <dt className="eyebrow">{label}</dt>
-          <dd className="whitespace-pre-wrap text-fg-muted">{value || "—"}</dd>
-        </div>
-      ))}
-      {entry.links.length > 0 && (
-        <div>
-          <dt className="eyebrow">Other links</dt>
-          <dd>
-            <ul className="space-y-1">
-              {entry.links.map((link) => (
-                <li key={link.url}>
-                  <ExternalLink href={link.url} label={link.label} />
-                </li>
-              ))}
-            </ul>
-          </dd>
-        </div>
-      )}
-    </dl>
-  );
-}
-
-function ExternalLink({ href, label }: { href: string; label?: string }) {
-  return (
-    <a href={href} target="_blank" rel="noopener noreferrer nofollow" className="break-all underline">
-      {label ?? href}
-    </a>
   );
 }

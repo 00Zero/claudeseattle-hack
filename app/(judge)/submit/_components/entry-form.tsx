@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useEffectEvent, useRef, useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { formatPacific } from "@/lib/time";
 import type { SaveState } from "../actions";
 import type { EntryLink, EntryValues } from "../_lib/entry";
 import { cleanLinks, FIELDS, loadSavedEntry, same, withField, type Field, type SavedEntry } from "../_lib/merge";
@@ -60,17 +61,23 @@ export function EntryForm({
   saved,
   limits,
   videoHint,
+  closesAt,
 }: {
   action: (formData: FormData) => Promise<SaveState>;
   teamId: string;
   saved: SavedEntry;
   limits: Limits;
   videoHint: string;
+  // After this, a save needs a confirm click first: it's kept but marked late.
+  closesAt: string;
 }) {
   const router = useRouter();
   const form = useRef<HTMLFormElement>(null);
   const [state, setState] = useState(idle);
   const [pending, startTransition] = useTransition();
+  // Showing the "this save will be late" warning; confirmLate makes the next submit send it.
+  const [askLate, setAskLate] = useState(false);
+  const confirmLate = useRef(false);
   // Per field, the saved value this form was last in step with. The save sends it, so the server
   // can tell this editor's changes from fields they left alone.
   const base = useRef(saved.values);
@@ -175,10 +182,24 @@ export function EntryForm({
       // Submit by hand so a failed save keeps what was typed (React resets forms after an action).
       onSubmit={(event) => {
         event.preventDefault();
+        const confirmed = confirmLate.current;
+        confirmLate.current = false;
+        // Past the deadline by this browser's clock: ask before saving. The server checks too.
+        if (!confirmed && Date.now() >= Date.parse(closesAt)) {
+          setAskLate(true);
+          return;
+        }
+        setAskLate(false);
         const data = new FormData(event.currentTarget);
         data.set("base", JSON.stringify(base.current));
+        if (confirmed) data.set("confirm_late", "yes");
         startTransition(async () => {
           const result = await action(data);
+          if (result.status === "confirm_late") {
+            setAskLate(true);
+            setState(idle);
+            return;
+          }
           setState(result);
           if (result.entry) receive(result.entry);
         });
@@ -264,9 +285,36 @@ export function EntryForm({
           {state.message}
         </p>
       )}
-      <button type="submit" disabled={pending} className="btn disabled:opacity-50">
-        {pending ? "Saving and checking links…" : "Save entry"}
-      </button>
+      {askLate ? (
+        <div className="space-y-3 rounded border border-red-600 bg-accent-soft px-4 py-3" role="alertdialog" aria-labelledby="late-heading" aria-describedby="late-detail">
+          <p id="late-heading" className="font-semibold text-red-600">
+            Submissions closed {formatPacific(closesAt)}.
+          </p>
+          <p id="late-detail" className="text-sm">
+            Saves after the deadline are kept, but your project will be marked as <strong>submitted late</strong>. Save anyway?
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => {
+                confirmLate.current = true;
+                form.current?.requestSubmit();
+              }}
+              className="btn disabled:opacity-50"
+            >
+              Save and mark as late
+            </button>
+            <button type="button" disabled={pending} onClick={() => setAskLate(false)} className="btn btn-ghost">
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button type="submit" disabled={pending} className="btn disabled:opacity-50">
+          {pending ? "Saving and checking links…" : "Save entry"}
+        </button>
+      )}
     </form>
   );
 }
