@@ -5,8 +5,9 @@ import { getEnabledCriteria } from "../_lib/criteria";
 import { countWord, formatScore, mean } from "../_lib/scoring";
 import { getFinalRound, getJudgeViewer, getMyGroup } from "./_lib/judge";
 
-// /judge: my assigned entries ranked by my mean score (the top one is my finalist), then the
-// final round, where every judge scores every finalist. Built for a phone.
+// /judge: my assigned entries ranked by my mean score (the top one is my finalist, or in a judging
+// group the group's top entry by mean is), then the final round, where every judge scores every
+// finalist. Built for a phone.
 
 const row = "flex items-center gap-4 border-t border-line px-1 py-4 no-underline transition-colors hover:bg-fg/5";
 
@@ -25,7 +26,11 @@ export default async function JudgePage() {
   }
 
   const top = group.ranked[0];
-  const tiedAtTop = top?.tied && top.rank === 1;
+  const tiedAtTop = !group.group && top?.tied && top.rank === 1;
+  // In a group, my entries that are finalists: the group's pick (or an admin's override).
+  const finalistIds = new Set(final.finalists.map((f) => f.id));
+  const isFinalist = (id: string) => (group.group ? finalistIds.has(id) : id === group.finalistId);
+  const finalistLabel = group.group ? "Group finalist" : "Your finalist";
   const finalScored = final.finalists.filter((f) => f.myScore).length;
 
   return (
@@ -34,8 +39,18 @@ export default async function JudgePage() {
         <PageHeader eyebrow={`Judging · ${viewer.name}`} title="Your" italic="judging">
           <p>
             Score each entry on {countWord(criteria.length)} criteri{criteria.length === 1 ? "on" : "a"} ({criteria.map((c) => c.name).join(", ")}), 1–8
-            each. Your entry score is the mean; your highest-scored entry goes to the final.
+            each. Your entry score is the mean;{" "}
+            {group.group
+              ? "your group's highest entry, by the mean of every group judge's score, goes to the final."
+              : "your highest-scored entry goes to the final."}
           </p>
+          {group.group && (
+            <p>
+              You&apos;re judging in <strong>{group.group.name}</strong>
+              {group.group.others.length ? ` with ${group.group.others.join(", ")}` : ""}: you all score the same entries. The
+              ranking below uses your scores only.
+            </p>
+          )}
         </PageHeader>
         <StatusPanel
           label="Where you are"
@@ -74,15 +89,15 @@ export default async function JudgePage() {
                   <span className="min-w-0 grow">
                     <span className="flex items-center gap-2 font-display text-xl font-light leading-snug">
                       {e.title || "Untitled"}
-                      {e.id === group.finalistId && <Mark label="Your finalist" />}
+                      {isFinalist(e.id) && <Mark label={finalistLabel} />}
                     </span>
                     <span className="block text-sm text-fg-muted">{e.team}</span>
                   </span>
                   <span className="text-right">
                     <span className="block font-display text-3xl font-light leading-none">{formatScore(e.score)}</span>
                     <span className="mt-1 block font-mono text-xs">
-                      {e.id === group.finalistId ? (
-                        <span className="text-accent">your finalist</span>
+                      {isFinalist(e.id) ? (
+                        <span className="text-accent">{finalistLabel.toLowerCase()}</span>
                       ) : e.tied ? (
                         <span className="text-clay">tied</span>
                       ) : !e.myScore ? (
@@ -101,7 +116,7 @@ export default async function JudgePage() {
         <Sig call="Read(finals.md)" title="Final round" id="final-heading" />
         <p className="text-sm text-fg-muted">Every judge scores every finalist during the live demos.</p>
         {final.finalists.length === 0 ? (
-          <p className="text-fg-muted">No finalists yet. Each judge&apos;s top prelim entry appears here once they&apos;ve scored their group.</p>
+          <p className="text-fg-muted">No finalists yet. Each group&apos;s top prelim entry appears here once its judges have scored it.</p>
         ) : (
           <>
             <ul className="border-b border-line">

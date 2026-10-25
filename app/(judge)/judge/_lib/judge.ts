@@ -42,13 +42,33 @@ async function myScores(judgeId: string, round: Round) {
   return new Map((data ?? []).map((s) => [s.entry_id as string, { scores: s.scores, criteria: s.criteria, comment: s.comment, updated_at: s.updated_at } as MyScore]));
 }
 
-// My prelim group, ranked by my mean score. The top entry (if not tied) is my finalist.
+// The judging group an admin put me in (judge_groups), with the other judges' names; null when
+// I judge alone. Also null before the judge_groups migration is applied.
+async function myJudgingGroup(judgeId: string) {
+  const supabase = await createClient();
+  const { data: mine } = await supabase.from("judge_group_members").select("group_id, judge_groups(name)").eq("judge_id", judgeId).maybeSingle();
+  if (!mine) return null;
+  const { data: others } = await supabase
+    .from("judge_group_members")
+    .select("profiles(display_name)")
+    .eq("group_id", mine.group_id)
+    .neq("judge_id", judgeId);
+  return {
+    name: (mine.judge_groups as unknown as { name: string } | null)?.name ?? "Your group",
+    others: (others ?? []).map((o) => (o.profiles as unknown as { display_name: string } | null)?.display_name ?? "another judge"),
+  };
+}
+
+// My prelim entries, ranked by my mean score. Judging alone, the top entry (if not tied) is my
+// finalist. In a group, the group's top entry by mean across its judges is, which I can't
+// compute from my scores alone: finalistId is null and /judge marks the group's finalist from
+// judge_finalists().
 export async function getMyGroup(judgeId: string) {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("judge_assignments")
-    .select("entry_id, judge_entries(id, title, fallback_team_name, teams(name))")
-    .eq("judge_id", judgeId);
+  const [{ data, error }, group] = await Promise.all([
+    supabase.from("judge_assignments").select("entry_id, judge_entries(id, title, fallback_team_name, teams(name))").eq("judge_id", judgeId),
+    myJudgingGroup(judgeId),
+  ]);
   if (error) return { ok: false as const };
   const scores = await myScores(judgeId, "prelim");
   const entries = (data ?? [])
@@ -57,8 +77,8 @@ export async function getMyGroup(judgeId: string) {
     .map((e) => ({ id: e.id, title: e.title, team: teamName(e), myScore: scores.get(e.id) ?? null }));
   const ranked = rankByScore(entries, (e) => (e.myScore ? mean(e.myScore.scores) : null));
   const top = ranked[0];
-  const finalistId = top && top.rank === 1 && !top.tied && top.score !== null ? top.id : null;
-  return { ok: true as const, ranked, finalistId, scoredCount: entries.filter((e) => e.myScore).length };
+  const finalistId = !group && top && top.rank === 1 && !top.tied && top.score !== null ? top.id : null;
+  return { ok: true as const, ranked, finalistId, group, scoredCount: entries.filter((e) => e.myScore).length };
 }
 
 export async function getFinalRound(judgeId: string) {

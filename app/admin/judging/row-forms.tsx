@@ -1,25 +1,39 @@
 "use client";
 
 import { startTransition, useActionState, useState } from "react";
-import { assignJudge, autoAssign, createFallbackEntry, generateNotes, setFinalist, setJudgingCriteria, type RowState } from "./actions";
+import {
+  addGroupMember,
+  assignJudge,
+  autoAssign,
+  createFallbackEntry,
+  createGroup,
+  deleteGroup,
+  generateNotes,
+  removeGroupMember,
+  setFinalist,
+  setJudgingCriteria,
+  type RowState,
+} from "./actions";
 
 const select = "rounded border border-foreground/20 bg-background text-xs disabled:opacity-60";
 const button = "rounded border border-foreground/20 px-2 py-0.5 text-xs hover:bg-foreground/5 disabled:cursor-wait disabled:opacity-50";
 const idle: RowState = { status: "idle" };
 
-export type JudgeOption = { id: string; name: string; load: number };
+export type JudgeOption = { id: string; name: string };
+// Who judges an entry: a group ("group:<id>") or a judge in no group ("judge:<id>").
+export type UnitOption = { value: string; name: string; load: number };
 
-// Judge dropdown for one entry. The option list shows each judge's current load.
-export function JudgeForm({ entryId, judgeId, judges }: { entryId: string; judgeId: string | null; judges: JudgeOption[] }) {
+// Judge dropdown for one entry: groups first, then judges in no group, each with its current load.
+export function JudgeForm({ entryId, unit, units }: { entryId: string; unit: string | null; units: UnitOption[] }) {
   const [state, formAction, pending] = useActionState(assignJudge, idle);
   return (
     <form action={formAction} className="flex flex-wrap items-center gap-1">
       <input type="hidden" name="entry_id" value={entryId} />
-      <select key={judgeId ?? ""} name="judge_id" defaultValue={judgeId ?? ""} disabled={pending} className={select} aria-label="Judge">
+      <select key={unit ?? ""} name="unit" defaultValue={unit ?? ""} disabled={pending} className={select} aria-label="Judge or group">
         <option value="">No judge</option>
-        {judges.map((j) => (
-          <option key={j.id} value={j.id}>
-            {j.name} ({j.load})
+        {units.map((u) => (
+          <option key={u.value} value={u.value}>
+            {u.name} ({u.load})
           </option>
         ))}
       </select>
@@ -148,7 +162,117 @@ export function AutoAssignForm({ world }: { world: "real" | "test" }) {
   );
 }
 
-export type CriterionOption = { key: string; name: string; note?: string; isDefault: boolean };
+function Message({ state }: { state: RowState }) {
+  if (!state.message) return null;
+  return (
+    <span className={`text-xs ${state.status === "error" ? "text-red-600" : "text-foreground/70"}`} role="status">
+      {state.message}
+    </span>
+  );
+}
+
+// New judging group: a name and two or more judges who aren't in a group yet.
+export function CreateGroupForm({ world, judges }: { world: "real" | "test"; judges: JudgeOption[] }) {
+  const [state, formAction, pending] = useActionState(createGroup, idle);
+  return (
+    <form action={formAction} key={state.status === "ok" ? state.message : "form"} className="space-y-2 rounded border border-foreground/15 px-3 py-2">
+      <input type="hidden" name="world" value={world} />
+      <label className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="font-medium">New group</span>
+        <input name="name" required maxLength={60} placeholder="Group name" className="rounded border border-foreground/20 bg-background px-2 py-0.5 text-sm" />
+      </label>
+      {judges.length < 2 ? (
+        <p className="text-xs text-foreground/60">A group needs two judges who aren&apos;t in a group yet.</p>
+      ) : (
+        <fieldset disabled={pending} className="flex flex-wrap gap-x-4 gap-y-1">
+          <legend className="sr-only">Judges</legend>
+          {judges.map((j) => (
+            <label key={j.id} className="flex items-center gap-1 text-sm">
+              <input type="checkbox" name="judge_id" value={j.id} />
+              {j.name}
+            </label>
+          ))}
+        </fieldset>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="submit" disabled={pending || judges.length < 2} className={button}>
+          {pending ? "Creating…" : "Create group"}
+        </button>
+        <Message state={state} />
+      </div>
+    </form>
+  );
+}
+
+// Add one judge who isn't in a group to this group.
+export function AddMemberForm({ groupId, judges }: { groupId: string; judges: JudgeOption[] }) {
+  const [state, formAction, pending] = useActionState(addGroupMember, idle);
+  if (!judges.length) return null;
+  return (
+    <form action={formAction} className="flex flex-wrap items-center gap-1">
+      <input type="hidden" name="group_id" value={groupId} />
+      <select name="judge_id" defaultValue="" required disabled={pending} className={select} aria-label="Judge to add">
+        <option value="" disabled>
+          Add a judge…
+        </option>
+        {judges.map((j) => (
+          <option key={j.id} value={j.id}>
+            {j.name}
+          </option>
+        ))}
+      </select>
+      <button type="submit" disabled={pending} className={button}>
+        {pending ? "Adding…" : "Add"}
+      </button>
+      <Message state={state} />
+    </form>
+  );
+}
+
+export function RemoveMemberButton({ groupId, judgeId, name, last }: { groupId: string; judgeId: string; name: string; last: boolean }) {
+  const [state, formAction, pending] = useActionState(removeGroupMember, idle);
+  return (
+    <form
+      action={formAction}
+      onSubmit={(event) => {
+        const note = last
+          ? `${name} is the last judge in this group. Remove them and delete the group? They keep its entries, judging alone.`
+          : `Remove ${name} from this group? The group keeps its entries; ${name}'s scores for them stop counting.`;
+        if (!confirm(note)) event.preventDefault();
+      }}
+      className="inline-flex items-center gap-1"
+    >
+      <input type="hidden" name="group_id" value={groupId} />
+      <input type="hidden" name="judge_id" value={judgeId} />
+      <button type="submit" disabled={pending} className="text-xs text-foreground/60 underline hover:text-foreground" aria-label={`Remove ${name}`}>
+        {pending ? "removing…" : "remove"}
+      </button>
+      <Message state={state} />
+    </form>
+  );
+}
+
+export function DeleteGroupButton({ groupId, name, entries }: { groupId: string; name: string; entries: number }) {
+  const [state, formAction, pending] = useActionState(deleteGroup, idle);
+  return (
+    <form
+      action={formAction}
+      onSubmit={(event) => {
+        const note = `Delete ${name}? Its judges go back to judging alone${entries ? `, and its ${entries} entr${entries === 1 ? "y goes" : "ies go"} back to having no judge` : ""}. Saved scores stay.`;
+        if (!confirm(note)) event.preventDefault();
+      }}
+      className="inline-flex items-center gap-1"
+    >
+      <input type="hidden" name="group_id" value={groupId} />
+      <button type="submit" disabled={pending} className={button}>
+        {pending ? "Deleting…" : "Delete group"}
+      </button>
+      <Message state={state} />
+    </form>
+  );
+}
+
+export type CriterionOption ={ key: string; name: string; note?: string; isDefault: boolean };
 
 // The criteria judges score: one checkbox each, at least one on. Disabled while locked.
 export function CriteriaForm({ criteria, enabled, locked }: { criteria: CriterionOption[]; enabled: string[]; locked: boolean }) {

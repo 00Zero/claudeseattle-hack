@@ -27,49 +27,203 @@ function done(): RowState {
   return { status: "ok" };
 }
 
+type Admin = ReturnType<typeof createAdminClient>;
+
 // Judges in one world: real judges score real entries, test judges test entries
 // (lib/test-accounts.ts). Admins are real.
-async function judgeIds(admin: ReturnType<typeof createAdminClient>, roles: string[], isTest: boolean) {
+async function judgeIds(admin: Admin, roles: string[], isTest: boolean) {
   const { data } = await admin.from("profiles").select("id").in("platform_role", roles).eq("is_test", isTest);
   return (data ?? []).map((p) => p.id as string);
 }
 
-async function entryIsTest(admin: ReturnType<typeof createAdminClient>, entryId: string) {
+async function entryIsTest(admin: Admin, entryId: string) {
   const { data } = await admin.from("judge_entry_results").select("is_test").eq("entry_id", entryId).maybeSingle();
   return Boolean(data?.is_test);
 }
 
-// Prelim: one judge per entry from the table's dropdown. An empty choice unassigns.
+// Judging groups (judge_groups migration): judges in a group score the same entries, and the
+// group sends its top entry by mean score to the final. A judge in no group judges alone.
+// judge_assignments holds one row per member per entry, so RLS and /judge need nothing else.
+
+async function groupMembers(admin: Admin, groupId: string) {
+  const { data, error } = await admin.from("judge_group_members").select("judge_id").eq("group_id", groupId);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((m) => m.judge_id as string);
+}
+
+async function loadGroup(admin: Admin, groupId: string) {
+  const { data } = await admin.from("judge_groups").select("id, name, is_test").eq("id", groupId).maybeSingle();
+  return data as { id: string; name: string; is_test: boolean } | null;
+}
+
+// Every member gets a row for every entry any member has, so the group judges one set together.
+async function syncGroup(admin: Admin, groupId: string) {
+  const members = await groupMembers(admin, groupId);
+  if (!members.length) return 0;
+  const { data, error } = await admin.from("judge_assignments").select("entry_id").in("judge_id", members);
+  if (error) throw new Error(error.message);
+  const entries = [...new Set((data ?? []).map((a) => a.entry_id as string))];
+  if (entries.length) {
+    const { error: upsertError } = await admin
+      .from("judge_assignments")
+      .upsert(entries.flatMap((entry_id) => members.map((judge_id) => ({ entry_id, judge_id }))), { onConflict: "entry_id,judge_id", ignoreDuplicates: true });
+    if (upsertError) throw new Error(upsertError.message);
+  }
+  return entries.length;
+}
+
+// A judge who may join a group in this world and isn't in one yet; null when that's fine.
+async function cannotJoin(admin: Admin, judgeId: string, isTest: boolean) {
+  if (!(await judgeIds(admin, ["judge", "admin"], isTest)).includes(judgeId)) return "Only judges (and admins) can be in a group. Set roles on the People tab.";
+  const { data } = await admin.from("judge_group_members").select("judge_groups(name)").eq("judge_id", judgeId).maybeSingle();
+  if (data) return `That judge is already in ${(data.judge_groups as unknown as { name: string } | null)?.name ?? "a group"}. Remove them there first.`;
+  return null;
+}
+
+function entries(n: number) {
+  return `${n} entr${n === 1 ? "y" : "ies"}`;
+}
+
+// New group: a name and two or more judges who aren't in a group. Entries they already have
+// become the group's, so every member scores all of them.
+export async function createGroup(_prev: RowState, formData: FormData): Promise<RowState> {
+  await assertAdmin();
+  const isTest = formData.get("world") === "test";
+  const name = String(formData.get("name") ?? "").trim().slice(0, 60);
+  const picked = [...new Set(formData.getAll("judge_id").map(String))];
+  if (!name) return { status: "error", message: "Name the group." };
+  if (picked.length < 2 || picked.some((j) => !UUID.test(j))) return { status: "error", message: "Pick two or more judges." };
+
+  const admin = createAdminClient();
+  for (const judgeId of picked) {
+    const reason = await cannotJoin(admin, judgeId, isTest);
+    if (reason) return { status: "error", message: reason };
+  }
+  const { data: group, error } = await admin.from("judge_groups").insert({ name, is_test: isTest }).select("id").single();
+  if (error || !group) return { status: "error", message: error?.message ?? "Couldn't create the group." };
+  const { error: membersError } = await admin.from("judge_group_members").insert(picked.map((judge_id) => ({ judge_id, group_id: group.id })));
+  if (membersError) {
+    await admin.from("judge_groups").delete().eq("id", group.id);
+    return { status: "error", message: membersError.message };
+  }
+  const count = await syncGroup(admin, group.id);
+  done();
+  return { status: "ok", message: `Created ${name}${count ? ` with ${entries(count)} from its judges` : ""}.` };
+}
+
+// Add a judge to a group: they get the group's entries, and any entries they had alone become
+// the group's too.
+export async function addGroupMember(_prev: RowState, formData: FormData): Promise<RowState> {
+  await assertAdmin();
+  const groupId = id(formData, "group_id");
+  const judgeId = id(formData, "judge_id");
+  if (!groupId || !judgeId) return { status: "error", message: "Pick a judge." };
+  const admin = createAdminClient();
+  const group = await loadGroup(admin, groupId);
+  if (!group) return { status: "error", message: "That group doesn't exist." };
+  const reason = await cannotJoin(admin, judgeId, group.is_test);
+  if (reason) return { status: "error", message: reason };
+  const { error } = await admin.from("judge_group_members").insert({ judge_id: judgeId, group_id: groupId });
+  if (error) return { status: "error", message: error.message };
+  await syncGroup(admin, groupId);
+  return done();
+}
+
+// Remove a judge from a group: the group keeps its entries and the judge loses them (their saved
+// scores stay but no longer count toward the group). If they were the last member, the group is
+// deleted and they keep the entries, judging alone.
+export async function removeGroupMember(_prev: RowState, formData: FormData): Promise<RowState> {
+  await assertAdmin();
+  const groupId = id(formData, "group_id");
+  const judgeId = id(formData, "judge_id");
+  if (!groupId || !judgeId) return { status: "error", message: "Bad request." };
+  const admin = createAdminClient();
+  const others = (await groupMembers(admin, groupId)).filter((j) => j !== judgeId);
+  if (others.length) {
+    const { error } = await admin.from("judge_assignments").delete().eq("judge_id", judgeId);
+    if (error) return { status: "error", message: error.message };
+  }
+  const { error } = others.length
+    ? await admin.from("judge_group_members").delete().eq("judge_id", judgeId).eq("group_id", groupId)
+    : await admin.from("judge_groups").delete().eq("id", groupId);
+  if (error) return { status: "error", message: error.message };
+  return done();
+}
+
+// Delete a group: its judges go back to judging alone, and its entries go back to having no
+// judge (otherwise each former member would have every entry and send their own finalist).
+// Saved scores stay.
+export async function deleteGroup(_prev: RowState, formData: FormData): Promise<RowState> {
+  await assertAdmin();
+  const groupId = id(formData, "group_id");
+  if (!groupId) return { status: "error", message: "Bad request." };
+  const admin = createAdminClient();
+  const members = await groupMembers(admin, groupId);
+  if (members.length) {
+    const { error } = await admin.from("judge_assignments").delete().in("judge_id", members);
+    if (error) return { status: "error", message: error.message };
+  }
+  const { error } = await admin.from("judge_groups").delete().eq("id", groupId);
+  if (error) return { status: "error", message: error.message };
+  return done();
+}
+
+// Prelim: a group or a judge (in no group) per entry from the table's dropdown, as
+// "group:<id>" or "judge:<id>". An empty choice unassigns.
 export async function assignJudge(_prev: RowState, formData: FormData): Promise<RowState> {
   await assertAdmin();
   const entryId = id(formData, "entry_id");
   if (!entryId) return { status: "error", message: "Missing entry." };
-  const judgeId = formData.get("judge_id") ? id(formData, "judge_id") : null;
-  if (formData.get("judge_id") && !judgeId) return { status: "error", message: "Unknown judge." };
+  const choice = String(formData.get("unit") ?? "");
+  const [kind, unitId] = choice.split(":");
+  if (choice && (!["group", "judge"].includes(kind) || !UUID.test(unitId ?? ""))) return { status: "error", message: "Unknown judge or group." };
 
   const admin = createAdminClient();
-  if (judgeId && !(await judgeIds(admin, ["judge", "admin"], await entryIsTest(admin, entryId))).includes(judgeId)) {
-    return { status: "error", message: "That person isn't a judge for this entry. Set their role on the People tab." };
+  const isTest = await entryIsTest(admin, entryId);
+  let judges: string[] = [];
+  if (kind === "group") {
+    const group = await loadGroup(admin, unitId);
+    if (!group || group.is_test !== isTest) return { status: "error", message: "That group doesn't judge this world's entries." };
+    judges = await groupMembers(admin, unitId);
+    if (!judges.length) return { status: "error", message: "That group has no judges yet." };
+  } else if (kind === "judge") {
+    if (!(await judgeIds(admin, ["judge", "admin"], isTest)).includes(unitId)) {
+      return { status: "error", message: "That person isn't a judge for this entry. Set their role on the People tab." };
+    }
+    const { data: grouped } = await admin.from("judge_group_members").select("group_id").eq("judge_id", unitId).maybeSingle();
+    judges = grouped ? await groupMembers(admin, grouped.group_id) : [unitId];
   }
   const { error: clearError } = await admin.from("judge_assignments").delete().eq("entry_id", entryId);
   if (clearError) return { status: "error", message: clearError.message };
-  if (judgeId) {
-    const { error } = await admin.from("judge_assignments").insert({ entry_id: entryId, judge_id: judgeId });
+  if (judges.length) {
+    const { error } = await admin.from("judge_assignments").insert(judges.map((judge_id) => ({ entry_id: entryId, judge_id })));
     if (error) return { status: "error", message: error.message };
   }
   return done();
 }
 
-// Spread submitted entries that have no judge across people with the judge role, filling
-// whoever has the fewest first. Existing assignments are kept, so it's safe to run again.
-// One world at a time (the page's "world" field): real entries to real judges, test to test.
-// Returns a message for the button instead of throwing, so "no judges yet" isn't an error page.
+// Spread submitted entries that have no judge across groups and the judges in no group (people
+// with the judge role), filling whoever has the fewest entries first. Existing assignments are
+// kept, so it's safe to run again. One world at a time (the page's "world" field): real entries to
+// real judges, test to test. Returns a message for the button instead of throwing, so "no judges
+// yet" isn't an error page.
 export async function autoAssign(_prev: RowState, formData: FormData): Promise<RowState> {
   await assertAdmin();
   const isTest = formData.get("world") === "test";
   const admin = createAdminClient();
-  const judges = await judgeIds(admin, ["judge"], isTest);
-  if (!judges.length) {
+  const [judges, { data: groups }, { data: memberships }] = await Promise.all([
+    judgeIds(admin, ["judge"], isTest),
+    admin.from("judge_groups").select("id").eq("is_test", isTest),
+    admin.from("judge_group_members").select("judge_id, group_id"),
+  ]);
+  // A unit is a group (its members) or a judge in no group (themselves).
+  const unitOf = new Map((memberships ?? []).map((m) => [m.judge_id as string, m.group_id as string]));
+  const units = new Map<string, string[]>();
+  for (const g of groups ?? []) units.set(g.id, []);
+  for (const m of memberships ?? []) units.get(m.group_id)?.push(m.judge_id);
+  for (const [unit, members] of units) if (!members.length) units.delete(unit);
+  for (const j of judges) if (!unitOf.has(j)) units.set(j, [j]);
+  if (!units.size) {
     return {
       status: "error",
       message: isTest
@@ -78,7 +232,7 @@ export async function autoAssign(_prev: RowState, formData: FormData): Promise<R
     };
   }
 
-  const [{ data: entries }, { data: assignments }] = await Promise.all([
+  const [{ data: results }, { data: assignments }] = await Promise.all([
     admin
       .from("judge_entry_results")
       .select("entry_id")
@@ -88,15 +242,18 @@ export async function autoAssign(_prev: RowState, formData: FormData): Promise<R
     admin.from("judge_assignments").select("entry_id, judge_id"),
   ]);
   const assigned = new Set((assignments ?? []).map((a) => a.entry_id));
-  const load = new Map(judges.map((j) => [j, 0]));
-  for (const a of assignments ?? []) if (load.has(a.judge_id)) load.set(a.judge_id, load.get(a.judge_id)! + 1);
+  const unitEntries = new Map([...units.keys()].map((u) => [u, new Set<string>()]));
+  for (const a of assignments ?? []) unitEntries.get(unitOf.get(a.judge_id) ?? a.judge_id)?.add(a.entry_id);
+  const load = new Map([...unitEntries].map(([u, set]) => [u, set.size]));
 
   const rows: { entry_id: string; judge_id: string }[] = [];
-  for (const { entry_id } of entries ?? []) {
+  let count = 0;
+  for (const { entry_id } of results ?? []) {
     if (assigned.has(entry_id)) continue;
-    const [judge] = [...load.entries()].sort((a, b) => a[1] - b[1])[0];
-    rows.push({ entry_id, judge_id: judge });
-    load.set(judge, load.get(judge)! + 1);
+    const [unit] = [...load.entries()].sort((a, b) => a[1] - b[1])[0];
+    for (const judge_id of units.get(unit)!) rows.push({ entry_id, judge_id });
+    load.set(unit, load.get(unit)! + 1);
+    count++;
   }
   if (rows.length) {
     const { error } = await admin.from("judge_assignments").insert(rows);
@@ -105,7 +262,7 @@ export async function autoAssign(_prev: RowState, formData: FormData): Promise<R
   done();
   return {
     status: "ok",
-    message: rows.length ? `Assigned ${rows.length} entr${rows.length === 1 ? "y" : "ies"}.` : "Every submitted entry already has a judge.",
+    message: count ? `Assigned ${entries(count)}.` : "Every submitted entry already has a judge.",
   };
 }
 

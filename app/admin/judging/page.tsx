@@ -7,9 +7,22 @@ import { ALL_CRITERIA, DEFAULT_CRITERIA, formatScore, sameCriteria } from "@/app
 import { SubmitButton } from "../submit-button";
 import { decideLateSave, setPublish } from "./actions";
 import { aiNotesConfigured, type AiNotesBody } from "@/app/(judge)/_lib/ai-notes";
-import { AiNotesForm, AutoAssignForm, CriteriaForm, FallbackEntryForm, FinalistForm, JudgeForm, type JudgeOption } from "./row-forms";
+import {
+  AddMemberForm,
+  AiNotesForm,
+  AutoAssignForm,
+  CreateGroupForm,
+  CriteriaForm,
+  DeleteGroupButton,
+  FallbackEntryForm,
+  FinalistForm,
+  JudgeForm,
+  RemoveMemberButton,
+  type JudgeOption,
+  type UnitOption,
+} from "./row-forms";
 
-// Admin judging: one row per entry with its judge, scores, finalist, and place; late saves to
+// Admin judging: judging groups; one row per entry with its judge or group, scores, finalist, and place; late saves to
 // accept or reject; publish toggles. docs/REQUIREMENTS.md, "Judging app (Dev B)", admin table.
 // Reads judge_entry_results with the service role, after the admin check.
 
@@ -61,7 +74,7 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
   const aiParam = showAi ? "&ai=1" : "";
 
   const admin = createAdminClient();
-  const [results, entries, assignments, judges, teams, lateSaves, settings, aiNotes, enabled, lock] = await Promise.all([
+  const [results, entries, assignments, judges, groups, memberships, teams, lateSaves, settings, aiNotes, enabled, lock] = await Promise.all([
     admin.from("judge_entry_results").select("*"),
     admin.from("judge_entries").select("id, finalist_override"),
     admin.from("judge_assignments").select("entry_id, judge_id"),
@@ -71,6 +84,9 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
       .in("platform_role", ["judge", "admin"])
       .eq("is_test", isTest)
       .order("display_name"),
+    // Missing until the judge_groups migration is applied: then everyone judges alone.
+    admin.from("judge_groups").select("id, name").eq("is_test", isTest).order("name"),
+    admin.from("judge_group_members").select("judge_id, group_id").order("added_at"),
     admin.from("teams").select("id, leader:profiles!teams_leader_id_fkey!inner(is_test)", { count: "exact", head: true }).eq("leader.is_test", isTest),
     admin
       .from("judge_late_saves")
@@ -103,25 +119,41 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
   const rows = ((results.data ?? []) as Result[]).filter((r) => r.is_test === isTest);
   const late = (lateSaves.data ?? []).filter((l) => (l.saver as unknown as { is_test: boolean } | null)?.is_test === isTest);
   const overrides = new Map((entries.data ?? []).map((e) => [e.id as string, e.finalist_override as boolean | null]));
-  const judgeOf = new Map((assignments.data ?? []).map((a) => [a.entry_id as string, a.judge_id as string]));
-  const load = new Map<string, number>();
-  for (const a of assignments.data ?? []) load.set(a.judge_id, (load.get(a.judge_id) ?? 0) + 1);
-  const judgeOptions: JudgeOption[] = (judges.data ?? []).map((j) => ({
-    id: j.id,
-    name: j.platform_role === "admin" ? `${j.display_name} (admin)` : j.display_name,
-    load: load.get(j.id) ?? 0,
+  // Who judges what: a group, or a judge in no group, judging alone (a one-person group).
+  const judgeName = new Map(
+    (judges.data ?? []).map((j) => [j.id as string, j.platform_role === "admin" ? `${j.display_name} (admin)` : (j.display_name as string)]),
+  );
+  const groupList = (groups.data ?? []).map((g) => ({
+    id: g.id as string,
+    name: g.name as string,
+    members: (memberships.data ?? []).filter((m) => m.group_id === g.id && judgeName.has(m.judge_id)).map((m) => m.judge_id as string),
   }));
-  const judgeName = new Map(judgeOptions.map((j) => [j.id, j.name]));
+  const groupOf = new Map(groupList.flatMap((g) => g.members.map((j) => [j, g.id] as const)));
+  const unitOfJudge = (judgeId: string) => (groupOf.has(judgeId) ? `group:${groupOf.get(judgeId)}` : `judge:${judgeId}`);
+  const unitOf = new Map<string, string>();
+  for (const a of assignments.data ?? []) if (!unitOf.has(a.entry_id)) unitOf.set(a.entry_id, unitOfJudge(a.judge_id));
+  const load = new Map<string, number>();
+  for (const u of unitOf.values()) load.set(u, (load.get(u) ?? 0) + 1);
+  const solo: JudgeOption[] = [...judgeName].filter(([j]) => !groupOf.has(j)).map(([id, name]) => ({ id, name }));
+  const unitOptions: UnitOption[] = [
+    ...groupList.map((g) => ({
+      value: `group:${g.id}`,
+      name: `${g.name}: ${g.members.map((j) => judgeName.get(j)).join(", ") || "no judges"}`,
+      load: load.get(`group:${g.id}`) ?? 0,
+    })),
+    ...solo.map((j) => ({ value: `judge:${j.id}`, name: j.name, load: load.get(`judge:${j.id}`) ?? 0 })),
+  ];
+  const unitName = new Map(unitOptions.map((u) => [u.value, u.name]));
 
   const compare =
     sort === "judge"
-      ? (a: Result, b: Result) => (judgeName.get(judgeOf.get(a.entry_id) ?? "") ?? "~").localeCompare(judgeName.get(judgeOf.get(b.entry_id) ?? "") ?? "~")
+      ? (a: Result, b: Result) => (unitName.get(unitOf.get(a.entry_id) ?? "") ?? "~").localeCompare(unitName.get(unitOf.get(b.entry_id) ?? "") ?? "~")
       : SORTS[sort];
   rows.sort((a, b) => compare(a, b) || a.team_name.localeCompare(b.team_name));
 
   const submittedCount = rows.filter((r) => r.submitted).length;
   const withoutSubmission = Math.max(0, (teams.count ?? 0) - rows.filter((r) => r.submitted && r.team_id).length);
-  const unassigned = rows.filter((r) => r.submitted && !judgeOf.has(r.entry_id)).length;
+  const unassigned = rows.filter((r) => r.submitted && !unitOf.has(r.entry_id)).length;
   const finalists = rows.filter((r) => r.is_finalist);
   const notesBy = new Map((aiNotes.data ?? []).map((n) => [n.entry_id as string, n.notes as Partial<AiNotesBody> | null]));
   const withNotes = new Set(notesBy.keys());
@@ -219,15 +251,47 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
       </section>
 
       <section className="space-y-3">
+        <h2 className="text-lg font-semibold">Judging groups</h2>
+        <p className="text-sm text-foreground/70">
+          Judges in a group score the same entries, and the group sends its top entry (by the mean of its judges&apos; scores) to the
+          final. A judge in no group judges alone. Putting judges in a group gives the group every entry they already had; set up
+          groups before assigning entries.
+          {groups.error && " Groups aren't in the database yet: apply the judge_groups migration."}
+        </p>
+        {groupList.length > 0 && (
+          <ul className="space-y-2">
+            {groupList.map((g) => (
+              <li key={g.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded border border-foreground/15 px-3 py-2 text-sm">
+                <span className="font-medium">{g.name}</span>
+                <span className="text-xs text-foreground/60">{load.get(`group:${g.id}`) ?? 0} entries</span>
+                <span className="flex grow flex-wrap gap-x-3 gap-y-1">
+                  {g.members.length === 0 && <span className="text-foreground/60">No judges</span>}
+                  {g.members.map((j) => (
+                    <span key={j} className="inline-flex items-center gap-1">
+                      {judgeName.get(j)}
+                      <RemoveMemberButton groupId={g.id} judgeId={j} name={judgeName.get(j) ?? "this judge"} last={g.members.length === 1} />
+                    </span>
+                  ))}
+                </span>
+                <AddMemberForm groupId={g.id} judges={solo} />
+                <DeleteGroupButton groupId={g.id} name={g.name} entries={load.get(`group:${g.id}`) ?? 0} />
+              </li>
+            ))}
+          </ul>
+        )}
+        {!groups.error && <CreateGroupForm key={groupList.length} world={isTest ? "test" : "real"} judges={solo} />}
+      </section>
+
+      <section className="space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <h2 className="text-lg font-semibold">Entries</h2>
           <AutoAssignForm world={isTest ? "test" : "real"} />
         </div>
         <p className="text-sm text-foreground/70">
-          Prelim: one judge per entry; each judge&apos;s top-scored entry becomes a finalist (an exact tie makes none until the
-          judge adjusts a score). Scores are the mean of {enabled.criteria.map((c) => c.name).join(", ")}. Override with the
-          finalist column. Judges and their load:{" "}
-          {judgeOptions.length ? judgeOptions.map((j) => `${j.name} ${j.load}`).join(", ") : "nobody has the judge role yet"}.
+          Prelim: one group or judge per entry; each group&apos;s (or lone judge&apos;s) top-scored entry becomes a finalist (an
+          exact tie makes none until a judge adjusts a score). Scores are the mean of {enabled.criteria.map((c) => c.name).join(", ")}.
+          Override with the finalist column. Load:{" "}
+          {unitOptions.length ? unitOptions.map((u) => `${u.name} ${u.load}`).join("; ") : "nobody has the judge role yet"}.
         </p>
         {!isTest && <FallbackEntryForm />}
         {rows.length === 0 ? (
@@ -239,7 +303,7 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
                 <tr>
                   {header("team", "Team")}
                   {header("submitted", "Submitted")}
-                  {header("judge", "Judge")}
+                  {header("judge", "Judge or group")}
                   {header("prelim", "Prelim")}
                   {header("final", "Final")}
                   <th className={th}>Finalist</th>
@@ -263,7 +327,7 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
                       )}
                     </td>
                     <td className={td}>
-                      <JudgeForm entryId={r.entry_id} judgeId={judgeOf.get(r.entry_id) ?? null} judges={judgeOptions} />
+                      <JudgeForm entryId={r.entry_id} unit={unitOf.get(r.entry_id) ?? null} units={unitOptions} />
                     </td>
                     <td className={td}>
                       {formatScore(r.prelim_score)} <span className="text-xs text-foreground/50">({r.prelim_votes})</span>
