@@ -164,14 +164,25 @@ export default async function SlidesPage() {
       ),
     },
     {
-      title: "Vibe coding",
+      title: "Agentic coding",
       tone: "dark",
       content: (
         <div className="grid h-full grid-cols-[1fr_1fr] items-center gap-16">
           <div className={`${styles.stagger} flex flex-col gap-8`}>
-            <Sig call="Define(vibe coding)" title="What is vibe coding?" />
+            <Sig
+              call="Define(agentic coding)"
+              title={
+                <>
+                  What is{" "}
+                  <span className={styles.struck}>
+                    vibe coding
+                  </span>{" "}
+                  <span className={`${styles.replacement} italic text-accent`}>agentic coding</span>?
+                </>
+              }
+            />
             <p className="font-display text-[42px] font-light leading-snug">You describe what you want in plain language. An AI agent writes, runs, and fixes the code.</p>
-            <p className="text-[24px] text-fg-muted">Also called agentic coding or AI code generation. Collins Word of the Year 2025.</p>
+            <p className="text-[24px] text-fg-muted">Also called vibe coding (Collins Word of the Year 2025) or AI code generation.</p>
             <blockquote className="border-l-4 border-accent pl-6 text-[24px] italic text-fg-muted">
               &ldquo;Fully give in to the vibes&hellip; and forget that the code even exists.&rdquo;
               <span className="mt-1 block font-mono text-[18px] not-italic text-fg-faint">Andrej Karpathy</span>
