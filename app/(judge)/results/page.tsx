@@ -69,6 +69,7 @@ export default async function ResultsPage() {
             </div>
           ))}
         </div>
+        <p className="text-sm text-fg-muted">{prizes.winnersValue}</p>
         <Link href="/entries" className="btn btn-ghost">
           Browse every entry
         </Link>

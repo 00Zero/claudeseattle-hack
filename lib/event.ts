@@ -31,13 +31,11 @@ export const ambassadors: Entry[] = [];
 
 export const prizes = {
   everyone: "Every participant gets $100 in Claude API credits.",
-  winners: [
-    "One month of Claude Max 20x per person",
-    "Tickets to the Seattle AI Week AI Summit (courtesy of WTIA)",
-    "A one-year WTIA membership",
-  ],
+  winners: ["One month of Claude Max 20x per person", "A one-year WTIA membership"],
+  // Shown under the list: the winning team's prizes in total.
+  winnersValue: "The winning team receives up to $1,000 in prizes per person.",
   // The top three places (the winner included).
-  topThree: ["Anthropic swag"],
+  topThree: ["Tickets to the Seattle AI Week AI Summit and the AI Week Opening Reception (courtesy of WTIA)", "Anthropic swag"],
 };
 
 // Docs/REQUIREMENTS.md, "Rubric". Each criterion is scored 1–8; the entry score is the mean of
