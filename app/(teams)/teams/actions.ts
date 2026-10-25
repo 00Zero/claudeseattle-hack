@@ -4,7 +4,16 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { cleanNote } from "./_lib/notes";
-import { getViewer, isTeamFull, isTooManyApplications, joinableIds, MAX_APPLICATIONS, TEAM_MAX, TEAM_MIN } from "./_lib/teams";
+import {
+  getFormationDeadline,
+  getViewer,
+  isTeamFull,
+  isTooManyApplications,
+  joinableIds,
+  MAX_APPLICATIONS,
+  TEAM_MAX,
+  TEAM_MIN,
+} from "./_lib/teams";
 
 export type FormState = { status: "idle" | "ok" | "error"; message?: string };
 
@@ -123,7 +132,7 @@ export async function leaveTeam(_prev: FormState, formData: FormData): Promise<F
   const supabase = await createClient();
   const { data: team } = await supabase.from("teams").select("leader_id").eq("id", teamId).maybeSingle();
   if (team?.leader_id === viewer.profile.id) {
-    return { status: "error", message: "Leaders can't leave their team. Ask an organizer to hand it over." };
+    return { status: "error", message: "Leaders can't leave their team. Delete the team instead, or ask an organizer to hand it over." };
   }
   // Members (not applicants) can't take the team below 2.
   const { data: mine } = await supabase
@@ -195,6 +204,35 @@ export async function removeMember(_prev: FormState, formData: FormData) {
 
 // Leader edits the team's name, concept, and looking-for (RLS: teams_leader). Allowed after
 // the deadline; the pages show that it's past the deadline.
+// Leader deletes their own team until team formation closes. Everyone on it, the leader
+// included, is free to join another team; its applications, invites, and notes go with it
+// (RLS: teams_leader_delete; on delete cascade). A team with a judging entry can't be deleted.
+export async function deleteTeam(_prev: FormState, formData: FormData): Promise<FormState> {
+  const teamId = id(formData, "team_id");
+  if (!teamId) return { status: "error", message: "That team doesn't exist." };
+  const viewer = await getViewer();
+  if (!viewer.signedIn) return { status: "error", message: "Your session expired. Log in again." };
+  if ((await getFormationDeadline()).isPast) {
+    return { status: "error", message: "Team formation has closed. Ask an organizer to delete the team." };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("teams")
+    .delete()
+    .eq("id", teamId)
+    .eq("leader_id", viewer.profile.id)
+    .select("id");
+  if (error?.code === "23503") {
+    return { status: "error", message: "Your team has started a submission, so it can't be deleted. Ask an organizer." };
+  }
+  if (error || !data?.length) return { status: "error", message: "We couldn't delete the team. Reload and try again." };
+  revalidatePath("/teams");
+  revalidatePath("/teams/people");
+  revalidatePath("/teams/inbox");
+  redirect("/teams");
+}
+
 export async function updateTeam(_prev: FormState, formData: FormData): Promise<FormState> {
   const teamId = id(formData, "team_id");
   if (!teamId) return { status: "error", message: "That team doesn't exist." };
