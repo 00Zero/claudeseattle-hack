@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { sendFeedback, type FeedbackState } from "./feedback-actions";
 
 const KINDS = [
@@ -17,12 +17,8 @@ export function FeedbackButton({ maxLength }: { maxLength: number }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const [state, formAction, pending] = useActionState<FeedbackState, FormData>(sendFeedback, { status: "idle" });
-  const form = useRef<HTMLFormElement>(null);
-
-  // Clear the form after a send, so a second message starts fresh.
-  useEffect(() => {
-    if (state.status === "ok") form.current?.reset();
-  }, [state]);
+  // React clears the form after each submit; after an error it refills with what was sent.
+  const kept = state.status === "error" ? state : null;
 
   useEffect(() => {
     if (!open) return;
@@ -37,7 +33,6 @@ export function FeedbackButton({ maxLength }: { maxLength: number }) {
     <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-2 print:hidden">
       {open && (
         <form
-          ref={form}
           id="feedback-form"
           action={formAction}
           className="w-[min(22rem,calc(100vw-2rem))] space-y-3 rounded-lg border border-line bg-bg-raised p-4 text-sm shadow-lg"
@@ -48,7 +43,7 @@ export function FeedbackButton({ maxLength }: { maxLength: number }) {
             <legend className="sr-only">What is this about?</legend>
             {KINDS.map((kind, i) => (
               <label key={kind.value} className="flex items-center gap-1.5 rounded border border-line px-2 py-1 has-[:checked]:border-accent">
-                <input type="radio" name="kind" value={kind.value} defaultChecked={i === 0} className="accent-[var(--accent)]" />
+                <input type="radio" name="kind" value={kind.value} defaultChecked={kept?.kind ? kept.kind === kind.value : i === 0} className="accent-[var(--accent)]" />
                 {kind.label}
               </label>
             ))}
@@ -58,6 +53,7 @@ export function FeedbackButton({ maxLength }: { maxLength: number }) {
             required
             rows={4}
             maxLength={maxLength}
+            defaultValue={kept?.text ?? ""}
             placeholder="What happened, or what do you need?"
             className="w-full rounded border border-line-strong bg-bg px-2 py-1.5 text-fg"
           />
