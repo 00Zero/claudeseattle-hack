@@ -36,24 +36,30 @@ export function TitleBar({ signedIn, isAdmin, isSuperAdmin = false, isJudge = fa
             <b className="font-medium text-fg">claude seattle</b> <span className="hidden xl:inline">~/impact-lab</span>
           </span>
         </Link>
-        <nav aria-label="Pages" className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-1 gap-y-1 sm:gap-x-2">
-          {visible.map((page) => (
-            <Link key={page.href} href={page.href} prefetch={false} className="hidden rounded px-2 py-1 text-fg-muted hover:bg-fg/5 hover:text-fg sm:inline">
-              <span className="text-accent">/</span>
-              {page.label}
-            </Link>
-          ))}
-          {isAdmin && (
-            <Link href="/admin" prefetch={false} className="hidden rounded px-2 py-1 text-fg-muted hover:bg-fg/5 hover:text-fg sm:inline">
-              <span className="text-accent">/</span>admin
-            </Link>
-          )}
-          {/* Super admins: present the kickoff deck (/slides) in full screen. */}
-          {isSuperAdmin && <PresentButton />}
-          <AuthLink initialSignedIn={signedIn} />
-          {/* Phones: the page links above are hidden, so signed-in people get them (and /logout) in a menu. */}
-          {signedIn && <MobileMenu pages={isAdmin ? [...visible, { href: "/admin", label: "admin" }] : visible} />}
-          <ThemeToggle />
+        {/* Two groups: page links, then the buttons. flex-wrap-reverse puts the buttons on the top
+            row when both don't fit on one (judges and admins have more links). */}
+        <nav aria-label="Pages" className="ml-auto flex min-w-0 flex-wrap-reverse items-center justify-end gap-x-2 gap-y-1">
+          <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-1 gap-y-1 sm:gap-x-2">
+            {visible.map((page) => (
+              <Link key={page.href} href={page.href} prefetch={false} className="hidden rounded px-2 py-1 text-fg-muted hover:bg-fg/5 hover:text-fg sm:inline">
+                <span className="text-accent">/</span>
+                {page.label}
+              </Link>
+            ))}
+            {isAdmin && (
+              <Link href="/admin" prefetch={false} className="hidden rounded px-2 py-1 text-fg-muted hover:bg-fg/5 hover:text-fg sm:inline">
+                <span className="text-accent">/</span>admin
+              </Link>
+            )}
+          </div>
+          <div className="flex items-center gap-x-1 sm:gap-x-2">
+            {/* Super admins: present the kickoff deck (/slides) in full screen. */}
+            {isSuperAdmin && <PresentButton />}
+            <AuthLink initialSignedIn={signedIn} />
+            {/* Phones: the page links are hidden, so signed-in people get them (and /logout) in a menu. */}
+            {signedIn && <MobileMenu pages={isAdmin ? [...visible, { href: "/admin", label: "admin" }] : visible} />}
+            <ThemeToggle />
+          </div>
         </nav>
       </div>
     </header>
