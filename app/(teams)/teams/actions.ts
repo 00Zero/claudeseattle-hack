@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { cleanNote } from "./_lib/notes";
-import { getViewer, isTeamFull, isTooManyApplications, joinableIds, MAX_APPLICATIONS, TEAM_MAX, TEAM_MIN } from "./_lib/teams";
+import { getViewer, isTeamFull, isTooManyApplications, joinableIds, MAX_APPLICATIONS, TEAM_MAX } from "./_lib/teams";
 
 export type FormState = { status: "idle" | "ok" | "error"; message?: string };
 
@@ -113,7 +113,8 @@ export async function applyToTeam(_prev: FormState, formData: FormData): Promise
 }
 
 // Withdraw an application or leave the team: set your own row to 'left' (RLS: members_leave).
-// The leader can't leave, because the team would have no one to accept applicants.
+// The leader can't leave, because the team would have no one to accept applicants; they can
+// disband it instead. Members can leave even if that takes the team below 2 (the page warns).
 export async function leaveTeam(_prev: FormState, formData: FormData): Promise<FormState> {
   const teamId = id(formData, "team_id");
   if (!teamId) return { status: "error", message: "That team doesn't exist." };
@@ -123,17 +124,7 @@ export async function leaveTeam(_prev: FormState, formData: FormData): Promise<F
   const supabase = await createClient();
   const { data: team } = await supabase.from("teams").select("leader_id").eq("id", teamId).maybeSingle();
   if (team?.leader_id === viewer.profile.id) {
-    return { status: "error", message: "Leaders can't leave their team. Ask an organizer to hand it over." };
-  }
-  // Members (not applicants) can't take the team below 2.
-  const { data: mine } = await supabase
-    .from("team_members")
-    .select("status")
-    .eq("team_id", teamId)
-    .eq("profile_id", viewer.profile.id)
-    .maybeSingle();
-  if (mine?.status === "member" && (await memberCount(supabase, teamId)) <= TEAM_MIN) {
-    return { status: "error", message: `A team needs at least ${TEAM_MIN} people, so you can't leave right now. Ask an organizer.` };
+    return { status: "error", message: "Leaders can't leave their team. Disband it, or ask an organizer to hand it over." };
   }
   const { data, error } = await supabase
     .from("team_members")
@@ -148,7 +139,7 @@ export async function leaveTeam(_prev: FormState, formData: FormData): Promise<F
 
 // Leader actions on someone else's row (RLS: members_leader). Only status and joined_at
 // are updatable. An empty result means the row wasn't in the expected state, or the
-// viewer isn't the leader.
+// viewer isn't the leader. Removing can take the team down to just the leader.
 async function leaderUpdate(
   formData: FormData,
   from: "applied" | "member",
@@ -162,9 +153,6 @@ async function leaderUpdate(
   if (profileId === viewer.profile.id) return { status: "error", message: "You can't do that to yourself." };
 
   const supabase = await createClient();
-  if (to === "removed" && (await memberCount(supabase, teamId)) <= TEAM_MIN) {
-    return { status: "error", message: `A team needs at least ${TEAM_MIN} people. Add someone first, or ask an organizer.` };
-  }
   if (to === "member" && (await memberCount(supabase, teamId)) >= TEAM_MAX) {
     return { status: "error", message: `Your team is full (${TEAM_MAX} people). Remove someone first.` };
   }
@@ -191,6 +179,27 @@ export async function declineApplicant(_prev: FormState, formData: FormData) {
 
 export async function removeMember(_prev: FormState, formData: FormData) {
   return leaderUpdate(formData, "member", "removed");
+}
+
+const DISBAND_ERRORS: Record<string, string> = {
+  not_signed_in: "Your session expired. Log in again.",
+  not_leader: "Only the team leader can disband the team.",
+  has_entry: "Your team has a submission, so it can't be disbanded. Ask an organizer.",
+};
+
+// Leader disbands the team: disband_team() deletes it with its memberships and invites, so
+// everyone on it is free to join another team. Refused once the team has a judging entry.
+export async function disbandTeam(_prev: FormState, formData: FormData): Promise<FormState> {
+  const teamId = id(formData, "team_id");
+  if (!teamId) return { status: "error", message: "That team doesn't exist." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("disband_team", { p_team: teamId });
+  if (error) return { status: "error", message: "We couldn't disband the team. Try again." };
+  if (data !== "ok") return { status: "error", message: DISBAND_ERRORS[data as string] ?? "We couldn't disband the team." };
+  revalidatePath("/teams");
+  revalidatePath("/teams/inbox");
+  revalidatePath("/teams/people");
+  redirect("/teams");
 }
 
 // Leader edits the team's name, concept, and looking-for (RLS: teams_leader). Allowed after

@@ -9,6 +9,7 @@ import {
   cancelInvite,
   declineApplicant,
   declineInvite,
+  disbandTeam,
   leaveTeam,
   removeMember,
 } from "../actions";
@@ -281,16 +282,11 @@ export default async function TeamPage({ params }: PageProps<"/teams/[id]">) {
           )}
         </div>
         <BalanceBadges balance={balanceOf(members)} />
-        {team.iLead && size === TEAM_MIN && (
-          <p className="text-sm text-fg-muted">
-            With {TEAM_MIN} people you can&apos;t remove anyone; accept someone first, or ask an organizer.
-          </p>
-        )}
         <ul className="divide-y divide-line rounded-lg border border-line bg-bg-raised">
           {members.map((m, i) => (
             <li key={m.id ?? i} className="space-y-2 px-4 py-3">
               <PersonDetails person={m} />
-              {team.iLead && !m.is_leader && m.id && size > TEAM_MIN && (
+              {team.iLead && !m.is_leader && m.id && (
                 <ActionButton
                   action={removeMember}
                   fields={{ ...fields, profile_id: m.id }}
@@ -345,6 +341,14 @@ function ViewerPanel({ viewer, team, teamId, size }: { viewer: Viewer; team: Tea
             Edit name, concept, or who you&apos;re looking for
           </Link>
         </div>
+        <ActionButton
+          action={disbandTeam}
+          fields={fields}
+          label="Disband team"
+          pendingLabel="Disbanding…"
+          confirm={`Disband ${team.name}? The team is deleted, and everyone on it, you included, can join another team. This can't be undone.`}
+          variant="link"
+        />
       </div>
     );
   }
@@ -372,20 +376,14 @@ function ViewerPanel({ viewer, team, teamId, size }: { viewer: Viewer; team: Tea
       return (
         <div className={box}>
           <p className="text-sm">You&apos;re on this team.</p>
-          {size <= TEAM_MIN ? (
-            <p className="text-sm text-fg-muted">
-              A team needs at least {TEAM_MIN} people, so you can&apos;t leave right now. Ask an organizer if you need to.
-            </p>
-          ) : (
-            <ActionButton
-              action={leaveTeam}
-              fields={fields}
-              label="Leave team"
-              pendingLabel="Leaving…"
-              confirm={`Leave ${team.name}? You'd need to apply again to rejoin.`}
-              variant="link"
-            />
-          )}
+          <ActionButton
+            action={leaveTeam}
+            fields={fields}
+            label="Leave team"
+            pendingLabel="Leaving…"
+            confirm={`Leave ${team.name}? You'd need to apply again to rejoin.`}
+            variant="link"
+          />
         </div>
       );
     case "applied":
