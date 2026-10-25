@@ -17,7 +17,7 @@ type Limits = { title: number; tagline: number; description: number; url: number
 // A teammate's saved version of a field this editor is in the middle of changing.
 type Theirs = { value: EntryValues[Field]; by: string | null };
 
-function Field({ label, hint, note, children }: { label: string; hint?: string; note?: React.ReactNode; children: React.ReactNode }) {
+function Field({ label, hint, note, children }: { label: string; hint?: React.ReactNode; note?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="space-y-1">
       <label className="block space-y-1">
@@ -200,7 +200,12 @@ export function EntryForm({
         >
           <textarea name="description" rows={12} maxLength={limits.description} defaultValue={saved.values.description} className={input} />
         </Field>
-        <Field label="Demo video link (required)" hint={`${videoHint}. Show the problem, the solution, and a walkthrough. Keep it to 3 minutes or less: judges stop watching at 3:00.`} note={note("video_url")}>
+        <Field label="Demo video link (required)" hint={
+            <>
+              {videoHint}. Show the problem, the solution, and a walkthrough.{" "}
+              <strong className="font-semibold text-red-600">Keep it to 3 minutes or less: judges stop watching at 3:00.</strong>
+            </>
+          } note={note("video_url")}>
           <input name="video_url" type="url" required inputMode="url" placeholder="https://www.youtube.com/watch?v=…" maxLength={limits.url} defaultValue={saved.values.video_url} className={input} />
         </Field>
         <Field
