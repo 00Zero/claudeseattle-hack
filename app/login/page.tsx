@@ -3,7 +3,10 @@ import { getCurrentProfile } from "@/lib/supabase/profile";
 import { LoginForm } from "./login-form";
 
 const errorMessages: Record<string, string> = {
-  link: "That sign-in link is invalid or has expired. Request a new one.",
+  link:
+    "That sign-in link no longer works. Each link works once, and asking for a new link cancels the earlier ones. " +
+    "If you asked more than once, open the newest email from Claude Seattle (check spam too) instead of requesting " +
+    "another. Otherwise, enter your email below for a new link.",
 };
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
