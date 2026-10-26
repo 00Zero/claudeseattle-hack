@@ -1,10 +1,12 @@
 "use server";
 
 import type { User } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { isValidEmail, maskEmail, normalizeEmail, sendEmail } from "@/lib/email";
 import { getOrigin } from "@/lib/site-url";
+import { SIGN_IN_NEXT_COOKIE, SIGN_IN_NEXT_MAX_AGE, safeNextPath } from "@/lib/sign-in-next";
 
 // How long after a link is sent before we send another to the same account. Supabase keeps
 // one live link per account, so a new link cancels the one still on its way; people who
@@ -135,6 +137,12 @@ export async function sendMagicLink(_prev: LoginState, formData: FormData): Prom
     resendAt: new Date(sentAt + RESEND_AFTER_SECONDS * 1000).toISOString(),
     alreadySent,
   });
+
+  // Remembered for the sign-in routes; the link itself can't carry it (lib/sign-in-next.ts).
+  const next = safeNextPath(formData.get("next"));
+  if (next) {
+    (await cookies()).set(SIGN_IN_NEXT_COOKIE, next, { httpOnly: true, sameSite: "lax", secure: true, path: "/", maxAge: SIGN_IN_NEXT_MAX_AGE });
+  }
 
   const lastSent = what.kind === "account" ? liveLinkSentAt(what.user) : null;
   if (lastSent && Date.now() - lastSent < RESEND_AFTER_SECONDS * 1000) return sent(lastSent, true);

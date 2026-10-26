@@ -20,19 +20,23 @@ export function accessFromRules(rules: AccessRule[], ticket: string | null, stat
   return rule?.access ?? (status === "declined" ? "blocked" : "profile_only");
 }
 
-// Where someone lands after logging in.
-export function landingPathFor(access: Access | null, profileConfirmed: boolean) {
+// Where someone lands after logging in. For approved people, `next` (a path on this site, see
+// lib/sign-in-next.ts) wins; once the event is over, the profile step is skipped.
+export function landingPathFor(access: Access | null, profileConfirmed: boolean, options: { next?: string | null; eventOver?: boolean } = {}) {
   if (access === "blocked") return "/declined";
   if (access !== "full") return "/pending";
-  return profileConfirmed ? "/" : "/profile";
+  if (options.next) return options.next;
+  return profileConfirmed || options.eventOver ? "/" : "/profile";
 }
 
 // Landing path for the user who just signed in on this request's session.
-export async function landingPathAfterSignIn(userId: string) {
+export async function landingPathAfterSignIn(userId: string, next?: string | null) {
   const supabase = await createClient();
-  const [{ data: access }, { data: profile }] = await Promise.all([
+  const [{ data: access }, { data: profile }, { data: settings }] = await Promise.all([
     supabase.rpc("current_access"),
     supabase.from("profiles").select("profile_confirmed").eq("id", userId).maybeSingle(),
+    supabase.from("event_settings").select("event_ends_at").eq("id", 1).maybeSingle(),
   ]);
-  return landingPathFor(access as Access | null, profile?.profile_confirmed ?? false);
+  const endsAt = settings?.event_ends_at ? Date.parse(settings.event_ends_at) : NaN;
+  return landingPathFor(access as Access | null, profile?.profile_confirmed ?? false, { next, eventOver: Date.now() > endsAt });
 }

@@ -155,7 +155,7 @@ function NotSentNotice({ state }: { state: NotSent }) {
   );
 }
 
-export function LoginForm() {
+export function LoginForm({ next }: { next?: string | null }) {
   const [state, formAction, pending] = useActionState<LoginState, FormData>(sendMagicLink, { status: "idle" });
 
   if (state.status === "sent") {
@@ -166,6 +166,7 @@ export function LoginForm() {
 
   return (
     <form action={formAction} className="space-y-3">
+      {next && <input type="hidden" name="next" value={next} />}
       <label className="block space-y-1">
         <span className="text-sm font-medium">Email</span>
         <input
