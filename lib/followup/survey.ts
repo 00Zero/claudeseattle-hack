@@ -21,7 +21,7 @@ export type Track = "attended" | "mentor" | "judge" | "volunteer" | "no_show" | 
 export type Answers = {
   track: Track;
   came?: string;
-  quick: Record<string, string>;
+  quick: Record<string, string | Record<string, string>>;
   more: boolean;
   detail: Record<string, string | string[] | Record<string, string>>;
   additional?: string;
@@ -114,6 +114,30 @@ const WEBSITE_PARTS: Question = {
 const AGREE = ["Agree", "Neutral", "Disagree", "Not sure"];
 const INVOLVE: Question = { id: "involve", kind: "multi", label: "How would you like to be involved next time?", options: ["Participant", "Mentor", "Volunteer", "Judge", "Sponsor (credits, food or venue)"] };
 
+// What mentors helped with, asked of mentors and of participants.
+const HELP_TOPICS = ["Small business needs", "Scoping the project", "Getting started with Claude Code", "GitHub", "API credits and keys", "Debugging", "Demo and pitch"];
+// Services for the "used" and "would like as credit sponsors" questions.
+const SERVICES = [
+  "OpenAI",
+  "Google Gemini",
+  "Cursor",
+  "GitHub Copilot",
+  "Vercel",
+  "Supabase",
+  "Firebase",
+  "AWS",
+  "Google Cloud",
+  "Azure",
+  "Cloudflare",
+  "Lovable",
+  "Replit",
+  "Bolt",
+  "ElevenLabs",
+  "Twilio",
+  "Stripe",
+  "Zapier, Make or n8n",
+];
+
 const TRACKS: Record<Track, { quick: Question[]; detail: Question[] }> = {
   attended: {
     quick: [
@@ -122,16 +146,20 @@ const TRACKS: Record<Track, { quick: Question[]; detail: Question[] }> = {
       THEME,
       { id: "build_time", kind: "choice", label: "Building time, 10:30 am to 5:30 pm, was:", options: ["Too short", "About right", "Too long"] },
       WEBSITE,
+      { id: "mentors", kind: "choice", label: "How helpful were the mentors?", options: ["Very helpful", "Somewhat helpful", "Not helpful", "Didn't work with a mentor"] },
       {
         id: "credits",
-        kind: "choice",
-        label: "Did you use the sponsored credits (Claude, OpenRouter, Tavily, Wispr Flow)?",
-        options: ["Yes, during the hackathon", "I claimed some but haven't used them yet", "I didn't claim any", "I didn't know about them"],
+        kind: "matrix",
+        label: "Did you use each sponsored credit?",
+        rows: ["Claude API credits ($100)", "OpenRouter credits ($10)", "Tavily credits (8,000)", "Wispr Flow Pro"],
+        options: ["Used it", "Claimed, not used yet", "Didn't claim it", "Didn't know about it"],
       },
       { id: "again", kind: "choice", label: "Would you come to another Claude Seattle hackathon?", options: AGAIN },
     ],
     detail: [
       ...OPEN,
+      { id: "mentor_help", kind: "multi", label: "What did mentors help you with?", options: HELP_TOPICS },
+      { id: "mentor_standouts", kind: "text", label: "Were there particular mentors who helped you especially? Who, and how?" },
       {
         id: "team_formed",
         kind: "choice",
@@ -144,13 +172,6 @@ const TRACKS: Record<Track, { quick: Question[]; detail: Question[] }> = {
       { id: "emails", kind: "choice", label: "The emails before the event were:", options: ["Very useful", "Somewhat useful", "Not useful", "I didn't read them"] },
       WEBSITE_PARTS,
       {
-        id: "credits_each",
-        kind: "matrix",
-        label: "Each sponsored credit:",
-        rows: ["Claude API credits ($100)", "OpenRouter credits ($10)", "Tavily credits (8,000)", "Wispr Flow Pro"],
-        options: ["Used it", "Claimed, not used yet", "Didn't claim it", "Didn't know about it"],
-      },
-      {
         id: "credits_why",
         kind: "multi",
         label: "If you didn't use some of the credits, why not?",
@@ -162,7 +183,9 @@ const TRACKS: Record<Track, { quick: Question[]; detail: Question[] }> = {
         label: "What did your team build with?",
         options: ["Claude Code", "Claude app (chat, Projects, Cowork)", "Claude API", "Other AI coding tools (Cursor, Codex, Copilot)", "App builders (Lovable, Bolt, Replit, v0)"],
       },
-      { id: "mentors", kind: "choice", label: "How helpful were the mentors?", options: ["Very helpful", "Somewhat helpful", "Not helpful", "Didn't work with a mentor"] },
+      { id: "services_used", kind: "multi", label: "Which other services did your team use?", options: SERVICES },
+      { id: "services_wanted", kind: "multi", label: "Which services would you like to see as credit sponsors at future hackathons?", options: SERVICES },
+      { id: "services_other", kind: "text", label: "Any other services you used, or would like credits for?" },
       { id: "keep_building", kind: "choice", label: "Will your team keep working on the project?", options: AGAIN },
       INVOLVE,
     ],
@@ -184,7 +207,7 @@ const TRACKS: Record<Track, { quick: Question[]; detail: Question[] }> = {
         id: "help_topics",
         kind: "multi",
         label: "What did teams ask for help with most?",
-        options: ["Small business needs", "Scoping the project", "Getting started with Claude Code", "GitHub", "API credits and keys", "Debugging", "Demo and pitch"],
+        options: HELP_TOPICS,
       },
       {
         id: "agree",
@@ -301,9 +324,41 @@ const STANDBY_EXTRAS: Question[] = [
   { id: "standby_better", kind: "text", label: "What would make standby better?" },
 ];
 
-export function questionsFor(track: Track, role: Role) {
+// Participants who checked in at Saturday's happy hour (a separate Luma event) say how useful it was;
+// everyone else says why they skipped it. Asked right after when their team came together.
+const HAPPY_HOUR_CAME: Question = { id: "happy_hour", kind: "choice", label: "How useful was Saturday's team formation happy hour?", options: ["Very useful", "Somewhat useful", "Not useful"] };
+const HAPPY_HOUR_SKIPPED: Question = {
+  id: "happy_hour_skipped",
+  kind: "choice",
+  label: "Why didn't you come to Saturday's team formation happy hour?",
+  options: ["I didn't know about it", "I couldn't make it", "I didn't think I needed it", "I already had a team", "Something else"],
+};
+
+export function questionsFor(track: Track, role: Role, happyHour = false) {
   const { quick, detail } = TRACKS[track];
-  return { quick, detail: track === "attended" && role === "standby" ? [...detail, ...STANDBY_EXTRAS] : detail };
+  if (track !== "attended") return { quick, detail };
+  const at = detail.findIndex((q) => q.id === "team_formed") + 1;
+  const withHappyHour = [...detail.slice(0, at), happyHour ? HAPPY_HOUR_CAME : HAPPY_HOUR_SKIPPED, ...detail.slice(at)];
+  return { quick, detail: role === "standby" ? [...withHappyHour, ...STANDBY_EXTRAS] : withHappyHour };
+}
+
+// A matrix answer with every row answered, or null.
+function fullMatrix(q: Extract<Question, { kind: "matrix" }>, value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const rows: Record<string, string> = {};
+  for (const row of q.rows) {
+    const v = (value as Record<string, unknown>)[row];
+    if (typeof v !== "string" || !q.options.includes(v)) return null;
+    rows[row] = v;
+  }
+  return rows;
+}
+
+// Whether a required question has an answer (choice: one option; matrix: every row).
+export function isAnswered(q: Question, value: unknown) {
+  if (q.kind === "choice") return typeof value === "string" && q.options.includes(value);
+  if (q.kind === "matrix") return fullMatrix(q, value) !== null;
+  return false;
 }
 
 // Tracks whose thank-you page asks for photos and videos (they came).
@@ -312,7 +367,7 @@ export const CAME_TRACKS: Track[] = ["attended", "mentor", "judge", "volunteer"]
 const MAX_TEXT = 4000;
 
 // Checks a submitted survey against the questions this invite sees. Returns the cleaned answers or an error.
-export function checkAnswers(group: Group, role: Role, raw: unknown): { ok: true; answers: Answers } | { ok: false; message: string } {
+export function checkAnswers(group: Group, role: Role, happyHour: boolean, raw: unknown): { ok: true; answers: Answers } | { ok: false; message: string } {
   if (!raw || typeof raw !== "object") return { ok: false, message: "Something went wrong. Try again." };
   const input = raw as Partial<Answers>;
   const gate = gateFor(group);
@@ -320,15 +375,13 @@ export function checkAnswers(group: Group, role: Role, raw: unknown): { ok: true
   if (gate && !gate.options.includes(String(came))) return { ok: false, message: "Please answer the first question." };
   const track = trackFor(group, role, came);
   if (!track) return { ok: false, message: "Please answer the first question." };
-  const { quick, detail } = questionsFor(track, role);
+  const { quick, detail } = questionsFor(track, role, happyHour);
 
-  const quickOut: Record<string, string> = {};
+  const quickOut: Answers["quick"] = {};
   for (const q of quick) {
     const value = input.quick?.[q.id];
-    if (q.kind !== "choice" || typeof value !== "string" || !q.options.includes(value)) {
-      return { ok: false, message: "Please answer every question in the first part." };
-    }
-    quickOut[q.id] = value;
+    if (!isAnswered(q, value)) return { ok: false, message: "Please answer every question in the first part." };
+    quickOut[q.id] = q.kind === "matrix" ? fullMatrix(q, value)! : (value as string);
   }
 
   const more = input.more === true;

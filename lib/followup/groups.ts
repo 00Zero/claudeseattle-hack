@@ -33,6 +33,7 @@ export type Recipient = {
   profile_id: string | null;
   grp: Group;
   role: Role;
+  happy_hour: boolean;
 };
 
 const pacificDay = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
@@ -51,8 +52,8 @@ async function all<T>(query: (from: number, to: number) => PromiseLike<{ data: T
 export async function computeRecipients(): Promise<Recipient[]> {
   const admin = createAdminClient();
   const [guests, profiles, tags, standby, members, { data: settings }] = await Promise.all([
-    all<{ guest_id: string; email: string; first_name: string | null; name: string | null; ticket_name: string | null; approval_status: string; checked_in_at: string | null; cancelled_at: string | null }>((a, b) =>
-      admin.from("luma_guests").select("guest_id, email, first_name, name, ticket_name, approval_status, checked_in_at, cancelled_at").order("guest_id").range(a, b),
+    all<{ guest_id: string; email: string; first_name: string | null; name: string | null; ticket_name: string | null; approval_status: string; checked_in_at: string | null; cancelled_at: string | null; happy_hour_checked_in_at: string | null }>((a, b) =>
+      admin.from("luma_guests").select("guest_id, email, first_name, name, ticket_name, approval_status, checked_in_at, cancelled_at, happy_hour_checked_in_at").order("guest_id").range(a, b),
     ),
     all<{ id: string; luma_guest_id: string | null; is_test: boolean | null; is_super_admin: boolean | null }>((a, b) =>
       admin.from("profiles").select("id, luma_guest_id, is_test, is_super_admin").order("id").range(a, b),
@@ -93,7 +94,7 @@ export async function computeRecipients(): Promise<Recipient[]> {
     if (out.has(email)) continue;
     const firstName = g.first_name?.trim() || g.name?.trim().split(/\s+/)[0] || null;
     // A cancelled guest has no ticket role that matters; their questions don't depend on it.
-    out.set(email, { email, first_name: firstName, luma_guest_id: g.guest_id, profile_id: profile?.id ?? null, grp, role: role ?? "participant" });
+    out.set(email, { email, first_name: firstName, luma_guest_id: g.guest_id, profile_id: profile?.id ?? null, grp, role: role ?? "participant", happy_hour: Boolean(g.happy_hour_checked_in_at) });
   }
   return [...out.values()];
 }

@@ -12,7 +12,7 @@ export default async function SurveyPage({ params }: PageProps<"/survey/[token]"
   const { token } = await params;
   const admin = createAdminClient();
   const { data: invite } = /^[0-9a-f]{32}$/.test(token)
-    ? await admin.from("followup_invites").select("id, first_name, grp, role, first_visit_at, visits").eq("token", token).maybeSingle()
+    ? await admin.from("followup_invites").select("id, first_name, grp, role, happy_hour, first_visit_at, visits").eq("token", token).maybeSingle()
     : { data: null };
 
   if (!invite) {
@@ -45,6 +45,7 @@ export default async function SurveyPage({ params }: PageProps<"/survey/[token]"
       firstName={invite.first_name}
       group={invite.grp as Group}
       role={invite.role as Role}
+      happyHour={invite.happy_hour}
       previous={(response?.answers as Answers | undefined) ?? null}
       answeredAt={response?.updated_at ?? null}
     />

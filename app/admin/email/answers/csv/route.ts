@@ -26,8 +26,7 @@ export async function GET() {
       said_more: r.answers.more ? "yes" : "no",
       additional: r.answers.additional ?? "",
     };
-    for (const [k, v] of Object.entries(r.answers.quick)) out[k] = v;
-    for (const [k, v] of Object.entries(r.answers.detail)) {
+    for (const [k, v] of [...Object.entries(r.answers.quick), ...Object.entries(r.answers.detail)]) {
       if (typeof v === "string") out[k] = v;
       else if (Array.isArray(v)) out[k] = v.join("; ");
       else for (const [row, choice] of Object.entries(v)) out[`${k}: ${row}`] = choice;

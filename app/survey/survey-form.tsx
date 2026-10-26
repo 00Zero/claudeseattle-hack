@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { CAME_TRACKS, gateFor, questionsFor, trackFor, type Answers, type Group, type Question, type Role } from "@/lib/followup/survey";
+import { CAME_TRACKS, gateFor, isAnswered, questionsFor, trackFor, type Answers, type Group, type Question, type Role } from "@/lib/followup/survey";
 import { submitSurvey } from "./actions";
 
 type Detail = Answers["detail"];
@@ -89,6 +89,7 @@ export function SurveyForm({
   firstName,
   group,
   role,
+  happyHour,
   previous,
   answeredAt,
 }: {
@@ -96,12 +97,13 @@ export function SurveyForm({
   firstName: string | null;
   group: Group;
   role: Role;
+  happyHour: boolean;
   previous: Answers | null;
   answeredAt: string | null;
 }) {
   const gate = gateFor(group);
   const [came, setCame] = useState<string | undefined>(previous?.came);
-  const [quick, setQuick] = useState<Record<string, string>>(previous?.quick ?? {});
+  const [quick, setQuick] = useState<Answers["quick"]>(previous?.quick ?? {});
   const [more, setMore] = useState<boolean | null>(previous ? previous.more : null);
   const [detail, setDetail] = useState<Detail>(previous?.detail ?? {});
   const [additional, setAdditional] = useState(previous?.additional ?? "");
@@ -109,8 +111,8 @@ export function SurveyForm({
   const [error, setError] = useState<string | null>(null);
 
   const track = trackFor(group, role, came);
-  const questions = track ? questionsFor(track, role) : null;
-  const quickDone = Boolean(questions && questions.quick.every((q) => quick[q.id]));
+  const questions = track ? questionsFor(track, role, happyHour) : null;
+  const quickDone = Boolean(questions && questions.quick.every((q) => isAnswered(q, quick[q.id])));
 
   async function submit() {
     if (!track || !quickDone || more === null) return;
@@ -166,6 +168,9 @@ export function SurveyForm({
           {firstName ? `Hi ${firstName}, ` : ""}
           <em className="text-fg-muted">how did it go?</em>
         </h1>
+        <p className="text-fg-muted">
+          We experimented with a lot of different concepts of this hackathon and would love your input to understand which ones to keep, remove, or improve.
+        </p>
         <p className="text-fg-muted">A few quick questions first, about a minute. Then you choose whether to say more.</p>
         {!token && <p className="rounded border border-line bg-bg-raised px-3 py-2 text-sm text-fg-muted">Preview of what this group sees ({group}, {role}). Nothing is saved.</p>}
         {answeredAt && (
@@ -178,7 +183,7 @@ export function SurveyForm({
       <section className="space-y-7">
         {gate && <Field q={gate} number={++n} value={came} onChange={(v) => setCame(v as string)} />}
         {questions?.quick.map((q) => (
-          <Field key={q.id} q={q} number={++n} value={quick[q.id]} onChange={(v) => setQuick({ ...quick, [q.id]: v as string })} />
+          <Field key={q.id} q={q} number={++n} value={quick[q.id]} onChange={(v) => setQuick({ ...quick, [q.id]: v as Answers["quick"][string] })} />
         ))}
       </section>
 

@@ -1,6 +1,6 @@
 -- 20261026171927_shared_followup_survey.sql
 -- Post-event feedback survey, sent from Admin -> Email (app/admin/email, lib/followup/*).
--- - followup_invites: one per email address. The token in the survey link (/feedback/<token>) is the
+-- - followup_invites: one per email address. The token in the survey link (/survey/<token>) is the
 --   only way in, so people answer without signing in. Delivery, opens, bounces and complaints come
 --   from Resend's webhook (/api/email/resend-webhook); visits and answers from the survey page.
 -- - followup_responses: the answers, one row per invite, overwritten if they answer again.
@@ -8,9 +8,14 @@
 --   the defaults in lib/followup/emails.ts.
 -- - luma_guests.cancelled_at: when the guest cancelled on Luma, from Luma's "Guest update" emails
 --   (the CSV export has no date). Finds same-day cancellations. The Luma import leaves it alone.
+-- - luma_guests.happy_hour_status / happy_hour_checked_in_at: the guest's row in the separate Luma event
+--   for Saturday's team formation happy hour (approved, invited, declined), matched by email. The
+--   survey asks people who came how useful it was, and others why they didn't come.
 -- Admins read everything here; every write goes through the service role after a server check.
 
 alter table luma_guests add column cancelled_at timestamptz;
+alter table luma_guests add column happy_hour_status text;
+alter table luma_guests add column happy_hour_checked_in_at timestamptz;
 
 create table followup_invites (
   id uuid primary key default gen_random_uuid(),
@@ -23,6 +28,8 @@ create table followup_invites (
   grp text not null check (grp in ('attended', 'unsure', 'crew', 'no_show', 'late_cancel', 'standby')),
   -- participant, standby, mentor, judge, volunteer or ambassador: picks the role questions
   role text not null check (role in ('participant', 'standby', 'mentor', 'judge', 'volunteer', 'ambassador')),
+  -- checked in at Saturday's happy hour: picks the happy hour question
+  happy_hour boolean not null default false,
   resend_id text unique,
   sent_at timestamptz,
   send_error text,
