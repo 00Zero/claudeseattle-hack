@@ -112,7 +112,7 @@ function LastSaved({ entry }: { entry: Entry | null }) {
 function LateSaveStatus({ lateSave }: { lateSave: LateSave }) {
   const outcome = {
     pending: "An organizer will accept or reject it.",
-    accepted: "An organizer accepted it, so judges see that version.",
+    accepted: "It's marked as submitted late, and judges see that version.",
     rejected: "An organizer didn't accept it, so judges see the version saved before the deadline.",
   }[lateSave.decision];
   return (
