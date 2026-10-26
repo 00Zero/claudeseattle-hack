@@ -14,19 +14,13 @@ Next.js 16 differs from older versions (for example, `middleware.ts` is now `pro
 
 ## Who owns what
 
-- **Admin (Adam, @00Zero):** shared foundation. Spec: "Shared foundation".
-- **Dev A (Nishant):** Teams app. Spec: "Teams app (Dev A)". Area notes: `app/(teams)/CLAUDE.md`.
-- **Dev B (Rajasuba):** submission and judging. Spec: "Judging app (Dev B)". Area notes: `app/(judge)/CLAUDE.md`.
+Adam (@00Zero) owns all of it. For the Oct 25 hackathon, Nishant (Dev A) built the Teams app and Rajasuba (Dev B) built submission and judging; they helped only until the event, so their areas are Adam's now too. The spec sections and area notes still describe that code:
 
-| Path | Owner |
-| --- | --- |
-| `app/(teams)/**` (routes under `/teams`) | Dev A |
-| `app/profile/**` | Admin scaffolds, then Dev A |
-| `app/(judge)/**` (`/submit`, `/judge`), `app/admin/judging/**` | Dev B |
-| `app/page.tsx`, `app/login`, `app/auth`, `app/pending`, `app/declined`, `app/verify-email`, `app/small-businesses`, rest of `app/admin/**` | Admin |
-| `lib/supabase/**`, `proxy.ts`, `app/layout.tsx`, `app/globals.css`, `package.json`, `package-lock.json`, this file | Shared |
-| `supabase/migrations/*_shared*.sql` | Shared (see Rules) |
-| `supabase/migrations/*_teams_*.sql`, `*_judge_*.sql` | Dev A, Dev B |
+| Path | Area | Read first |
+| --- | --- | --- |
+| `app/(teams)/**` (routes under `/teams`), `app/profile/**` | Teams app | Spec "Teams app (Dev A)", `app/(teams)/CLAUDE.md` |
+| `app/(judge)/**` (`/submit`, `/judge`, `/results`, `/entries`), `app/admin/judging/**` | Submission and judging | Spec "Judging app (Dev B)", `app/(judge)/CLAUDE.md` |
+| Everything else, incl. `lib/supabase/**`, `proxy.ts`, `app/layout.tsx`, `app/globals.css`, `package.json` | Shared foundation | Spec "Shared foundation" |
 
 ## Table contract (`supabase/migrations/*_shared*.sql`)
 
@@ -38,11 +32,11 @@ Next.js 16 differs from older versions (for example, `middleware.ts` is now `pro
 
 ## Rules
 
-- **Merging:** each dev merges their own PRs once the Vercel check on the PR is green and it works on localhost (Vercel previews are behind Adam's login). Shared files (`lib/supabase/**`, `proxy.ts`, `app/layout.tsx`, `app/globals.css`, `package.json`) affect both apps: keep changes to them small, check that both `/teams` and `/submit` still work on localhost, and mention the change in the dev WhatsApp group.
+- **Merging:** Adam merges PRs once the Vercel check on the PR is green and it works on localhost (Vercel previews are behind Adam's login). Shared files (`lib/supabase/**`, `proxy.ts`, `app/layout.tsx`, `app/globals.css`, `package.json`) affect both apps: keep changes to them small and check that both `/teams` and `/submit` still work on localhost.
 - **Branches:** start each change on a new branch from the latest `main`. Once a branch's PR is merged, don't push to it again (GitHub deletes it on merge); follow-up work goes on a new branch and a new PR.
 - **Migrations:** schema changes only through new migration files in the repo, never the Supabase dashboard. The Supabase GitHub integration applies new migrations to production automatically when the PR merges to `main`, so merge only when the "Migration review" check is green. It blocks destructive changes (dropping tables or columns, truncate, delete, shared-table changes beyond adding nullable columns, disabling RLS); those go to Adam, and the check @mentions him on the PR. Never edit, rename or delete a merged migration. A new migration must be newer than every migration on `main`: if a newer one merged first, rename yours with `npx supabase migration new` and move the SQL. Don't run `supabase db push`. The integration deploys only on a push to `main`, so to confirm a migration is live, check its version in the project's migration history (Supabase dashboard, Database → Migrations) after the merge. If it's missing, check that "Deploy to production" is on (Supabase → Project Settings → Integrations → GitHub, production branch `main`).
-- **Your tables** are prefixed `teams_*` (Dev A) or `judge_*` (Dev B): `npx supabase migration new teams_<what>` or `judge_<what>`.
-- **Shared tables** (`profiles`, `profile_emails`, `teams`, `team_members`, `event_settings`, `luma_guests`, `access_rules`): to change one, add `npx supabase migration new shared_<what>` in your PR. Prefer adding nullable columns over changing or dropping. Keep RLS enabled and add policies for anything new. Mention it in the dev WhatsApp group.
+- **Table prefixes:** Teams app tables are `teams_*` and judging tables `judge_*` (`npx supabase migration new teams_<what>` or `judge_<what>`); everything else is `shared_*`.
+- **Shared tables** (`profiles`, `profile_emails`, `teams`, `team_members`, `event_settings`, `luma_guests`, `access_rules`): to change one, add `npx supabase migration new shared_<what>` in your PR. Prefer adding nullable columns over changing or dropping. Keep RLS enabled and add policies for anything new.
 - **Dependencies:** adding an npm package is fine. Don't add one that duplicates a library already in `package.json` (a second date, UI, or form library); prefer well-known, maintained packages. Never commit a lockfile conflict: take main's `package-lock.json` and re-run `npm install`.
 - Admin writes go through the service-role client (`lib/supabase/admin.ts`) after a server-side admin check. Everything else uses `lib/supabase/server.ts` or `client.ts`, so RLS applies. The one exception is team matching: `lib/matching.ts` reads `matching_profiles` with the service role after checking the caller can browse.
 - Luma answers that aren't on `profiles` (why join, features of interest, employee count, enrichment) and all survey answers are for matching only: never render them or send them to the browser raw. The tiers are in `docs/REQUIREMENTS.md`, "Luma data: what goes where".

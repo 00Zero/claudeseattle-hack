@@ -1,17 +1,5 @@
-# Review requests from this file are email notifications, not approvals:
-# nothing is blocked, and each dev still merges their own PRs.
-# GitHub skips the PR's author, so only the others are notified.
-# The last matching pattern wins.
-# GitHub ignores owners without write access to the repo.
+# Review requests from this file are email notifications, not approvals: nothing is blocked.
+# Adam owns the whole repo (CLAUDE.md, "Who owns what"); Nishant and Rajasuba helped only until
+# the Oct 25 hackathon. GitHub skips the PR's author, so Adam's own PRs notify nobody.
 
-# Any migration: applied to production automatically on merge (Migration review check).
-/supabase/migrations/               @00Zero
-
-# Shared code and shared tables: affects both apps.
-/supabase/migrations/*_shared*.sql  @00Zero @nishantrevur @rajasuba
-/lib/supabase/                      @00Zero @nishantrevur @rajasuba
-/proxy.ts                           @00Zero @nishantrevur @rajasuba
-/app/layout.tsx                     @00Zero @nishantrevur @rajasuba
-/app/globals.css                    @00Zero @nishantrevur @rajasuba
-/package.json                       @00Zero @nishantrevur @rajasuba
-/CLAUDE.md                          @00Zero @nishantrevur @rajasuba
+*  @00Zero

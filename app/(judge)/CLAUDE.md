@@ -1,5 +1,7 @@
 # Judging app (Dev B, Rajasuba)
 
+Rajasuba built this for the Oct 25 hackathon and helped only until the event; Adam owns it now (root `CLAUDE.md`, "Who owns what"). "You" below means whoever is working on it.
+
 Spec: `docs/REQUIREMENTS.md`, "Judging app (Dev B)" and its "Rubric", plus "Event facts the software depends on". Live by Sun Oct 25, 9:00 am; judge views must work on a phone.
 
 ## You own
@@ -38,7 +40,7 @@ Spec: `docs/REQUIREMENTS.md`, "Judging app (Dev B)" and its "Rubric", plus "Even
 
 ## Shared code and tables
 
-- Need a column on a shared table? Add a `shared_` migration in your PR (rules in the root `CLAUDE.md`) and mention it in the dev WhatsApp group.
+- Need a column on a shared table? Add a `shared_` migration in your PR (rules in the root `CLAUDE.md`).
 - Shared files (`lib/supabase/**`, `proxy.ts`, `app/layout.tsx`, `app/globals.css`, `package.json`) affect the teams app too: keep changes small and check `/teams` still works on localhost.
 - Leave `app/admin/layout.tsx` and Adam's login, auth, import, people, and settings routes alone. Never write to `teams` or `team_members`.
 

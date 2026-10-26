@@ -49,6 +49,9 @@ export const partners: Entry[] = [
 ];
 export const ambassadors: Entry[] = [];
 
+// "1st place", "4th place": finalists' places on /results and /small-businesses (only the top three win prizes).
+export const placeLabel = (place: number) => `${place}${place % 100 >= 11 && place % 100 <= 13 ? "th" : place % 10 === 1 ? "st" : place % 10 === 2 ? "nd" : place % 10 === 3 ? "rd" : "th"} place`;
+
 export const prizes = {
   everyone: "Every participant gets $100 in Claude API credits.",
   winners: ["One month of Claude Max 20x per person", "A one-year WTIA membership"],
