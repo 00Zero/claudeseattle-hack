@@ -3,7 +3,8 @@ import { requireAdminPage } from "@/lib/admin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPacific } from "@/lib/time";
 import { criteriaLocked, getEnabledCriteria } from "@/app/(judge)/_lib/criteria";
-import { ALL_CRITERIA, DEFAULT_CRITERIA, formatScore, mean, rankByScore, sameCriteria } from "@/app/(judge)/_lib/scoring";
+import { ALL_CRITERIA, DEFAULT_CRITERIA, formatScore, mean, rankByScore, sameCriteria, scoresByKey, shortName } from "@/app/(judge)/_lib/scoring";
+import { FinalStandings, type FinalRow } from "./final-standings";
 import { SubmitButton } from "../submit-button";
 import { decideLateSave, setPublish } from "./actions";
 import { aiNotesConfigured, type AiNotesBody } from "@/app/(judge)/_lib/ai-notes";
@@ -74,11 +75,11 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
   const aiParam = showAi ? "&ai=1" : "";
 
   const admin = createAdminClient();
-  const [results, entries, assignments, prelimScores, judges, groups, memberships, teams, lateSaves, settings, aiNotes, enabled, lock] = await Promise.all([
+  const [results, entries, assignments, allScores, judges, groups, memberships, teams, lateSaves, settings, aiNotes, enabled, lock] = await Promise.all([
     admin.from("judge_entry_results").select("*"),
     admin.from("judge_entries").select("id, finalist_override"),
     admin.from("judge_assignments").select("entry_id, judge_id"),
-    admin.from("judge_scores").select("entry_id, judge_id, scores").eq("round", "prelim"),
+    admin.from("judge_scores").select("entry_id, judge_id, round, scores, criteria"),
     admin
       .from("profiles")
       .select("id, display_name, platform_role")
@@ -149,7 +150,9 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
   // Group standings: each group's (or lone judge's) entries ranked by the mean of its judges'
   // entry scores, as judge_entry_results picks each group's finalist. For choosing extra
   // finalists, such as second places.
-  const judgeScore = new Map((prelimScores.data ?? []).map((sc) => [`${sc.entry_id}:${sc.judge_id}`, mean(sc.scores as number[])]));
+  type ScoreRow = { entry_id: string; judge_id: string; round: "prelim" | "final"; scores: number[]; criteria: string[] | null };
+  const scoreRows = (allScores.data ?? []) as ScoreRow[];
+  const judgeScore = new Map(scoreRows.filter((sc) => sc.round === "prelim").map((sc) => [`${sc.entry_id}:${sc.judge_id}`, mean(sc.scores)]));
   const resultById = new Map(rows.map((r) => [r.entry_id, r]));
   const unitEntries = new Map<string, Map<string, { judges: number; scores: number[] }>>();
   for (const a of assignments.data ?? []) {
@@ -163,6 +166,38 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
     byEntry.set(a.entry_id, tally);
     unitEntries.set(unit, byEntry);
   }
+  // Final round: finalists by place, with each judge's final score (alphabetical columns). Judges
+  // are everyone with the judge role in this world plus anyone else who scored a finalist.
+  const finalists = rows
+    .filter((r) => r.is_finalist)
+    .sort((a, b) => (a.place ?? 99) - (b.place ?? 99) || Number(b.final_score ?? -1) - Number(a.final_score ?? -1) || a.team_name.localeCompare(b.team_name));
+  const finalistIds = new Set(finalists.map((f) => f.entry_id));
+  const finalScores = scoreRows.filter((sc) => sc.round === "final" && finalistIds.has(sc.entry_id));
+  const finalKeys = ALL_CRITERIA.map((c) => c.key).filter((k) => finalScores.some((sc) => scoresByKey(sc).has(k)));
+  const finalJudgeIds = new Set([
+    ...(judges.data ?? []).filter((j) => j.platform_role === "judge").map((j) => j.id as string),
+    ...finalScores.map((sc) => sc.judge_id),
+  ]);
+  const finalJudges = [...finalJudgeIds]
+    .map((id) => ({ id, name: (judges.data ?? []).find((j) => j.id === id)?.display_name ?? "Former judge" }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const finalRows: FinalRow[] = finalists.map((f) => ({
+    entryId: f.entry_id,
+    team: f.team_name,
+    title: f.title,
+    place: f.place,
+    finalScore: f.final_score,
+    votes: f.final_votes,
+    byJudge: Object.fromEntries(
+      finalScores
+        .filter((sc) => sc.entry_id === f.entry_id)
+        .map((sc) => {
+          const byKey = scoresByKey(sc);
+          return [sc.judge_id, { mean: mean(sc.scores) ?? 0, ratings: finalKeys.map((k) => byKey.get(k) ?? "–").join(" · ") }];
+        }),
+    ),
+  }));
+
   const standings = unitOptions
     .filter((u) => unitEntries.has(u.value))
     .map((u) => ({
@@ -182,7 +217,6 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
   const submittedCount = rows.filter((r) => r.submitted).length;
   const withoutSubmission = Math.max(0, (teams.count ?? 0) - rows.filter((r) => r.submitted && r.team_id).length);
   const unassigned = rows.filter((r) => r.submitted && !unitOf.has(r.entry_id)).length;
-  const finalists = rows.filter((r) => r.is_finalist);
   const notesBy = new Map((aiNotes.data ?? []).map((n) => [n.entry_id as string, n.notes as Partial<AiNotesBody> | null]));
   const withNotes = new Set(notesBy.keys());
   const notedCount = rows.filter((r) => r.submitted && withNotes.has(r.entry_id)).length;
@@ -255,6 +289,16 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
         </div>
         {s && <p className="text-sm text-foreground/70">Submissions close {formatPacific(s.submissions_close_at)}. Change it on the Settings tab.</p>}
       </div>
+
+      {finalRows.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">Final standings</h2>
+          <p className="text-sm text-foreground/70">
+            Finalists by place: the mean of every judge&apos;s final-round score. &ldquo;Judges&rdquo; is how many have scored it.
+          </p>
+          <FinalStandings rows={finalRows} judges={finalJudges} legend={finalKeys.map(shortName).join(" · ")} />
+        </section>
+      )}
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Criteria</h2>
