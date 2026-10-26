@@ -11,6 +11,7 @@ const tabs = [
   { href: "/admin/banners", label: "Banners" },
   { href: "/admin/email", label: "Email" },
   { href: "/admin/judging", label: "Judging" },
+  { href: "/admin/small-businesses", label: "Small businesses" },
   { href: "/admin/test-accounts", label: "Test accounts" },
   { href: "/admin/settings", label: "Settings" },
 ];

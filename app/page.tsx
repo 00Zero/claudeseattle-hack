@@ -148,6 +148,7 @@ export default async function Home() {
   const slots = [...saturdaySchedule, ...sundaySchedule]
     .filter((item): item is typeof item & { start: string; end: string } => Boolean(item.start && item.end))
     .map((item) => ({ what: item.what, short: item.short ?? item.what, start: item.start, end: item.end }));
+  const resultsOut = Boolean(settings?.publish_winners);
   const winners = settings?.publish_winners ? await getWinners(settings.audience_voting_enabled && settings.audience_voting === "closed") : [];
   const finals = sundaySchedule.find((item) => item.what.startsWith("Finals"));
   const moments = [
@@ -173,6 +174,13 @@ export default async function Home() {
             One day at {venue.name}. {audience}
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
+            {/* Once winners are published the event is over: the projects are for small businesses
+                now, nobody gets "Browse teams", and signed-out visitors don't get "Log in" either. */}
+            {resultsOut && (
+              <Link href="/small-businesses" className="btn">
+                Implement in your small business
+              </Link>
+            )}
             {profile ? (
               <>
                 {/* Switched on in Settings, opened there or from the awards deck; /vote checks who may vote. */}
@@ -181,27 +189,44 @@ export default async function Home() {
                     Vote for the audience choice
                   </Link>
                 )}
-                <Link href="/teams" className="btn">
-                  Browse teams
-                </Link>
-                <Link href="/resources" className="btn btn-ghost">
-                  Credits &amp; resources
-                </Link>
-                <a href={lumaCalendarUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost">
-                  Upcoming events
-                </a>
+                {resultsOut ? (
+                  <>
+                    <a href={lumaCalendarUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost">
+                      Upcoming events
+                    </a>
+                    <Link href="/resources" className="btn btn-ghost">
+                      Resources
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <Link href="/teams" className="btn">
+                      Browse teams
+                    </Link>
+                    <Link href="/resources" className="btn btn-ghost">
+                      Credits &amp; resources
+                    </Link>
+                    <a href={lumaCalendarUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost">
+                      Upcoming events
+                    </a>
+                  </>
+                )}
                 <Link href="/resources#upload-media" className="btn">
                   Upload media
                 </Link>
               </>
             ) : (
               <>
-                <Link href="/login" className="btn">
-                  Log in with a magic link
-                </Link>
-                <Link href="/teams" className="btn btn-ghost">
-                  Browse teams
-                </Link>
+                {!resultsOut && (
+                  <>
+                    <Link href="/login" className="btn">
+                      Log in with a magic link
+                    </Link>
+                    <Link href="/teams" className="btn btn-ghost">
+                      Browse teams
+                    </Link>
+                  </>
+                )}
                 <a href={lumaCalendarUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost">
                   Upcoming events
                 </a>
