@@ -162,7 +162,7 @@ export function SurveyForm({
         <p className="text-fg-muted">We read every answer, and they shape the next Seattle Claude events.</p>
         {cameToEvent && (
           <div className="space-y-3 rounded-lg border border-line bg-bg-raised p-5">
-            <p className="font-medium">Share your photos and videos from the event</p>
+            <p className="font-medium">Share your photos/videos from the event</p>
             <p className="text-sm text-fg-muted">Upload them on the Resources page. Sign in with the email you used on Luma if you aren&apos;t already.</p>
             <Link href="/login?next=/resources" className="btn">
               Upload photos and videos
