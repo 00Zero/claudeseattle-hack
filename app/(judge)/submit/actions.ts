@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatPacific } from "@/lib/time";
 import { checkEntry, type Checklist } from "./_lib/checklist";
 import { getSubmissionDeadline, getSubmitContext, LIMITS, type EntryLink, type EntryValues } from "./_lib/entry";
-import { fieldList, FIELDS, loadSavedEntry, mergeValues, writeEntry, type SavedEntry } from "./_lib/merge";
+import { fieldList, FIELDS, loadSavedEntry, mergeValues, writeEntry, type Field, type SavedEntry } from "./_lib/merge";
 import { loadPart, writeGithub, writePart, type Part } from "./_lib/parts";
 
 // entry: the saved version after this save, or the teammate's version it conflicted with.
@@ -114,9 +114,21 @@ function entryRow(values: EntryValues) {
   };
 }
 
+// A teammate changed the same fields since the editor's form had them: refuse the save and send
+// their version, so the form shows both to pick from.
+function conflictState(current: SavedEntry, conflicts: Field[]): SaveState {
+  return {
+    ...failed(
+      `${current.savedBy ?? "A teammate"} also changed ${fieldList(conflicts)}${current.savedAt ? ` at ${formatPacific(current.savedAt)}` : ""}, so the entry didn't save.`,
+      `A teammate saved the same ${conflicts.length === 1 ? "field" : "fields"} while you were editing. Nothing you typed is lost: under ${conflicts.length === 1 ? "that field" : "each of those fields"} there's an orange box. Open “Show their version”, choose Use theirs or Keep mine, then press Save again.`,
+    ),
+    entry: current,
+  };
+}
+
 // Save the caller's team entry. Before the deadline it writes judge_entries (RLS: a team member
 // who may submit, and judge_submissions_open()); a trigger stamps who saved and when. After the
-// deadline the save is kept in judge_late_saves for an organizer to accept or reject.
+// deadline it's kept in judge_late_saves, accepted at once and copied onto the entry, marked late.
 //
 // Teammates edit the same entry, so the save merges field by field with what's saved now: fields
 // this editor didn't change keep teammates' saves. If a teammate changed the same field since the
@@ -145,9 +157,10 @@ export async function saveEntry(formData: FormData): Promise<SaveState> {
   const supabase = await createClient();
   const teamId = ctx.team.id;
 
-  // After the deadline, keep the save for an organizer instead of losing it.
+  // After the deadline the save goes to judge_late_saves, which accepts it at once: a trigger copies
+  // it onto the entry (judge_accept_late_save), and the entry stays marked late.
   async function saveLate(values: EntryValues, checklist: Checklist): Promise<SaveState> {
-    // In judge_entries' columns: accepting it copies them onto the entry.
+    // In judge_entries' columns: the trigger copies them onto the entry.
     const { error } = await supabase
       .from("judge_late_saves")
       .insert({ team_id: teamId, payload: { ...entryRow(values), checklist } });
@@ -155,18 +168,21 @@ export async function saveEntry(formData: FormData): Promise<SaveState> {
     revalidatePath("/submit");
     return {
       status: "late",
-      message: "Saved, and marked as submitted late. An organizer will accept or reject it.",
+      message: "Saved, and marked as submitted late. Judges see this version.",
     };
   }
 
-  // After the deadline the editor confirms first (the form asks), then the save is kept as is:
-  // there's no merging with the on-time entry, since the form started from the team's latest save.
+  // After the deadline the editor confirms first (the form asks). The save merges with the entry as
+  // saved now, like an on-time save, so one teammate's late save doesn't undo another's.
   const confirmedLate = formData.get("confirm_late") === "yes";
   if (ctx.isPast) {
     if (!confirmedLate) return CONFIRM_LATE;
-    const problem = invalid(mine);
+    const now = await loadSavedEntry(supabase, teamId);
+    const { values, conflicts } = now ? mergeValues(base, mine, now.values) : { values: mine, conflicts: [] };
+    const problem = invalid(values);
     if (problem) return problem;
-    return saveLate(mine, await checkEntry(mine, ctx.entry));
+    if (now && conflicts.length) return conflictState(now, conflicts);
+    return saveLate(values, await checkEntry(values, ctx.entry));
   }
 
   let current: SavedEntry | null = ctx.entry
@@ -179,15 +195,7 @@ export async function saveEntry(formData: FormData): Promise<SaveState> {
     const problem = invalid(values);
     if (problem) return problem;
     const who = current?.savedBy ?? "A teammate";
-    if (current && conflicts.length) {
-      return {
-        ...failed(
-          `${who} also changed ${fieldList(conflicts)}${current.savedAt ? ` at ${formatPacific(current.savedAt)}` : ""}, so the entry didn't save.`,
-          `A teammate saved the same ${conflicts.length === 1 ? "field" : "fields"} while you were editing. Nothing you typed is lost: under ${conflicts.length === 1 ? "that field" : "each of those fields"} there's an orange box. Open “Show their version”, choose Use theirs or Keep mine, then press Save again.`,
-        ),
-        entry: current,
-      };
-    }
+    if (current && conflicts.length) return conflictState(current, conflicts);
 
     const checklist = await checkEntry(values, ctx.entry);
 
