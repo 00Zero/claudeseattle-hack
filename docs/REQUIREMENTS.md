@@ -30,7 +30,7 @@ Team formation closes Sunday 10:30 am; submissions close Sunday 5:30 pm; prelim 
 
 Numbers as of Oct 17: 498 Luma registrations, 83 approved, 391 pending, 4 waitlisted, 20 declined. Ticket types: Standard (427), Mentor (27), Volunteer (21), Ambassador (2), Judge (1). Expect roughly 15–25 teams and five judges.
 
-Theme: build AI tools, workflows, and playbooks that small businesses can adopt. All projects are open-sourced on GitHub, which is why team and entry pages are public.
+Theme: build AI tools, workflows, and playbooks that small businesses can adopt. All projects are open-sourced on GitHub, which is why team and entry pages are public. `/terms#projects` sets the rule: a public repo under an OSI-approved license (MIT when the repo has none), which the hosts may copy and showcase.
 
 Prizes, for the home page and results page: every participant gets $100 in Claude API credits; the winning team gets one month of Claude Max 20x per person and a one-year WTIA membership, up to $1,000 in prizes per person in total; the top three teams get tickets to the Seattle AI Week AI Summit and the AI Week Opening Reception (courtesy of WTIA) and Anthropic swag. Venue: thinkspace Seattle, 1700 Westlake Ave N #200.
 
