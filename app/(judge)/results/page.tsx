@@ -14,11 +14,14 @@ export default async function ResultsPage() {
     // Every submitted entry; the view returns nothing until submissions close.
     supabase.from("public_judge_entries").select("id, team_name, title, tagline").order("team_name"),
   ]);
-  const entries = (entryRows ?? []) as EntryCard[];
   const winners = Boolean(settings?.publish_winners);
   const rows = ((data ?? []) as { entry_id: string; team_name: string; title: string; place: number | null }[]).sort((a, b) =>
     winners ? (a.place ?? 99) - (b.place ?? 99) || a.team_name.localeCompare(b.team_name) : a.team_name.localeCompare(b.team_name),
   );
+
+  // Every entry, with its place badge once winners are published.
+  const places = new Map(rows.map((r) => [r.entry_id, r.place]));
+  const entries = ((entryRows ?? []) as EntryCard[]).map((e) => ({ ...e, place: places.get(e.id) ?? null }));
 
   return (
     <div className="space-y-12">

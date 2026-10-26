@@ -1,7 +1,6 @@
 import Link from "next/link";
+import { placeLabel } from "@/lib/event";
 import type { Project } from "@/lib/small-business-options";
-
-const PLACES = ["1st place", "2nd place", "3rd place"];
 
 const FIT = { strong: "Strong fit", good: "Good fit", partial: "Partial fit" };
 
@@ -13,7 +12,7 @@ export function ProjectCard({ project, fit, reason }: { project: Project; fit?: 
     <article className={`flex h-full flex-col gap-3 rounded-lg border p-4 ${plugin ? "border-accent bg-accent-soft" : "border-line bg-bg-raised"}`}>
       <header className="space-y-1">
         <div className="flex flex-wrap items-center gap-2">
-          {project.place && project.place <= 3 && <span className="eyebrow text-accent">{PLACES[project.place - 1]}</span>}
+          {project.place && <span className="eyebrow text-accent">{placeLabel(project.place)}</span>}
           {plugin && <span className="eyebrow text-accent">From Anthropic</span>}
           {fit && <span className="rounded-full border border-line-strong px-2 py-0.5 font-mono text-[11px] text-fg">{FIT[fit]}</span>}
         </div>
