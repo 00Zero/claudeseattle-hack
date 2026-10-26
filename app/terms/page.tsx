@@ -26,6 +26,23 @@ export default function TermsPage() {
           you took or have the right to share.
         </p>
       </section>
+      <section id="projects" className="scroll-mt-20 space-y-3">
+        <h2 className="text-lg font-semibold">Projects and open source</h2>
+        <p>
+          Every project submitted to the hackathon must be in a public GitHub repository and released under an open source license
+          approved by the Open Source Initiative, such as MIT or Apache 2.0. Add the license as a LICENSE file in the repository. If
+          the repository has no license when you submit, you agree that the project is released under the MIT License.
+        </p>
+        <p>
+          You and your teammates keep ownership of what you build. You allow the hosts to copy, archive, and showcase your project,
+          including in a public collection of the hackathon&apos;s projects on GitHub, with credit to your team.
+        </p>
+        <p>
+          Submit only code, data, and other content you have the right to release under that license, and never commit passwords, API
+          keys, or personal data. Projects are shared as is, without warranty. Anyone who uses a project is responsible for following
+          its license and for how they use it; the hosts are not liable for any project or its use.
+        </p>
+      </section>
     </div>
   );
 }
