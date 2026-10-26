@@ -35,13 +35,15 @@ export default async function ResourcesPage() {
   const supabase = await createClient();
   // Hands a checked-in person their personal codes (OpenRouter) before the offers are read.
   await supabase.rpc("claim_offer_codes");
-  const [{ data }, { data: offerRows }] = await Promise.all([
+  const [{ data }, { data: offerRows }, { data: settings }] = await Promise.all([
     supabase
       .from("resources")
       .select("id, section, title, description, url, sort_order, visible")
       .order("sort_order")
       .order("title"),
     supabase.rpc("attendee_offers"),
+    // The small businesses card waits for the winners, like the home page button.
+    supabase.from("event_settings").select("publish_winners").eq("id", 1).maybeSingle(),
   ]);
   const resources = (data ?? []) as Resource[];
   const offers = (offerRows ?? []) as AttendeeOffer[];
@@ -85,17 +87,19 @@ export default async function ResourcesPage() {
           </div>
         )}
       </section>
-      <section aria-labelledby="small-businesses" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-bg-raised p-4 sm:p-5">
-        <div className="space-y-1">
-          <h2 id="small-businesses" className="text-lg font-semibold">
-            For small businesses
-          </h2>
-          <p className="text-fg-muted">Know a business that could use one of the projects? Send them here to find the ones that fit, or browse every project.</p>
-        </div>
-        <Link href="/small-businesses" className="btn">
-          Implement in your small business
-        </Link>
-      </section>
+      {settings?.publish_winners && (
+        <section aria-labelledby="small-businesses" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-bg-raised p-4 sm:p-5">
+          <div className="space-y-1">
+            <h2 id="small-businesses" className="text-lg font-semibold">
+              For small businesses
+            </h2>
+            <p className="text-fg-muted">Know a business that could use one of the projects? Send them here to find the ones that fit, or browse every project.</p>
+          </div>
+          <Link href="/small-businesses" className="btn">
+            Implement in your small business
+          </Link>
+        </section>
+      )}
       {resources.length === 0 && offers.length === 0 && <p className="text-fg-muted">Nothing here yet. Check back closer to the event.</p>}
       {RESOURCE_SECTIONS.map((section) => {
         const items = resources.filter((r) => r.section === section.key);

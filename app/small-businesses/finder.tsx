@@ -1,11 +1,24 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { CLAUDE_PLUGIN, CLAUDE_PLUGIN_ID, INDUSTRIES, LIMITS, TEAM_SIZES, type BusinessInput, type FollowUp } from "@/lib/small-business-options";
+import {
+  ANSWER_MAX,
+  CLAUDE_PLUGIN,
+  CLAUDE_PLUGIN_ID,
+  EMAIL,
+  FIELDS,
+  INDUSTRIES,
+  inputProblem,
+  LABELS,
+  TEAM_SIZES,
+  type BusinessInput,
+  type FollowUp,
+} from "@/lib/small-business-options";
 import { askFollowUps, findMatches, type MatchedProject } from "./actions";
 import { ProjectCard } from "./project-card";
 
-type Step = "business" | "challenges" | "questions" | "results";
+// "email": asked for after the free searches, before the next one goes ahead.
+type Step = "business" | "challenges" | "email" | "questions" | "results";
 
 const STEPS: { key: Step; label: string }[] = [
   { key: "business", label: "Your business" },
@@ -14,27 +27,38 @@ const STEPS: { key: Step; label: string }[] = [
   { key: "results", label: "Your matches" },
 ];
 
-const EMPTY: BusinessInput = { name: "", industry: "", size: "", tools: "", about: "", challenges: "", opportunities: "" };
+const EMPTY: BusinessInput = { name: "", email: "", website: "", industry: "", size: "", tools: "", about: "", challenges: "", opportunities: "" };
 
-const input = "w-full rounded border border-line bg-bg px-3 py-2";
-const label = "block space-y-1.5";
+// Hints under a field's label; fields without one show just the label.
+const HINTS: Partial<Record<keyof BusinessInput, string>> = {
+  email: "So we can follow up about the projects. Needed if you search more than once.",
+  about: "What you sell or do, who your customers are, and how they find you and buy from you.",
+  challenges: "What eats your time, what you keep putting off, where you lose customers or money.",
+  opportunities: "Anything you've wondered about, tried, or worried about with AI. It's fine to say you don't know yet.",
+};
+
+const OTHER = "Other";
+
+const inputClass = "w-full rounded border border-line bg-bg px-3 py-2";
 const hint = "block text-sm text-fg-muted";
 
 // The finder: business details, then challenges and opportunities, then up to three follow-up
-// questions Claude writes from those answers, then the matching projects with why each fits.
-// Claude for Small Business is always offered too.
+// questions Claude writes from those answers (each with "Other"), then the matching projects with
+// how each could help. Claude for Small Business is always offered too. Which fields are required
+// is set in lib/small-business-options.ts (FIELDS); the server checks the same rules.
 export function Finder() {
   const [step, setStep] = useState<Step>("business");
   const [form, setForm] = useState<BusinessInput>(EMPTY);
   const [questions, setQuestions] = useState<FollowUp[]>([]);
-  const [answers, setAnswers] = useState<Record<number, string>>({});
+  // Per question: the chosen option, or OTHER with the typed text in `other`.
+  const [choices, setChoices] = useState<Record<number, string>>({});
+  const [other, setOther] = useState<Record<number, string>>({});
   const [matches, setMatches] = useState<MatchedProject[] | null>(null);
+  // What to run once the visitor has added their email.
+  const [afterEmail, setAfterEmail] = useState<"ask" | "match">("ask");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const top = useRef<HTMLDivElement>(null);
-
-  const set = (key: keyof BusinessInput) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-    setForm((f) => ({ ...f, [key]: e.target.value }));
 
   const go = (next: Step) => {
     setError(null);
@@ -42,13 +66,35 @@ export function Finder() {
     top.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const match = (qs: FollowUp[], chosen: Record<number, string>) =>
+  const field = (key: keyof BusinessInput, control: (props: { id: string; value: string; required: boolean; maxLength: number; onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void }) => React.ReactNode, className = "") => {
+    const { mode, max } = FIELDS[key];
+    if (mode === "hidden") return null;
+    const id = `sb-${key}`;
+    return (
+      <div className={`space-y-1.5 ${className}`}>
+        <label htmlFor={id} className="block font-medium">
+          {LABELS[key]}
+          {mode === "optional" && <span className="font-normal text-fg-muted"> (optional)</span>}
+        </label>
+        {HINTS[key] && <span className={hint}>{HINTS[key]}</span>}
+        {control({ id, value: form[key], required: mode === "required", maxLength: max, onChange: (e) => setForm((f) => ({ ...f, [key]: e.target.value })) })}
+      </div>
+    );
+  };
+
+  const answers = () =>
+    questions.map((q, i) => ({ question: q.question, answer: choices[i] === OTHER ? (other[i] ?? "").trim() : (choices[i] ?? "") }));
+
+  const match = (qs: FollowUp[], chosen: { question: string; answer: string }[]) =>
     startTransition(async () => {
-      const result = await findMatches(
-        form,
-        qs.map((q, i) => ({ question: q.question, answer: chosen[i] ?? "" })),
-      );
-      if (!result.ok) return setError(result.error);
+      const result = await findMatches(form, qs.length ? chosen : []);
+      if (!result.ok) {
+        if (result.needEmail) {
+          setAfterEmail("match");
+          return go("email");
+        }
+        return setError(result.error);
+      }
       setMatches(result.matches);
       go("results");
     });
@@ -56,22 +102,31 @@ export function Finder() {
   const ask = () =>
     startTransition(async () => {
       const result = await askFollowUps(form);
-      if (!result.ok) return setError(result.error);
+      if (!result.ok) {
+        if (result.needEmail) {
+          setAfterEmail("ask");
+          return go("email");
+        }
+        return setError(result.error);
+      }
       setQuestions(result.questions);
-      setAnswers({});
-      if (result.questions.length === 0) return match([], {});
+      setChoices({});
+      setOther({});
+      if (result.questions.length === 0) return match([], []);
       go("questions");
     });
 
   const restart = () => {
-    setForm(EMPTY);
+    // Keep the email: they've already given it.
+    setForm({ ...EMPTY, email: form.email });
     setQuestions([]);
-    setAnswers({});
+    setChoices({});
+    setOther({});
     setMatches(null);
     go("business");
   };
 
-  const index = STEPS.findIndex((s) => s.key === step);
+  const index = STEPS.findIndex((s) => s.key === (step === "email" ? "questions" : step));
 
   return (
     <div ref={top} className="scroll-mt-20 space-y-6 rounded-lg border border-line p-4 sm:p-6">
@@ -88,43 +143,35 @@ export function Finder() {
           className="space-y-4"
           onSubmit={(e) => {
             e.preventDefault();
+            const problem = inputProblem(form, [1]);
+            if (problem) return setError(problem);
             go("challenges");
           }}
         >
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className={label}>
-              <span className="font-medium">Business name (optional)</span>
-              <input value={form.name} onChange={set("name")} maxLength={LIMITS.name} className={input} autoComplete="organization" />
-            </label>
-            <label className={label}>
-              <span className="font-medium">Industry</span>
-              <select value={form.industry} onChange={set("industry")} className={input}>
+            {field("name", (p) => <input {...p} className={inputClass} autoComplete="organization" />)}
+            {field("website", (p) => <input {...p} type="text" inputMode="url" placeholder="example.com" className={inputClass} autoComplete="url" />)}
+            {field("industry", (p) => (
+              <select id={p.id} value={p.value} required={p.required} onChange={p.onChange} className={inputClass}>
                 <option value="">Choose one</option>
                 {INDUSTRIES.map((i) => (
                   <option key={i}>{i}</option>
                 ))}
                 <option>Other</option>
               </select>
-            </label>
-            <label className={label}>
-              <span className="font-medium">How many people work there?</span>
-              <select value={form.size} onChange={set("size")} className={input}>
+            ))}
+            {field("size", (p) => (
+              <select id={p.id} value={p.value} required={p.required} onChange={p.onChange} className={inputClass}>
                 <option value="">Choose one</option>
                 {TEAM_SIZES.map((s) => (
                   <option key={s}>{s}</option>
                 ))}
               </select>
-            </label>
-            <label className={label}>
-              <span className="font-medium">Tools you use today (optional)</span>
-              <input value={form.tools} onChange={set("tools")} maxLength={LIMITS.tools} placeholder="Gmail, Square, QuickBooks, Instagram…" className={input} />
-            </label>
+            ))}
+            {field("tools", (p) => <input {...p} placeholder="Gmail, Square, QuickBooks, Instagram…" className={inputClass} />, "sm:col-span-2")}
           </div>
-          <label className={label}>
-            <span className="font-medium">Describe your business</span>
-            <span className={hint}>What you sell or do, who your customers are, and how they find you and buy from you.</span>
-            <textarea value={form.about} onChange={set("about")} rows={5} maxLength={LIMITS.about} required className={input} />
-          </label>
+          {field("about", (p) => <textarea {...p} rows={5} className={inputClass} />)}
+          {field("email", (p) => <input {...p} type="email" className={`${inputClass} sm:max-w-sm`} autoComplete="email" />)}
           <button type="submit" className="btn">
             Next: challenges
           </button>
@@ -136,20 +183,13 @@ export function Finder() {
           className="space-y-4"
           onSubmit={(e) => {
             e.preventDefault();
-            if (!form.challenges.trim() && !form.opportunities.trim()) return setError("Fill in at least one of the two.");
+            const problem = inputProblem(form, [2]);
+            if (problem) return setError(problem);
             ask();
           }}
         >
-          <label className={label}>
-            <span className="font-medium">What are your biggest challenges?</span>
-            <span className={hint}>What eats your time, what you keep putting off, where you lose customers or money.</span>
-            <textarea value={form.challenges} onChange={set("challenges")} rows={5} maxLength={LIMITS.challenges} className={input} />
-          </label>
-          <label className={label}>
-            <span className="font-medium">Where could AI help?</span>
-            <span className={hint}>Anything you&apos;ve wondered about, tried, or worried about with AI. It&apos;s fine to say you don&apos;t know yet.</span>
-            <textarea value={form.opportunities} onChange={set("opportunities")} rows={4} maxLength={LIMITS.opportunities} className={input} />
-          </label>
+          {field("challenges", (p) => <textarea {...p} rows={5} className={inputClass} />)}
+          {field("opportunities", (p) => <textarea {...p} rows={4} className={inputClass} />)}
           <div className="flex flex-wrap gap-3">
             <button type="submit" className="btn" disabled={pending}>
               {pending ? "Thinking…" : "Next"}
@@ -161,12 +201,63 @@ export function Finder() {
         </form>
       )}
 
+      {step === "email" && (
+        <form
+          className="space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!EMAIL.test(form.email.trim())) return setError("That email address doesn't look right.");
+            setError(null);
+            if (afterEmail === "ask") ask();
+            else match(questions, answers());
+          }}
+        >
+          <p>To keep searching, tell us how to reach you. We&apos;ll only use it to follow up about the projects.</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <label htmlFor="sb-gate-email" className="block font-medium">
+                Email
+              </label>
+              <input
+                id="sb-gate-email"
+                type="email"
+                required
+                maxLength={FIELDS.email.max}
+                value={form.email}
+                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                className={inputClass}
+                autoComplete="email"
+              />
+            </div>
+            {FIELDS.name.mode !== "hidden" && (
+              <div className="space-y-1.5">
+                <label htmlFor="sb-gate-name" className="block font-medium">
+                  Business name{FIELDS.name.mode === "optional" && <span className="font-normal text-fg-muted"> (optional)</span>}
+                </label>
+                <input
+                  id="sb-gate-name"
+                  required={FIELDS.name.mode === "required"}
+                  maxLength={FIELDS.name.max}
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  className={inputClass}
+                  autoComplete="organization"
+                />
+              </div>
+            )}
+          </div>
+          <button type="submit" className="btn" disabled={pending}>
+            {pending ? "Thinking…" : "Continue"}
+          </button>
+        </form>
+      )}
+
       {step === "questions" && (
         <form
           className="space-y-5"
           onSubmit={(e) => {
             e.preventDefault();
-            match(questions, answers);
+            match(questions, answers());
           }}
         >
           <p className="text-fg-muted">A few quick questions to narrow it down. Skip any you&apos;re not sure about.</p>
@@ -174,19 +265,19 @@ export function Finder() {
             <fieldset key={q.question} className="space-y-2">
               <legend className="font-medium">{q.question}</legend>
               <div className="flex flex-wrap gap-2">
-                {q.options.map((option) => {
-                  const chosen = answers[i] === option;
+                {[...q.options, OTHER].map((option) => {
+                  const chosen = choices[i] === option;
                   return (
                     <label
                       key={option}
-                      className={`cursor-pointer rounded-full border px-3 py-1.5 text-sm ${chosen ? "border-accent bg-accent text-accent-fg" : "border-line-strong hover:bg-fg/5"}`}
+                      className={`cursor-pointer rounded-full border px-3 py-1.5 text-sm has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent ${chosen ? "border-accent bg-accent text-accent-fg" : "border-line-strong hover:bg-fg/5"}`}
                     >
                       <input
                         type="radio"
                         name={`q${i}`}
                         value={option}
                         checked={chosen}
-                        onChange={() => setAnswers((a) => ({ ...a, [i]: option }))}
+                        onChange={() => setChoices((c) => ({ ...c, [i]: option }))}
                         className="sr-only"
                       />
                       {option}
@@ -194,6 +285,17 @@ export function Finder() {
                   );
                 })}
               </div>
+              {choices[i] === OTHER && (
+                <input
+                  aria-label={`Your answer: ${q.question}`}
+                  value={other[i] ?? ""}
+                  onChange={(e) => setOther((o) => ({ ...o, [i]: e.target.value }))}
+                  maxLength={ANSWER_MAX}
+                  placeholder="Type your answer"
+                  autoFocus
+                  className={`${inputClass} sm:max-w-md`}
+                />
+              )}
             </fieldset>
           ))}
           <div className="flex flex-wrap gap-3">
@@ -244,11 +346,14 @@ export function Finder() {
       )}
 
       {error && (
-        <p role="alert" className="text-sm text-accent">
+        <p role="status" className="text-sm text-accent">
           {error}
         </p>
       )}
-      <p className="font-mono text-xs text-fg-faint">What you type is sent to Claude to find matches and isn&apos;t stored.</p>
+      <p className="font-mono text-xs text-fg-faint">
+        Your answers are sent to Claude to find matches and saved so the Seattle Claude community organizers can see what small businesses need. We won&apos;t share them
+        outside the organizers without your approval.
+      </p>
     </div>
   );
 }

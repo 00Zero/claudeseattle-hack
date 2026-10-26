@@ -175,7 +175,7 @@ export default async function Home() {
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             {/* Once winners are published the event is over: the projects are for small businesses
-                now, and signed-out visitors no longer get the teams or log-in buttons. */}
+                now, nobody gets "Browse teams", and signed-out visitors don't get "Log in" either. */}
             {resultsOut && (
               <Link href="/small-businesses" className="btn">
                 Implement in your small business
@@ -189,15 +189,28 @@ export default async function Home() {
                     Vote for the audience choice
                   </Link>
                 )}
-                <Link href="/teams" className={resultsOut ? "btn btn-ghost" : "btn"}>
-                  Browse teams
-                </Link>
-                <Link href="/resources" className="btn btn-ghost">
-                  {resultsOut ? "Resources" : <>Credits &amp; resources</>}
-                </Link>
-                <a href={lumaCalendarUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost">
-                  Upcoming events
-                </a>
+                {resultsOut ? (
+                  <>
+                    <a href={lumaCalendarUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost">
+                      Upcoming events
+                    </a>
+                    <Link href="/resources" className="btn btn-ghost">
+                      Resources
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <Link href="/teams" className="btn">
+                      Browse teams
+                    </Link>
+                    <Link href="/resources" className="btn btn-ghost">
+                      Credits &amp; resources
+                    </Link>
+                    <a href={lumaCalendarUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost">
+                      Upcoming events
+                    </a>
+                  </>
+                )}
                 <Link href="/resources#upload-media" className="btn">
                   Upload media
                 </Link>

@@ -5,7 +5,8 @@ import { unstable_cache } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { githubFetch, parseGitHubRepo } from "@/app/(judge)/_lib/github";
 import { joinDescription } from "@/app/(judge)/_lib/description";
-import { AREAS, CLAUDE_PLUGIN, CLAUDE_PLUGIN_ID, INDUSTRIES, LIMITS, SETUPS, type BusinessInput, type FollowUp, type FollowUpAnswer, type Project } from "@/lib/small-business-options";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { AREAS, CLAUDE_PLUGIN, CLAUDE_PLUGIN_ID, FIELDS, INDUSTRIES, inputProblem, SETUPS, type BusinessInput, type FollowUp, type FollowUpAnswer, type Project } from "@/lib/small-business-options";
 
 // /small-businesses: help a small business find the hackathon projects that fit it.
 //
@@ -15,14 +16,19 @@ import { AREAS, CLAUDE_PLUGIN, CLAUDE_PLUGIN_ID, INDUSTRIES, LIMITS, SETUPS, typ
 // cached by a hash of the entry, so it reruns only when a team edits it. Without a gateway key,
 // or when a call fails, the card falls back to the team's own tagline and description.
 //
-// The finder sends what the visitor typed about their business to Claude twice: once for a few
-// follow-up questions, once for the matches. Nothing they type is stored. Entries and the
-// visitor's text are untrusted input: prompts treat them as material, the output is a fixed
-// schema, and project ids are checked against the catalog.
+// The finder sends what the visitor typed about their business (never their email) to Claude
+// twice: once for a few follow-up questions, once for the matches. Each completed search is saved
+// in small_business_requests (admin only, /admin/small-businesses) so the organizers can see what
+// businesses want. Entries and the visitor's text are untrusted input: prompts treat them as
+// material, the output is a fixed schema, and project ids are checked against the catalog.
 // Server-side only, through the Vercel AI Gateway (CLAUDE.md, "Models").
 
+// Summaries are cached, so they run once per entry. The finder runs on every search: Sonnet reads a
+// whole business against the whole catalog well enough to say how each project would help it,
+// at a few cents a search.
 const SUMMARY_MODEL = "anthropic/claude-sonnet-5.5";
-const FINDER_MODEL = "anthropic/claude-haiku-5.5";
+const FOLLOW_UP_MODEL = "anthropic/claude-sonnet-5.5";
+const MATCH_MODEL = "anthropic/claude-sonnet-5.5";
 const SUMMARY_CACHE_SECONDS = 7 * 24 * 60 * 60;
 const README_CHARS = 8_000;
 
@@ -41,7 +47,15 @@ const clip = (value: string | null | undefined, max: number) => {
   return flat.length > max ? `${flat.slice(0, max)}…` : flat;
 };
 
-async function callJson<T>(model: string, system: string, user: string, schema: Record<string, unknown>, maxTokens: number, timeout: number): Promise<T | null> {
+async function callJson<T>(
+  model: string,
+  system: string,
+  user: string,
+  schema: Record<string, unknown>,
+  maxTokens: number,
+  timeout: number,
+  effort: "low" | "medium" = "low",
+): Promise<T | null> {
   const api = gateway();
   if (!api) return null;
   const response = await api.messages.create(
@@ -49,7 +63,7 @@ async function callJson<T>(model: string, system: string, user: string, schema: 
       model,
       max_tokens: maxTokens,
       system,
-      output_config: { effort: "low", format: { type: "json_schema", schema } },
+      output_config: { effort, format: { type: "json_schema", schema } },
       messages: [{ role: "user", content: user }],
     },
     { timeout },
@@ -206,30 +220,29 @@ export async function getProjects(): Promise<Project[]> {
 // The finder: follow-up questions, then matches
 // ---------------------------------------------------------------------------------------
 
-// Clips every field to its limit; null when the visitor hasn't said enough to match on.
-export function cleanInput(raw: Partial<Record<keyof BusinessInput, unknown>>): BusinessInput | null {
-  const field = (key: keyof BusinessInput) => (typeof raw[key] === "string" ? (raw[key] as string).trim().slice(0, LIMITS[key]) : "");
-  const input = {
-    name: field("name"),
-    industry: field("industry"),
-    size: field("size"),
-    tools: field("tools"),
-    about: field("about"),
-    challenges: field("challenges"),
-    opportunities: field("opportunities"),
-  };
-  if (!input.about || !(input.challenges || input.opportunities)) return null;
-  return input;
+// Clips every field to its limit and drops hidden ones. Null (with why) when a required field is
+// missing, the email is malformed, or there's nothing to match on (lib/small-business-options.ts, FIELDS).
+export function cleanInput(raw: Partial<Record<keyof BusinessInput, unknown>>): { input: BusinessInput; problem: null } | { input: null; problem: string } {
+  const input = Object.fromEntries(
+    (Object.keys(FIELDS) as (keyof BusinessInput)[]).map((key) => {
+      const value = raw[key];
+      return [key, FIELDS[key].mode !== "hidden" && typeof value === "string" ? value.trim().slice(0, FIELDS[key].max) : ""];
+    }),
+  ) as BusinessInput;
+  input.email = input.email.toLowerCase();
+  const problem = inputProblem(input, [1, 2]);
+  return problem ? { input: null, problem } : { input, problem: null };
 }
 
 function businessText(input: BusinessInput, answers: FollowUpAnswer[] = []) {
   return [
     `<business>`,
     input.name && `Name: ${input.name}`,
+    input.website && `Website: ${input.website}`,
     input.industry && `Industry: ${input.industry}`,
     input.size && `People working there: ${input.size}`,
     input.tools && `Tools they use today: ${input.tools}`,
-    `About the business:\n${input.about}`,
+    input.about && `About the business:\n${input.about}`,
     input.challenges && `Challenges:\n${input.challenges}`,
     input.opportunities && `Where they think AI could help:\n${input.opportunities}`,
     answers.length > 0 && `Follow-up answers:\n${answers.map((a) => `- ${a.question} ${a.answer}`).join("\n")}`,
@@ -272,17 +285,17 @@ const FOLLOW_UP_SYSTEM = `You help a small-business owner find which open-source
 
 Good questions narrow down between real candidates in the list: which problem matters most right now, which tools they already use (email, point of sale, bookkeeping, calendar), how comfortable they are setting up software (unless that's already clear), how customers reach them. Don't ask what they already told you. Don't mention project names.
 
-Each question: at most 15 words, plain language, addressed to the owner as "you". Give three to five short answer options each (at most 6 words per option), covering the likely answers.
+Each question: at most 15 words, plain language, addressed to the owner as "you". Give three or four short answer options each (at most 6 words per option), covering the likely answers. Don't add an "Other" or "Not sure" option; the form adds its own.
 
 ${UNTRUSTED}`;
 
 export async function getFollowUps(input: BusinessInput, projects: Project[]): Promise<FollowUp[] | null> {
   try {
-    const result = await callJson<{ questions: FollowUp[] }>(FINDER_MODEL, FOLLOW_UP_SYSTEM, `${catalogText(projects)}\n\n${businessText(input)}`, FOLLOW_UP_SCHEMA, 1500, 30_000);
+    const result = await callJson<{ questions: FollowUp[] }>(FOLLOW_UP_MODEL, FOLLOW_UP_SYSTEM, `${catalogText(projects)}\n\n${businessText(input)}`, FOLLOW_UP_SCHEMA, 1500, 30_000);
     if (!result) return null;
     return result.questions
       .slice(0, 3)
-      .map((q) => ({ question: clip(q.question, 200), options: q.options.map((o) => clip(o, 80)).filter(Boolean).slice(0, 5) }))
+      .map((q) => ({ question: clip(q.question, 200), options: q.options.map((o) => clip(o, 80)).filter((o) => o && !/^(other|not sure)\b/i.test(o)).slice(0, 4) }))
       .filter((q) => q.question && q.options.length >= 2);
   } catch (error) {
     console.error("Small business AI: follow-ups failed", error);
@@ -313,22 +326,62 @@ const MATCH_SYSTEM = `You help a small-business owner find which open-source AI 
 
 Pick the projects that would genuinely help this business, best first, at most six. Include a project only if it addresses something the owner said or plainly needs; it's fine to return just one or two. Rate each fit: "strong" when it targets one of their stated problems and suits their kind of business, "good" when it clearly helps but is less targeted, "partial" when it helps with part of the problem or needs adapting. Weigh how much setup each needs against how comfortable the owner is with technology.
 
-For each, write one reason to the owner, addressed as "you": at most 35 words, saying which of their problems it helps with and how. Use plain language and don't invent features the summary doesn't mention.
+For each, write one or two sentences to the owner, addressed as "you" (at most 45 words), on how this project could help their business specifically: which of their problems it takes on and what it would do for them day to day, using details they gave (their kind of business, customers, tools). If something stands in the way, such as a tool they don't use or setup beyond their comfort, say so briefly. Use plain language and don't invent features the summary doesn't mention.
 
 ${UNTRUSTED}`;
 
 export async function getMatches(input: BusinessInput, answers: FollowUpAnswer[], projects: Project[]): Promise<Match[] | null> {
   try {
-    const result = await callJson<{ matches: Match[] }>(FINDER_MODEL, MATCH_SYSTEM, `${catalogText(projects)}\n\n${businessText(input, answers)}`, MATCH_SCHEMA, 2500, 45_000);
+    const result = await callJson<{ matches: Match[] }>(MATCH_MODEL, MATCH_SYSTEM, `${catalogText(projects)}\n\n${businessText(input, answers)}`, MATCH_SCHEMA, 4000, 60_000, "medium");
     if (!result) return null;
     const ids = new Set([...projects.map((p) => p.id), CLAUDE_PLUGIN_ID]);
     const seen = new Set<string>();
     return result.matches
       .filter((m) => ids.has(m.id) && !seen.has(m.id) && seen.add(m.id))
       .slice(0, 6)
-      .map((m) => ({ id: m.id, fit: m.fit, reason: clip(m.reason, 300) }));
+      .map((m) => ({ id: m.id, fit: m.fit, reason: clip(m.reason, 400) }));
   } catch (error) {
     console.error("Small business AI: matching failed", error);
     return null;
   }
+}
+
+// ---------------------------------------------------------------------------------------
+// Saved searches (small_business_requests: service role writes, admins read)
+// ---------------------------------------------------------------------------------------
+
+// The email this visitor gave on an earlier search, and how many searches they've run.
+export async function visitorHistory(visitorId: string): Promise<{ searches: number; email: string | null }> {
+  const { data, error } = await createAdminClient().from("small_business_requests").select("email").eq("visitor_id", visitorId);
+  if (error) throw error;
+  return { searches: data.length, email: data.find((r) => r.email)?.email ?? null };
+}
+
+export async function saveRequest(row: {
+  visitorId: string;
+  profileId: string | null;
+  input: BusinessInput;
+  answers: FollowUpAnswer[];
+  matches: (Match & { title: string })[];
+}) {
+  const { input } = row;
+  const { error } = await createAdminClient()
+    .from("small_business_requests")
+    .insert({
+      visitor_id: row.visitorId,
+      profile_id: row.profileId,
+      email: input.email || null,
+      business_name: input.name || null,
+      website: input.website || null,
+      industry: input.industry || null,
+      team_size: input.size || null,
+      tools: input.tools || null,
+      about: input.about || null,
+      challenges: input.challenges || null,
+      opportunities: input.opportunities || null,
+      follow_ups: row.answers,
+      matches: row.matches,
+    });
+  // The visitor still gets their matches; the row is only for the organizers.
+  if (error) console.error("Small business: saving the request failed", error);
 }

@@ -20,7 +20,11 @@ export function ProjectCard({ project, fit, reason }: { project: Project; fit?: 
         <h3 className="font-display text-2xl font-light leading-snug">{project.title}</h3>
         {!plugin && <p className="eyebrow">{project.by}</p>}
       </header>
-      {reason && <p className="border-l-2 border-accent pl-3 text-sm text-fg">{reason}</p>}
+      {reason && (
+        <p className="border-l-2 border-accent pl-3 text-sm text-fg">
+          <span className="font-medium">How it could help you:</span> {reason}
+        </p>
+      )}
       {project.summary && <p className="text-sm">{project.summary}</p>}
       {project.forWhom && (
         <p className="text-sm text-fg-muted">

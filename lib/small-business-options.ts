@@ -67,16 +67,62 @@ export const CLAUDE_PLUGIN: Project = {
   place: null,
 };
 
-export const LIMITS = { name: 120, industry: 80, size: 40, tools: 400, about: 2000, challenges: 2000, opportunities: 2000, answer: 300 };
-
 export type BusinessInput = {
   name: string;
+  email: string;
+  website: string;
   industry: string;
   size: string;
   tools: string;
   about: string;
   challenges: string;
   opportunities: string;
+};
+
+// The finder's fields. To make a field required or optional (or hide it), change its mode here:
+// the form and the server both follow it. Steps 1 and 2 only; follow-up answers are always optional.
+export type FieldMode = "required" | "optional" | "hidden";
+export const FIELDS: Record<keyof BusinessInput, { step: 1 | 2; mode: FieldMode; max: number }> = {
+  name: { step: 1, mode: "optional", max: 120 },
+  email: { step: 1, mode: "optional", max: 200 },
+  website: { step: 1, mode: "optional", max: 200 },
+  industry: { step: 1, mode: "optional", max: 80 },
+  size: { step: 1, mode: "optional", max: 40 },
+  tools: { step: 1, mode: "optional", max: 400 },
+  about: { step: 1, mode: "optional", max: 2000 },
+  challenges: { step: 2, mode: "optional", max: 2000 },
+  opportunities: { step: 2, mode: "optional", max: 2000 },
+};
+// Whatever their modes, at least one of these must be filled in: something to match on.
+export const NEED_ONE_OF: (keyof BusinessInput)[] = ["challenges", "opportunities"];
+
+// Searches a visitor can run before the finder asks for their email (signed-in people never are).
+export const FREE_SEARCHES = 1;
+
+export const ANSWER_MAX = 300;
+
+export const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// What's missing or invalid in `input` for the given step(s), as one message; null when it's fine.
+export function inputProblem(input: BusinessInput, steps: (1 | 2)[]): string | null {
+  const keys = (Object.keys(FIELDS) as (keyof BusinessInput)[]).filter((k) => steps.includes(FIELDS[k].step));
+  const missing = keys.filter((k) => FIELDS[k].mode === "required" && !input[k].trim());
+  if (missing.length) return `Please fill in: ${missing.map((k) => LABELS[k].toLowerCase()).join(", ")}.`;
+  if (keys.includes("email") && input.email.trim() && !EMAIL.test(input.email.trim())) return "That email address doesn't look right.";
+  if (steps.includes(2) && NEED_ONE_OF.every((k) => !input[k].trim())) return `Fill in at least one of: ${NEED_ONE_OF.map((k) => LABELS[k].toLowerCase()).join(", ")}.`;
+  return null;
+}
+
+export const LABELS: Record<keyof BusinessInput, string> = {
+  name: "Business name",
+  email: "Email",
+  website: "Website",
+  industry: "Industry",
+  size: "How many people work there?",
+  tools: "Tools you use today",
+  about: "Describe your business",
+  challenges: "What are your biggest challenges?",
+  opportunities: "Where could AI help?",
 };
 
 export type FollowUp = { question: string; options: string[] };
