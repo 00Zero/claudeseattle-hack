@@ -6,7 +6,8 @@
 
 export type Question =
   | { id: string; kind: "choice"; label: string; options: string[] }
-  | { id: string; kind: "multi"; label: string; options: string[] }
+  // other: adds "Other" with a text box, saved as "Other: <text>". none: an option that clears the rest.
+  | { id: string; kind: "multi"; label: string; options: string[]; other?: boolean; none?: string }
   | { id: string; kind: "matrix"; label: string; rows: string[]; options: string[] }
   | { id: string; kind: "text"; label: string; help?: string };
 
@@ -21,7 +22,7 @@ export type Track = "attended" | "mentor" | "judge" | "volunteer" | "no_show" | 
 export type Answers = {
   track: Track;
   came?: string;
-  quick: Record<string, string | Record<string, string>>;
+  quick: Record<string, string | string[] | Record<string, string>>;
   more: boolean;
   detail: Record<string, string | string[] | Record<string, string>>;
   additional?: string;
@@ -148,11 +149,20 @@ const TRACKS: Record<Track, { quick: Question[]; detail: Question[] }> = {
       WEBSITE,
       { id: "mentors", kind: "choice", label: "How helpful were the mentors?", options: ["Very helpful", "Somewhat helpful", "Not helpful", "Didn't work with a mentor"] },
       {
+        id: "agents",
+        kind: "multi",
+        label: "Which coding agents did you mainly use?",
+        options: ["Claude Code", "Codex", "Gemini CLI", "Cursor", "GitHub Copilot", "Windsurf", "Cline"],
+        other: true,
+        none: "None",
+      },
+      {
+        // Who claimed each credit is already known from the offer clicks; this asks whether it went into the project.
         id: "credits",
         kind: "matrix",
-        label: "Did you use each sponsored credit?",
+        label: "Did you actually use each sponsored credit for your project?",
         rows: ["Claude API credits ($100)", "OpenRouter credits ($10)", "Tavily credits (8,000)", "Wispr Flow Pro"],
-        options: ["Used it", "Claimed, not used yet", "Didn't claim it", "Didn't know about it"],
+        options: ["Yes, in our project", "Yes, but not for the project", "No", "Not sure"],
       },
       { id: "again", kind: "choice", label: "Would you come to another Claude Seattle hackathon?", options: AGAIN },
     ],
@@ -174,14 +184,8 @@ const TRACKS: Record<Track, { quick: Question[]; detail: Question[] }> = {
       {
         id: "credits_why",
         kind: "multi",
-        label: "If you didn't use some of the credits, why not?",
+        label: "If your project didn't use some of the credits, why not?",
         options: ["I didn't know how to claim them", "I already had my own subscription or credits", "Our team used one person's account", "Setting them up took too long", "Our project didn't need them"],
-      },
-      {
-        id: "tools",
-        kind: "multi",
-        label: "What did your team build with?",
-        options: ["Claude Code", "Claude app (chat, Projects, Cowork)", "Claude API", "Other AI coding tools (Cursor, Codex, Copilot)", "App builders (Lovable, Bolt, Replit, v0)"],
       },
       { id: "services_used", kind: "multi", label: "Which other services did your team use?", options: SERVICES },
       { id: "services_wanted", kind: "multi", label: "Which services would you like to see as credit sponsors at future hackathons?", options: SERVICES },
@@ -354,9 +358,22 @@ function fullMatrix(q: Extract<Question, { kind: "matrix" }>, value: unknown) {
   return rows;
 }
 
-// Whether a required question has an answer (choice: one option; matrix: every row).
+export const OTHER = "Other: ";
+
+// The valid picks of a multi answer: listed options, "None", and "Other: <text>" with some text.
+export function multiPicks(q: Extract<Question, { kind: "multi" }>, value: unknown) {
+  if (!Array.isArray(value)) return [];
+  const picks = value.filter(
+    (v): v is string =>
+      typeof v === "string" && (q.options.includes(v) || v === q.none || (Boolean(q.other) && v.startsWith(OTHER) && v.slice(OTHER.length).trim() !== "")),
+  );
+  const cleaned = picks.map((v) => (v.startsWith(OTHER) ? `${OTHER}${v.slice(OTHER.length).trim().slice(0, 200)}` : v));
+  return q.none && cleaned.includes(q.none) ? [q.none] : cleaned;
+}
+// Whether a required question has an answer (choice: one option; multi: at least one; matrix: every row).
 export function isAnswered(q: Question, value: unknown) {
   if (q.kind === "choice") return typeof value === "string" && q.options.includes(value);
+  if (q.kind === "multi") return multiPicks(q, value).length > 0;
   if (q.kind === "matrix") return fullMatrix(q, value) !== null;
   return false;
 }
@@ -381,7 +398,7 @@ export function checkAnswers(group: Group, role: Role, happyHour: boolean, raw: 
   for (const q of quick) {
     const value = input.quick?.[q.id];
     if (!isAnswered(q, value)) return { ok: false, message: "Please answer every question in the first part." };
-    quickOut[q.id] = q.kind === "matrix" ? fullMatrix(q, value)! : (value as string);
+    quickOut[q.id] = q.kind === "matrix" ? fullMatrix(q, value)! : q.kind === "multi" ? multiPicks(q, value) : (value as string);
   }
 
   const more = input.more === true;
@@ -392,8 +409,8 @@ export function checkAnswers(group: Group, role: Role, happyHour: boolean, raw: 
       if (value == null) continue;
       if (q.kind === "text" && typeof value === "string" && value.trim()) detailOut[q.id] = value.trim().slice(0, MAX_TEXT);
       if (q.kind === "choice" && typeof value === "string" && q.options.includes(value)) detailOut[q.id] = value;
-      if (q.kind === "multi" && Array.isArray(value)) {
-        const picked = value.filter((v): v is string => typeof v === "string" && q.options.includes(v));
+      if (q.kind === "multi") {
+        const picked = multiPicks(q, value);
         if (picked.length) detailOut[q.id] = picked;
       }
       if (q.kind === "matrix" && typeof value === "object" && !Array.isArray(value)) {

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/lib/admin";
-import { questionsFor, type Answers, type Question, type Role, type Track } from "@/lib/followup/survey";
+import { OTHER, questionsFor, type Answers, type Question, type Role, type Track } from "@/lib/followup/survey";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const TRACK_LABELS: Record<Track, string> = {
@@ -42,17 +42,24 @@ function Tally({ q, rows, from }: { q: Question; rows: Row[]; from: "quick" | "d
     );
   }
   const flat = values.flatMap((v) => (Array.isArray(v) ? v : [v as string]));
+  const options = q.kind === "multi" && q.none ? [...q.options, q.none] : q.options;
+  const others = flat.filter((v) => v.startsWith(OTHER)).map((v) => v.slice(OTHER.length));
   return (
     <div className="space-y-1">
       <p className="font-medium">
         {q.label} <span className="font-normal text-foreground/60">({values.length})</span>
       </p>
       <ul className="flex flex-wrap gap-x-4 text-sm">
-        {q.options.map((o) => (
+        {options.map((o) => (
           <li key={o} className="tabular-nums">
             {o}: <strong>{flat.filter((v) => v === o).length}</strong>
           </li>
         ))}
+        {others.length > 0 && (
+          <li>
+            Other: <strong>{others.length}</strong> <span className="text-foreground/60">({others.join(", ")})</span>
+          </li>
+        )}
       </ul>
     </div>
   );

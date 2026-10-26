@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { CAME_TRACKS, gateFor, isAnswered, questionsFor, trackFor, type Answers, type Group, type Question, type Role } from "@/lib/followup/survey";
+import { CAME_TRACKS, OTHER, gateFor, isAnswered, questionsFor, trackFor, type Answers, type Group, type Question, type Role } from "@/lib/followup/survey";
 import { submitSurvey } from "./actions";
 
 type Detail = Answers["detail"];
@@ -60,11 +60,33 @@ function Field({ q, value, onChange, number }: { q: Question; value: Detail[stri
   }
   if (q.kind === "multi") {
     const picked = Array.isArray(value) ? value : [];
+    const otherText = picked.find((p) => p.startsWith(OTHER));
+    const options = [...q.options, ...(q.other ? ["Other"] : []), ...(q.none ? [q.none] : [])];
+    const selected = [...picked.filter((p) => !p.startsWith(OTHER)), ...(otherText != null ? ["Other"] : [])];
+    // "None" clears the rest; anything else clears "None". "Other" keeps its text in the answer.
+    const toggle = (v: string, checked: boolean) => {
+      if (!checked) return onChange(picked.filter((p) => (v === "Other" ? !p.startsWith(OTHER) : p !== v)));
+      if (v === q.none) return onChange([v]);
+      const rest = picked.filter((p) => p !== q.none);
+      onChange([...rest, v === "Other" ? OTHER : v]);
+    };
     return (
       <fieldset>
         {label}
         <p className="-mt-1 mb-2 text-sm text-fg-faint">Pick any.</p>
-        <Pills name={q.id} type="checkbox" options={q.options} selected={picked} onChange={(v, checked) => onChange(checked ? [...picked, v] : picked.filter((p) => p !== v))} />
+        <Pills name={q.id} type="checkbox" options={options} selected={selected} onChange={toggle} />
+        {otherText != null && (
+          <input
+            type="text"
+            maxLength={200}
+            autoFocus
+            aria-label={`${q.label} Other`}
+            placeholder="Which ones?"
+            value={otherText.slice(OTHER.length)}
+            onChange={(e) => onChange(picked.map((p) => (p.startsWith(OTHER) ? `${OTHER}${e.target.value}` : p)))}
+            className="mt-2 w-full max-w-sm rounded border border-line bg-bg px-3 py-1.5 text-sm"
+          />
+        )}
       </fieldset>
     );
   }
