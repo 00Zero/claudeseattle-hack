@@ -1,5 +1,7 @@
 # Teams app (Dev A, Nishant)
 
+Nishant built this for the Oct 25 hackathon and helped only until the event; Adam owns it now (root `CLAUDE.md`, "Who owns what"). "You" below means whoever is working on it.
+
 Spec: `docs/REQUIREMENTS.md`, "Teams app (Dev A)", plus the access table in "Shared foundation". Mobile-first; live by Sat Oct 24, 4:30 pm.
 
 ## You own
@@ -35,7 +37,7 @@ Spec: `docs/REQUIREMENTS.md`, "Teams app (Dev A)", plus the access table in "Sha
 
 ## Shared code and tables
 
-- Need a column on a shared table? Add a `shared_` migration in your PR (rules in the root `CLAUDE.md`) and mention it in the dev WhatsApp group.
+- Need a column on a shared table? Add a `shared_` migration in your PR (rules in the root `CLAUDE.md`).
 - Shared files (`lib/supabase/**`, `proxy.ts`, `app/layout.tsx`, `app/globals.css`, `package.json`) affect the judging app too: keep changes small and check `/submit` still works on localhost.
 - Leave Adam's login, auth, and admin routes alone.
 
