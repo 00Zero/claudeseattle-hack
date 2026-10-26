@@ -85,6 +85,17 @@ export default async function ResourcesPage() {
           </div>
         )}
       </section>
+      <section aria-labelledby="small-businesses" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-bg-raised p-4 sm:p-5">
+        <div className="space-y-1">
+          <h2 id="small-businesses" className="text-lg font-semibold">
+            For small businesses
+          </h2>
+          <p className="text-fg-muted">Know a business that could use one of the projects? Send them here to find the ones that fit, or browse every project.</p>
+        </div>
+        <Link href="/small-businesses" className="btn">
+          Implement in your small business
+        </Link>
+      </section>
       {resources.length === 0 && offers.length === 0 && <p className="text-fg-muted">Nothing here yet. Check back closer to the event.</p>}
       {RESOURCE_SECTIONS.map((section) => {
         const items = resources.filter((r) => r.section === section.key);

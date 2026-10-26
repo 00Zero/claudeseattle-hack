@@ -23,7 +23,7 @@ Next.js 16 differs from older versions (for example, `middleware.ts` is now `pro
 | `app/(teams)/**` (routes under `/teams`) | Dev A |
 | `app/profile/**` | Admin scaffolds, then Dev A |
 | `app/(judge)/**` (`/submit`, `/judge`), `app/admin/judging/**` | Dev B |
-| `app/page.tsx`, `app/login`, `app/auth`, `app/pending`, `app/declined`, `app/verify-email`, rest of `app/admin/**` | Admin |
+| `app/page.tsx`, `app/login`, `app/auth`, `app/pending`, `app/declined`, `app/verify-email`, `app/small-businesses`, rest of `app/admin/**` | Admin |
 | `lib/supabase/**`, `proxy.ts`, `app/layout.tsx`, `app/globals.css`, `package.json`, `package-lock.json`, this file | Shared |
 | `supabase/migrations/*_shared*.sql` | Shared (see Rules) |
 | `supabase/migrations/*_teams_*.sql`, `*_judge_*.sql` | Dev A, Dev B |
