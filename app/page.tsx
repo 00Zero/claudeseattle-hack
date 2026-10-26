@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { audience, eventDate, eventCloseAt, eventName, eventOpenAt, ambassadors, hosts, judges, lumaCalendarUrl as defaultLumaUrl, openSourceNote, partners, prizes, sponsors, rubric, sundaySchedule, saturdaySchedule, theme, venue as defaultVenue, type Entry } from "@/lib/event";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { getEnabledCriteria } from "@/app/(judge)/_lib/criteria";
@@ -9,6 +10,7 @@ import { Agenda } from "@/components/home/agenda";
 import { ContextWindow } from "@/components/home/context-window";
 import { SkylineBand } from "@/components/home/skyline-band";
 import { Wifi } from "@/components/home/wifi";
+import { WinnersCard, type Winner } from "@/components/home/winners-card";
 
 // Section header styled as a Claude Code tool call.
 function Sig({ call, title }: { call: string; title: string }) {
@@ -95,13 +97,30 @@ function Groups({ groups }: { groups: { id: string; call: string; title: string;
     ));
 }
 
+const PLACES = ["1st place", "2nd place", "3rd place"];
+
+// The top three from the published results, then the audience choice once voting has closed.
+// audience_vote_results is service-role only; only the winning title leaves the server.
+async function getWinners(withAudience: boolean): Promise<Winner[]> {
+  const [{ data: placed }, { data: audienceTop }] = await Promise.all([
+    (await createClient()).from("public_judge_results").select("entry_id, title, team_name, place").gte("place", 1).lte("place", 3).order("place"),
+    withAudience
+      ? createAdminClient().from("audience_vote_results").select("entry_id, title, team_name").eq("place", 1).eq("is_test", false).gt("points", 0)
+      : Promise.resolve({ data: [] as { entry_id: string; title: string | null; team_name: string }[] }),
+  ]);
+  return [
+    ...(placed ?? []).map((r) => ({ prize: PLACES[r.place - 1], entryId: r.entry_id, title: r.title || r.team_name })),
+    ...(audienceTop ?? []).map((r) => ({ prize: "Audience choice", entryId: r.entry_id, title: r.title || r.team_name })),
+  ];
+}
+
 export default async function Home() {
   const supabase = await createClient();
   const [{ data: settings }, profile, { criteria }] = await Promise.all([
     supabase
       .from("event_settings")
       .select(
-        "team_formation_closes_at, submissions_close_at, event_starts_at, event_ends_at, venue_name, venue_address, venue_neighborhood, venue_lat, venue_lon, luma_calendar_url, wifi_network, wifi_password, audience_voting_enabled, audience_voting",
+        "team_formation_closes_at, submissions_close_at, event_starts_at, event_ends_at, venue_name, venue_address, venue_neighborhood, venue_lat, venue_lon, luma_calendar_url, wifi_network, wifi_password, audience_voting_enabled, audience_voting, publish_winners",
       )
       .eq("id", 1)
       .single(),
@@ -129,6 +148,7 @@ export default async function Home() {
   const slots = [...saturdaySchedule, ...sundaySchedule]
     .filter((item): item is typeof item & { start: string; end: string } => Boolean(item.start && item.end))
     .map((item) => ({ what: item.what, short: item.short ?? item.what, start: item.start, end: item.end }));
+  const winners = settings?.publish_winners ? await getWinners(settings.audience_voting_enabled && settings.audience_voting === "closed") : [];
   const finals = sundaySchedule.find((item) => item.what.startsWith("Finals"));
   const moments = [
     { label: "Hackathon starts", at: sundaySchedule[0].start! },
@@ -192,15 +212,14 @@ export default async function Home() {
         <div className="grid min-w-0 gap-3">
           <ContextWindow openAt={openAt} closeAt={closeAt} moments={moments} slots={slots} />
           {hasWifi && <Wifi openAt={openAt} closeAt={closeAt} />}
-          {/* Signed-in people; the upload section on /resources checks approval. */}
-          {profile && (
-            <section aria-label="Upload photos and videos" className="grid gap-2 rounded-lg border border-line bg-bg-raised p-4 font-mono text-xs text-fg-muted">
-              <span className="text-fg-faint">Photos and videos from the event</span>
-              <Link href="/resources#upload-media" className="btn justify-self-start font-sans">
-                Upload media
-              </Link>
-            </section>
-          )}
+          {/* Everyone sees it; signed out goes through sign-in first (/login?next=), and /resources checks approval. */}
+          <section aria-label="Share your photos and videos" className="snake-border grid gap-3 rounded-lg p-4 font-mono text-xs text-fg-muted">
+            <span className="text-sm text-fg">Share your photos and videos from the event</span>
+            <Link href={profile ? "/resources#upload-media" : "/login?next=/resources%23upload-media"} className="btn pulse-ring justify-self-start font-sans">
+              Upload media
+            </Link>
+          </section>
+          {winners.length > 0 && <WinnersCard winners={winners} />}
         </div>
       </section>
 
