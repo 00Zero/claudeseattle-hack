@@ -81,6 +81,30 @@ export async function getMyGroup(judgeId: string) {
   return { ok: true as const, ranked, finalistId, group, scoredCount: entries.filter((e) => e.myScore).length };
 }
 
+export type GroupJudgeScore = { judgeId: string; name: string; score: MyScore | null; mean: number | null };
+
+// My judging group's ranking, from judge_group_scores(): every entry assigned to me, ranked by the
+// mean of the group's judges' entry scores (as judge_entry_results ranks it), with each judge's
+// ratings. The function returns nothing until I've scored all my entries, so this is empty then.
+export async function getGroupRanking() {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("judge_group_scores");
+  if (error) return [];
+  type Row = { entry_id: string; judge_id: string; judge_name: string; scores: number[] | null; criteria: string[] | null };
+  const byEntry = new Map<string, GroupJudgeScore[]>();
+  for (const r of (data ?? []) as Row[]) {
+    const score = r.scores ? { scores: r.scores, criteria: r.criteria, comment: null, updated_at: "" } : null;
+    const list = byEntry.get(r.entry_id) ?? [];
+    list.push({ judgeId: r.judge_id, name: r.judge_name, score, mean: score ? mean(score.scores) : null });
+    byEntry.set(r.entry_id, list);
+  }
+  const entries = [...byEntry].map(([id, judges]) => {
+    const scored = judges.filter((j) => j.mean !== null).map((j) => j.mean!);
+    return { id, judges, groupMean: mean(scored), scoredCount: scored.length };
+  });
+  return rankByScore(entries, (e) => e.groupMean);
+}
+
 export async function getFinalRound(judgeId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("judge_finalists");

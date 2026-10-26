@@ -8,11 +8,11 @@ Spec: `docs/REQUIREMENTS.md`, "Judging app (Dev B)" and its "Rubric", plus "Even
 
 ## Routes (starting point; change with Adam)
 
-- `/judge`: my assigned entries, score form, live ranking of my group by mean; my top entry is my finalist. In a judging group (`judge_groups`, set on `/admin/judging`), every member gets an assignment row for each of the group's entries and the group's top entry by mean across its judges is the finalist (`judge_entry_results`).
+- `/judge`: my assigned entries, score form, live ranking of my group by mean; my top entry is my finalist. In a judging group (`judge_groups`, set on `/admin/judging`), every member gets an assignment row for each of the group's entries and the group's top entry by mean across its judges is the finalist (`judge_entry_results`). Once a group judge has scored all their entries, `judge_group_scores()` opens the group ranking on `/judge`: each entry's group mean and every member's criterion ratings (never comments).
 - `/judge/results`: the final round across all judges: finalists ranked by mean final score with how many judges have scored each. A judge sees it only after submitting scores for every finalist, so nobody anchors on other judges' scores. Prelim scores from other groups aren't shown. This is what the panel checks before Adam flips "publish winners".
 - `/results`: public; shows only what `publish_finalists` / `publish_winners` allow. Never raw scores.
 - Public entry pages (after `submissions_close_at`): a dynamic route under `/submit` or `/entries`, your choice.
-- `app/admin/judging/**`: assignments and the results table. It sits inside Adam's admin shell (`app/admin/layout.tsx`), so it's outside this route group but still yours.
+- `app/admin/judging/**`: assignments and the results table; `/admin/judging/scores` lists every score by judge or by team. It sits inside Adam's admin shell (`app/admin/layout.tsx`), so it's outside this route group but still yours.
 - Your tables, prefixed `judge_` (entries, scores, assignments, AI notes), in migrations named `<timestamp>_judge_<what>.sql` (`npx supabase migration new judge_<what>`). Merging to `main` applies them to production automatically (Supabase GitHub integration), so merge only when the "Migration review" check is green; destructive changes are blocked and go to Adam. Never edit a migration that's already merged; if a newer migration lands on `main` first, rename yours with `npx supabase migration new` and move the SQL. Don't run `supabase db push`.
 
 ## Shared data you use (`supabase/migrations/*_shared*.sql`)

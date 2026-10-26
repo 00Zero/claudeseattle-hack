@@ -209,6 +209,9 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
           <span className="rounded bg-foreground/5 px-2 py-1">
             AI notes: {notedCount}/{submittedCount}
           </span>
+          <Link href={`/admin/judging/scores${isTest ? "?world=test" : ""}`} className="rounded px-2 py-1 underline hover:bg-foreground/5">
+            All scores by judge and team
+          </Link>
         </div>
         <div className="space-y-1">
           <AiNotesForm world={isTest ? "test" : "real"} disabled={!aiNotesConfigured()} />
