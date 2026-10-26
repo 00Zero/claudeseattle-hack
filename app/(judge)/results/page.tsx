@@ -1,16 +1,20 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { eventName, prizes } from "@/lib/event";
+import { EntryGrid, type EntryCard } from "../_components/entry-grid";
 import { PageHeader, Sig } from "../_components/ui";
 
 // /results: public. Shows only what event_settings allows: finalists once "publish finalists"
 // is on, places once "publish winners" is on. Never scores (public_judge_results has none).
 export default async function ResultsPage() {
   const supabase = await createClient();
-  const [{ data: settings }, { data }] = await Promise.all([
+  const [{ data: settings }, { data }, { data: entryRows }] = await Promise.all([
     supabase.from("event_settings").select("publish_finalists, publish_winners").eq("id", 1).maybeSingle(),
     supabase.from("public_judge_results").select("entry_id, team_name, title, place"),
+    // Every submitted entry; the view returns nothing until submissions close.
+    supabase.from("public_judge_entries").select("id, team_name, title, tagline").order("team_name"),
   ]);
+  const entries = (entryRows ?? []) as EntryCard[];
   const winners = Boolean(settings?.publish_winners);
   const rows = ((data ?? []) as { entry_id: string; team_name: string; title: string; place: number | null }[]).sort((a, b) =>
     winners ? (a.place ?? 99) - (b.place ?? 99) || a.team_name.localeCompare(b.team_name) : a.team_name.localeCompare(b.team_name),
@@ -70,10 +74,15 @@ export default async function ResultsPage() {
           ))}
         </div>
         <p className="text-sm text-fg-muted">{prizes.winnersValue}</p>
-        <Link href="/entries" className="btn btn-ghost">
-          Browse every entry
-        </Link>
       </section>
+
+      {entries.length > 0 && (
+        <section className="space-y-4">
+          <Sig call="Read(entries.md)" title="Every entry" />
+          <p className="text-fg-muted">Every project is open source on GitHub, so a small business can pick one up next week.</p>
+          <EntryGrid entries={entries} />
+        </section>
+      )}
     </div>
   );
 }

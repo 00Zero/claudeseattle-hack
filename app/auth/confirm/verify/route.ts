@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { landingPathAfterSignIn } from "@/lib/access";
+import { SIGN_IN_NEXT_COOKIE, safeNextPath } from "@/lib/sign-in-next";
 import { createClient } from "@/lib/supabase/server";
 
 const EMAIL_TYPES: EmailOtpType[] = ["email", "magiclink", "signup"];
@@ -33,5 +34,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (!userId) return to("/login?error=link");
-  return to(await landingPathAfterSignIn(userId));
+  const response = to(await landingPathAfterSignIn(userId, safeNextPath(request.cookies.get(SIGN_IN_NEXT_COOKIE)?.value)));
+  response.cookies.delete(SIGN_IN_NEXT_COOKIE);
+  return response;
 }

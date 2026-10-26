@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatPacific } from "@/lib/time";
+import { EntryGrid, type EntryCard } from "../_components/entry-grid";
 import { PageHeader } from "../_components/ui";
 import { getSubmissionDeadline } from "../submit/_lib/entry";
 
@@ -12,7 +12,7 @@ export default async function EntriesPage() {
     getSubmissionDeadline(),
     supabase.from("public_judge_entries").select("id, team_name, title, tagline").order("team_name"),
   ]);
-  const entries = (data ?? []) as { id: string; team_name: string; title: string; tagline: string | null }[];
+  const entries = (data ?? []) as EntryCard[];
 
   return (
     <div className="space-y-10">
@@ -24,17 +24,7 @@ export default async function EntriesPage() {
       ) : entries.length === 0 ? (
         <p className="text-fg-muted">No entries.</p>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2">
-          {entries.map((e) => (
-            <li key={e.id}>
-              <Link href={`/entries/${e.id}`} className="block h-full rounded-lg border border-line bg-bg-raised p-4 no-underline transition-colors hover:border-accent">
-                <span className="block font-display text-2xl font-light leading-snug">{e.title || e.team_name}</span>
-                <span className="eyebrow mt-1 block">{e.team_name}</span>
-                {e.tagline && <span className="mt-1 block text-sm">{e.tagline}</span>}
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <EntryGrid entries={entries} />
       )}
     </div>
   );
