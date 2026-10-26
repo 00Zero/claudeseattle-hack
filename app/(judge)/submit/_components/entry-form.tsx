@@ -62,7 +62,6 @@ function TheirVersion({ theirs, onUse, onKeep }: { theirs: Theirs; onUse: () => 
 type ContributionsConfig = {
   teammates: Teammate[];
   me: string;
-  closed: boolean;
   legacy: string;
   limit: number;
   githubAction: (formData: FormData) => Promise<PartState>;
@@ -376,7 +375,7 @@ export function EntryForm({
           teamId={teamId}
           teammates={contributions.teammates}
           me={contributions.me}
-          closed={contributions.closed}
+          closesAt={closesAt}
           disabled={pending}
           legacy={contributions.legacy}
           limit={contributions.limit}

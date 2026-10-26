@@ -21,7 +21,6 @@ const HELP = {
   blocked: "Only participants on this team can save its entry. If that's wrong, find an organizer.",
   stale: "This page is out of date, usually because the site was just updated. Copy anything you typed somewhere safe, reload the page, paste it back, and save.",
   retry: "The database didn't take the save. Wait a few seconds and press Save again. If it keeps failing, find an organizer, and don't close this tab: your text is only here.",
-  closed: "Submissions closed at the deadline, so this can't change now. If something important is missing, find an organizer.",
 } as const;
 
 function failed(message: string, ...details: string[]): SaveState {
@@ -220,8 +219,8 @@ export type PartResult = { profile_id: string; status: "ok" | "conflict" | "erro
 // PartState: what a GitHub username add returns; details as in SaveState.
 export type PartState = { status: "idle" | "ok" | "error"; message?: string; details?: string[] };
 
-// Save teammates' "who did what" parts (judge_contributions; RLS: a team member who may submit,
-// before the deadline). Anyone on the team can write anyone's part. Each part is written on its
+// Save teammates' "who did what" parts (judge_contributions; RLS: a team member who may submit;
+// no cutoff, so parts saved after the deadline are kept and shown as late). Anyone on the team can write anyone's part. Each part is written on its
 // own and only if nobody saved it since the form last had it; otherwise the form shows both
 // versions to pick from, so nobody's writing is lost. The form calls this alongside saveEntry.
 export async function saveContributions(edits: PartEdit[]): Promise<PartResult[]> {
@@ -230,7 +229,6 @@ export async function saveContributions(edits: PartEdit[]): Promise<PartResult[]
   if (ctx.kind === "signed_out") return refuse("Your session expired.", HELP.signedOut);
   if (ctx.kind === "no_access") return refuse("Your registration is awaiting approval.", HELP.noAccess);
   if (ctx.kind !== "ready") return refuse("You can't edit this team's entry.", HELP.blocked);
-  if (ctx.isPast) return refuse("Submissions closed, so who did what can't change now.", HELP.closed);
 
   const supabase = await createClient();
   const results = await Promise.all(
@@ -265,7 +263,6 @@ export async function setTeammateGithub(formData: FormData): Promise<PartState> 
   const nope = (message: string, detail: string): PartState => ({ status: "error", message, details: [detail] });
   if (ctx.kind === "signed_out") return nope("Your session expired.", HELP.signedOut);
   if (ctx.kind !== "ready") return nope("You can't edit this team's entry.", HELP.blocked);
-  if (ctx.isPast) return nope("Submissions closed.", HELP.closed);
   const teammate = ctx.teammates.find((t) => t.id === formData.get("profile_id"));
   if (!teammate) return nope("That person isn't on your team anymore.", "They left the team or were removed after this page loaded. Reload the page to see the current team.");
   if (teammate.github) return nope(`${teammate.name} already has a GitHub username.`, "Someone added it after this page loaded. Reload the page to see it.");

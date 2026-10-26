@@ -52,7 +52,7 @@ function githubTip(t: Teammate, mine: boolean) {
 
 // A missing GitHub username, highlighted, with a field anyone on the team can fill in. Not a form
 // (it sits inside the entry form), so Add and Enter call the action directly.
-function AddGithub({ teammate, closed, action }: { teammate: Teammate; closed: boolean; action: (formData: FormData) => Promise<PartState> }) {
+function AddGithub({ teammate, action }: { teammate: Teammate; action: (formData: FormData) => Promise<PartState> }) {
   const [value, setValue] = useState("");
   const [state, setState] = useState(idle);
   const [pending, startTransition] = useTransition();
@@ -76,31 +76,27 @@ function AddGithub({ teammate, closed, action }: { teammate: Teammate; closed: b
   return (
     <div className="space-y-1 rounded border border-clay bg-accent-soft px-3 py-2 text-sm">
       <p className="font-medium text-clay">No GitHub username</p>
-      {closed ? (
-        <p className="text-fg-muted">Judges won&apos;t be able to find {teammate.name}&apos;s commits.</p>
-      ) : (
         <div className="flex flex-wrap gap-2 sm:flex-nowrap">
-          <input
-            value={value}
-            onChange={(event) => setValue(event.target.value)}
-            onKeyDown={(event) => {
-              // Enter adds the username instead of saving the whole entry.
-              if (event.key === "Enter") {
-                event.preventDefault();
-                add();
-              }
-            }}
-            maxLength={300}
-            aria-label={`GitHub username for ${teammate.name}`}
-            placeholder="username or github.com/username"
-            className={input}
-            disabled={pending}
-          />
-          <button type="button" onClick={add} disabled={pending || !value.trim()} className="btn btn-ghost shrink-0 disabled:opacity-50">
-            {pending ? "Adding…" : "Add"}
-          </button>
-        </div>
-      )}
+        <input
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          onKeyDown={(event) => {
+            // Enter adds the username instead of saving the whole entry.
+            if (event.key === "Enter") {
+              event.preventDefault();
+              add();
+            }
+          }}
+          maxLength={300}
+          aria-label={`GitHub username for ${teammate.name}`}
+          placeholder="username or github.com/username"
+          className={input}
+          disabled={pending}
+        />
+        <button type="button" onClick={add} disabled={pending || !value.trim()} className="btn btn-ghost shrink-0 disabled:opacity-50">
+          {pending ? "Adding…" : "Add"}
+        </button>
+      </div>
       {state.message &&
         (state.status === "error" ? (
           <ErrorMessage message={state.message} details={state.details} />
@@ -124,6 +120,7 @@ function PartEditor({
   nameOf,
   limit,
   disabled,
+  closesAt,
   onDirty,
   onSaved,
 }: {
@@ -134,6 +131,7 @@ function PartEditor({
   nameOf: (id: string | null) => string;
   limit: number;
   disabled: boolean;
+  closesAt: string;
   onDirty: (id: string, dirty: boolean) => void;
   onSaved: (part: Part) => void;
 }) {
@@ -245,6 +243,7 @@ function PartEditor({
       <p className={`text-xs ${dirty ? "font-medium text-clay" : "text-fg-faint"}`}>
         {value.length}/{limit}
         {dirty ? " · not saved yet" : base.at ? ` · saved ${formatPacific(base.at)} by ${nameOf(base.by)}` : ""}
+        {!dirty && base.at && Date.parse(base.at) >= Date.parse(closesAt) && <span className="font-medium text-clay"> · after the deadline</span>}
       </p>
     </div>
   );
@@ -258,7 +257,7 @@ export function Contributions({
   teamId,
   teammates,
   me,
-  closed,
+  closesAt,
   disabled,
   legacy,
   limit,
@@ -269,7 +268,8 @@ export function Contributions({
   teamId: string;
   teammates: Teammate[];
   me: string;
-  closed: boolean;
+  // Parts saved after this are marked late; they stay editable (no hard stop on submissions).
+  closesAt: string;
   // While the form is saving.
   disabled: boolean;
   // The shared "who did what" written before each teammate had their own part.
@@ -293,7 +293,7 @@ export function Contributions({
 
   // Reads run as the user in the browser, so they cost no server calls; RLS limits them to the team.
   const poll = useEffectEvent(async () => {
-    if (document.hidden || closed) return;
+    if (document.hidden) return;
     const parts = await loadParts(createClient(), teamId);
     setSeen((prev) => {
       const next = new Map(prev);
@@ -369,37 +369,23 @@ export function Contributions({
                 )}
               </div>
 
-              {!t.github && <AddGithub teammate={t} closed={closed} action={githubAction} />}
+              {!t.github && <AddGithub teammate={t} action={githubAction} />}
 
-              {closed ? (
-                part.body.trim() ? (
-                  <div className="space-y-1">
-                    <p className="whitespace-pre-wrap text-sm text-fg-muted">{part.body}</p>
-                    {part.at && (
-                      <p className="text-xs text-fg-faint">
-                        Saved {formatPacific(part.at)} by {nameOf(part.by)}
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-sm text-fg-faint">Nothing written.</p>
-                )
-              ) : (
-                <PartEditor
-                  ref={(editor) => {
-                    if (editor) editors.current.set(t.id, editor);
-                    else editors.current.delete(t.id);
-                  }}
-                  teammate={t}
-                  remote={part}
-                  mine={mine}
-                  nameOf={nameOf}
-                  limit={limit}
-                  disabled={disabled}
-                  onDirty={onDirty}
-                  onSaved={(saved) => setSeen((prev) => new Map(prev).set(t.id, saved))}
-                />
-              )}
+              <PartEditor
+                ref={(editor) => {
+                  if (editor) editors.current.set(t.id, editor);
+                  else editors.current.delete(t.id);
+                }}
+                teammate={t}
+                remote={part}
+                mine={mine}
+                nameOf={nameOf}
+                limit={limit}
+                disabled={disabled}
+                closesAt={closesAt}
+                onDirty={onDirty}
+                onSaved={(saved) => setSeen((prev) => new Map(prev).set(t.id, saved))}
+              />
             </li>
           );
         })}

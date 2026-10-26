@@ -1,3 +1,4 @@
+import { formatPacific } from "@/lib/time";
 import { joinDescription } from "../_lib/description";
 import { parseVideo } from "../_lib/video";
 
@@ -19,8 +20,9 @@ export type EntryDetailsData = {
 
 const PROVIDER_NAMES = { youtube: "YouTube", loom: "Loom", vimeo: "Vimeo", drive: "Google Drive" } as const;
 
-// github and contribution ("who did what", one per member): judges only.
-export type RosterMember = { name: string; detail?: string | null; github?: string | null; contribution?: string | null };
+// github and contribution ("who did what", one per member): judges only. contributionLateAt: when
+// the part was saved, if that was after the deadline.
+export type RosterMember = { name: string; detail?: string | null; github?: string | null; contribution?: string | null; contributionLateAt?: string | null };
 
 // Links were checked on save, but render only http(s) anyway.
 function safeHref(url: string | null | undefined) {
@@ -115,6 +117,7 @@ export function EntryDetails({ entry, roster }: { entry: EntryDetailsData; roste
                   </>
                 )}
                 {m.contribution?.trim() && <span className="block whitespace-pre-wrap">{m.contribution}</span>}
+                {m.contributionLateAt && <span className="block text-xs text-clay">Saved after the deadline, {formatPacific(m.contributionLateAt)}</span>}
               </li>
             ))}
           </ul>
