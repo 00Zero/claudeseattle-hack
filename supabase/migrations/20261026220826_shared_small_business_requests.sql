@@ -33,3 +33,7 @@ create index small_business_requests_created_idx on small_business_requests (cre
 
 alter table small_business_requests enable row level security;
 create policy small_business_requests_admin on small_business_requests for all using (is_admin()) with check (is_admin());
+-- A second layer behind the policy: anon gets nothing, and signed-in people can't write (the
+-- finder writes with the service role).
+revoke all on small_business_requests from anon;
+revoke insert, update, delete on small_business_requests from authenticated;
