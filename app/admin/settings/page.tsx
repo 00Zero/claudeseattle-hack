@@ -7,6 +7,8 @@ import { setNameTagsEnabled } from "./name-tag-actions";
 import { setAudienceVotingEnabled, setAudienceVotingState } from "./audience-voting-actions";
 import { feedbackAudience, slackWebhookConfigured } from "@/lib/feedback";
 import { setFeedbackAudience } from "./feedback-actions";
+import { registrationMode, registrationOpen, type RegistrationMode } from "@/lib/registration";
+import { setRegistration } from "./registration-actions";
 import { SubmitButton } from "../submit-button";
 import { RESOURCE_SECTIONS, type Resource } from "@/lib/resources";
 import { addTicket, deleteTicket, saveEventSettings, saveTicketRules } from "./actions";
@@ -36,6 +38,11 @@ const FEEDBACK_AUDIENCE_OPTIONS = [
   { value: "signed_in", label: "Everyone signed in, including pending and declined" },
   { value: "off", label: "Off" },
 ];
+const REGISTRATION_OPTIONS: { value: RegistrationMode; label: string }[] = [
+  { value: "auto", label: "Automatic: open until the event ends, then closed" },
+  { value: "open", label: "Open" },
+  { value: "closed", label: "Closed" },
+];
 const input = "rounded border border-foreground/20 bg-background px-2 py-1";
 const button = "rounded bg-foreground px-3 py-1.5 text-sm text-background";
 
@@ -54,6 +61,8 @@ export default async function SettingsPage() {
   const resources = (resourceRows ?? []) as Resource[];
   const nameTags = nameTagsStatus(settings);
   const feedback = feedbackAudience(settings?.feedback_audience);
+  const registration = registrationMode(settings?.registration);
+  const registrationIsOpen = registrationOpen(registration, settings?.event_ends_at);
   const audienceOn = settings?.audience_voting_enabled === true;
   const voting = settings?.audience_voting as "open" | "closed" | null | undefined;
   const { data: recentTags } = await admin
@@ -202,6 +211,32 @@ export default async function SettingsPage() {
             </form>
           )}
         </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">New accounts</h2>
+        <p className="text-sm text-foreground/70">
+          Whether people can create an account. Closed stops first sign-ins for Luma registrations that have no account yet, and new
+          sign-in requests. Guests checked in on Luma can still create one (to upload photos), and existing accounts always sign in.
+        </p>
+        <p className="text-sm">
+          Right now: <strong>{registrationIsOpen ? "open" : "closed"}</strong>
+          {registration === "auto" && settings?.event_ends_at && (
+            <span className="text-foreground/70">
+              {" "}
+              ({registrationIsOpen ? "closes" : "closed"} when the event ended, {formatPacific(settings.event_ends_at)})
+            </span>
+          )}
+        </p>
+        <form action={setRegistration} className="space-y-2">
+          {REGISTRATION_OPTIONS.map((option) => (
+            <label key={option.value} className="flex items-center gap-2 text-sm">
+              <input type="radio" name="registration" value={option.value} defaultChecked={registration === option.value} />
+              {option.label}
+            </label>
+          ))}
+          <SubmitButton className={button}>Save new accounts setting</SubmitButton>
+        </form>
       </section>
 
       <section className="space-y-3">
