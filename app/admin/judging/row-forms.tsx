@@ -2,6 +2,7 @@
 
 import { startTransition, useActionState, useState } from "react";
 import {
+  acceptLateInGrace,
   addGroupMember,
   assignJudge,
   autoAssign,
@@ -123,6 +124,20 @@ export function FallbackEntryForm() {
         </div>
       </form>
     </details>
+  );
+}
+
+// Accepts every waiting late save from the grace period at once, oldest first.
+export function AcceptGraceForm({ world, waiting }: { world: "real" | "test"; waiting: number }) {
+  const [state, formAction, pending] = useActionState(acceptLateInGrace, idle);
+  return (
+    <form action={formAction} className="flex flex-wrap items-center gap-2">
+      <input type="hidden" name="world" value={world} />
+      <button type="submit" disabled={pending || waiting === 0} className={button}>
+        {pending ? "Accepting…" : `Accept all ${waiting} from the grace period`}
+      </button>
+      <Message state={state} />
+    </form>
   );
 }
 

@@ -8,6 +8,7 @@ import { LIMITS } from "@/app/(judge)/submit/_lib/entry";
 import { aiNotesConfigured, generateAiNotes, MODEL as NOTES_MODEL, type RosterForNotes } from "@/app/(judge)/_lib/ai-notes";
 import { criteriaLocked, getEnabledCriteria } from "@/app/(judge)/_lib/criteria";
 import { ALL_CRITERIA, criteriaKeys, sameCriteria } from "@/app/(judge)/_lib/scoring";
+import { graceCutoff } from "./late";
 
 // Admin judging actions. Each re-checks the caller is an admin, then writes with the
 // service-role client (the admin layout's check is not enough on its own).
@@ -286,8 +287,27 @@ export async function setFinalist(_prev: RowState, formData: FormData): Promise<
 
 const ENTRY_FIELDS = ["title", "tagline", "description_short", "description_long", "video_url", "repo_url", "links", "contributions", "checklist"] as const;
 
-// Accept: copy the late save onto the team's entry (creating it if the team never saved before
-// the deadline), stamped with when and by whom it was saved. Reject: keep the on-time version.
+type LateSave = { id: string; team_id: string; saved_by: string; saved_at: string; payload: unknown };
+
+// Copy a late save onto the team's entry (creating it if the team never saved before the deadline),
+// stamped with when and by whom it was saved, and mark it accepted. The entry stays flagged late
+// (judge_entry_results.late: the team has a late save).
+async function acceptLate(admin: Admin, late: LateSave, adminId: string) {
+  const payload = (late.payload ?? {}) as Record<string, unknown>;
+  const row: Record<string, unknown> = { team_id: late.team_id, last_saved_at: late.saved_at, last_saved_by: late.saved_by };
+  for (const field of ENTRY_FIELDS) if (field in payload) row[field] = payload[field] === "" ? null : payload[field];
+  if (!row.title) row.title = "";
+  const { error } = await admin.from("judge_entries").upsert(row, { onConflict: "team_id" });
+  if (error) throw new Error(error.message);
+  const { error: decideError } = await admin
+    .from("judge_late_saves")
+    .update({ decision: "accepted", decided_by: adminId, decided_at: new Date().toISOString() })
+    .eq("id", late.id)
+    .eq("decision", "pending");
+  if (decideError) throw new Error(decideError.message);
+}
+
+// Accept: copy the late save onto the team's entry. Reject: keep the on-time version.
 export async function decideLateSave(formData: FormData) {
   const me = await assertAdmin();
   const lateId = id(formData, "late_id");
@@ -297,28 +317,61 @@ export async function decideLateSave(formData: FormData) {
   const admin = createAdminClient();
   const { data: late, error: readError } = await admin
     .from("judge_late_saves")
-    .select("team_id, saved_by, saved_at, payload, decision")
+    .select("id, team_id, saved_by, saved_at, payload, decision")
     .eq("id", lateId)
     .single();
   if (readError || !late) throw new Error("That late save doesn't exist.");
   if (late.decision !== "pending") throw new Error("That late save was already decided.");
 
   if (decision === "accepted") {
-    const payload = (late.payload ?? {}) as Record<string, unknown>;
-    const row: Record<string, unknown> = { team_id: late.team_id, last_saved_at: late.saved_at, last_saved_by: late.saved_by };
-    for (const field of ENTRY_FIELDS) if (field in payload) row[field] = payload[field] === "" ? null : payload[field];
-    if (!row.title) row.title = "";
-    const { error } = await admin.from("judge_entries").upsert(row, { onConflict: "team_id" });
+    await acceptLate(admin, late as LateSave, me.id);
+  } else {
+    const { error } = await admin
+      .from("judge_late_saves")
+      .update({ decision, decided_by: me.id, decided_at: new Date().toISOString() })
+      .eq("id", lateId);
     if (error) throw new Error(error.message);
   }
-
-  const { error } = await admin
-    .from("judge_late_saves")
-    .update({ decision, decided_by: me.id, decided_at: new Date().toISOString() })
-    .eq("id", lateId);
-  if (error) throw new Error(error.message);
   revalidatePath("/submit");
   done();
+}
+
+// Accept every pending late save in one world made within the grace period, oldest first, so a
+// team's last save in the window is the one its entry ends up with. Admin-side only: the /submit
+// save path is unchanged.
+export async function acceptLateInGrace(_prev: RowState, formData: FormData): Promise<RowState> {
+  const me = await assertAdmin();
+  const isTest = formData.get("world") === "test";
+  const admin = createAdminClient();
+  const { data: settings } = await admin.from("event_settings").select("submissions_close_at").eq("id", 1).single();
+  if (!settings) return { status: "error", message: "Couldn't read the deadline." };
+  const cutoff = graceCutoff(settings.submissions_close_at).toISOString();
+
+  const { data: pending, error } = await admin
+    .from("judge_late_saves")
+    .select("id, team_id, saved_by, saved_at, payload, saver:profiles!judge_late_saves_saved_by_fkey(is_test)")
+    .eq("decision", "pending")
+    .lte("saved_at", cutoff)
+    .order("saved_at");
+  if (error) return { status: "error", message: error.message };
+  const inWorld = (pending ?? []).filter((l) => Boolean((l.saver as unknown as { is_test: boolean } | null)?.is_test) === isTest);
+  let accepted = 0;
+  for (const late of inWorld) {
+    try {
+      await acceptLate(admin, late as unknown as LateSave, me.id);
+      accepted++;
+    } catch (e) {
+      done();
+      return { status: "error", message: `Accepted ${accepted}, then one failed: ${e instanceof Error ? e.message : "unknown error"}. Click again to retry.` };
+    }
+  }
+  revalidatePath("/submit");
+  done();
+  const teams = new Set(inWorld.map((l) => l.team_id)).size;
+  return {
+    status: "ok",
+    message: accepted ? `Accepted ${accepted} late save${accepted === 1 ? "" : "s"} from ${teams} team${teams === 1 ? "" : "s"}.` : "No late saves from the grace period are waiting.",
+  };
 }
 
 // "Publish finalists" and "publish winners" on event_settings; /results shows only what's on.

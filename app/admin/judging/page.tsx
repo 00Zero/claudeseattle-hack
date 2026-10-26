@@ -7,7 +7,9 @@ import { ALL_CRITERIA, DEFAULT_CRITERIA, formatScore, sameCriteria } from "@/app
 import { SubmitButton } from "../submit-button";
 import { decideLateSave, setPublish } from "./actions";
 import { aiNotesConfigured, type AiNotesBody } from "@/app/(judge)/_lib/ai-notes";
+import { graceCutoff, LATE_GRACE_MINUTES } from "./late";
 import {
+  AcceptGraceForm,
   AddMemberForm,
   AiNotesForm,
   AutoAssignForm,
@@ -159,6 +161,7 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
   const withNotes = new Set(notesBy.keys());
   const notedCount = rows.filter((r) => r.submitted && withNotes.has(r.entry_id)).length;
   const s = settings.data;
+  const cutoff = s ? graceCutoff(s.submissions_close_at) : null;
 
   const header = (key: SortKey, label: string) => (
     <th className={th}>
@@ -360,7 +363,10 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
         <h2 className="text-lg font-semibold">Late saves ({late.length})</h2>
         <p className="text-sm text-foreground/70">
           Saved after the deadline. Accept to replace the team&apos;s entry with this version; reject to keep the one saved on time.
+          Accepted entries stay marked late in the entries table.
+          {cutoff && ` Saves up to ${LATE_GRACE_MINUTES} minutes late (by ${formatPacific(cutoff.toISOString())}) can be accepted all at once.`}
         </p>
+        {cutoff && <AcceptGraceForm world={isTest ? "test" : "real"} waiting={late.filter((l) => new Date(l.saved_at) <= cutoff).length} />}
         {!late.length ? (
           <p className="text-sm">None waiting.</p>
         ) : (
@@ -373,6 +379,11 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
                 <li key={l.id} className="flex flex-wrap items-center gap-2 rounded border border-foreground/15 px-3 py-2 text-sm">
                   <span className="grow">
                     <strong>{team}</strong>: “{title}” by {saver}, {formatPacific(l.saved_at)}
+                    {cutoff && (
+                      <span className="ml-2 rounded bg-foreground/5 px-1 text-xs">
+                        {new Date(l.saved_at) <= cutoff ? "within grace" : "after grace"}
+                      </span>
+                    )}
                   </span>
                   <form action={decideLateSave}>
                     <input type="hidden" name="late_id" value={l.id} />
