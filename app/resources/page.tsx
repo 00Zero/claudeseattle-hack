@@ -62,7 +62,7 @@ export default async function ResourcesPage() {
         <p className="text-fg-muted">For attendees of the Claude Impact Lab Hackathon. Please don&apos;t share these links outside the event.</p>
       </div>
       <section id="upload-media" className="snake-border scroll-mt-20 space-y-3 rounded-lg p-4 sm:p-5">
-        <h2 className="text-lg font-semibold">Share your photos and videos from the event</h2>
+        <h2 className="text-lg font-semibold">Share your photos/videos from the event</h2>
         <p className="text-fg-muted">They go to the organizers; other attendees can&apos;t see them. Uploaded the wrong file? Delete it below.</p>
         <p className="rounded border border-line bg-bg-raised px-3 py-2 text-sm text-fg-muted">
           By registering for this website or the event, or attending it, you agree that the hosts and their affiliates may use your

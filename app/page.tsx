@@ -214,7 +214,7 @@ export default async function Home() {
           {hasWifi && <Wifi openAt={openAt} closeAt={closeAt} />}
           {/* Everyone sees it; signed out goes through sign-in first (/login?next=), and /resources checks approval. */}
           <section aria-label="Share your photos and videos" className="snake-border grid gap-3 rounded-lg p-4 font-mono text-xs text-fg-muted">
-            <span className="text-sm text-fg">Share your photos and videos from the event</span>
+            <span className="text-[13px] text-fg">Share your photos/videos from the event</span>
             <Link href={profile ? "/resources#upload-media" : "/login?next=/resources%23upload-media"} className="btn pulse-ring justify-self-start font-sans">
               Upload media
             </Link>
