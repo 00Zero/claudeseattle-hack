@@ -22,11 +22,14 @@ const ICONS: Record<string, string[]> = {
 type Chip = { label: string; tempF: number; windMph: number; at: number; kind: string; fallback?: boolean };
 
 // The full-bleed pixel Seattle band: skyline, live weather, time of day, and Clawd on the waterfront.
-export function SkylineBand({ venueName }: { venueName: string }) {
+// Once winners are published, a blimp carries them across the sky (lib/pixel/skyline.js, setBlimp).
+export function SkylineBand({ venueName, winners = [] }: { venueName: string; winners?: { prize: string; title: string }[] }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const iconRef = useRef<HTMLCanvasElement>(null);
   const [chip, setChip] = useState<Chip | null>(null);
+  const skyRef = useRef<ReturnType<typeof initSkyline> | null>(null);
+  const winnersKey = JSON.stringify(winners);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -37,6 +40,7 @@ export function SkylineBand({ venueName }: { venueName: string }) {
     const measureScrollbar = () => document.documentElement.style.setProperty("--scrollbar", `${window.innerWidth - document.documentElement.clientWidth}px`);
     measureScrollbar();
     const sky = initSkyline({ canvas, theme: currentTheme() === "dark" ? "dark" : "light" });
+    skyRef.current = sky;
     const placeStage = () => {
       measureScrollbar();
       stage.style.top = `${sky.groundY}px`;
@@ -91,8 +95,14 @@ export function SkylineBand({ venueName }: { venueName: string }) {
       window.removeEventListener(THEME_EVENT, onTheme);
       clawd.destroy();
       sky.destroy();
+      skyRef.current = null;
     };
   }, []);
+
+  // The winners on the blimp; an empty list hides it.
+  useEffect(() => {
+    skyRef.current?.setBlimp(JSON.parse(winnersKey));
+  }, [winnersKey]);
 
   // Redraw the chip icon when the weather or the theme changes.
   useEffect(() => {
@@ -111,7 +121,9 @@ export function SkylineBand({ venueName }: { venueName: string }) {
   return (
     <div
       className="full-bleed relative overflow-hidden border-y border-line bg-bg-sunken leading-[0]"
-      aria-label={`Pixel-art Seattle skyline with live weather at ${venueName}. Clawd, the Claude Code mascot, walks the waterfront.`}
+      aria-label={`Pixel-art Seattle skyline with live weather at ${venueName}. Clawd, the Claude Code mascot, walks the waterfront.${
+        winners.length ? ` A blimp shows the winners: ${winners.map((w) => `${w.prize}, ${w.title}`).join("; ")}.` : ""
+      }`}
       role="img"
     >
       <canvas ref={canvasRef} className="block w-full [image-rendering:pixelated]" aria-hidden="true" />

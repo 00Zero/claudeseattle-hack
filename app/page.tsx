@@ -223,7 +223,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <SkylineBand venueName={venue.name} />
+      <SkylineBand venueName={venue.name} winners={winners.map((w) => ({ prize: w.prize, title: w.title }))} />
 
       <div className="mx-auto max-w-3xl">
         <section className="grid gap-6 border-b border-line py-12">
