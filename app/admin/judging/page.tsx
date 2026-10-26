@@ -3,7 +3,7 @@ import { requireAdminPage } from "@/lib/admin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPacific } from "@/lib/time";
 import { criteriaLocked, getEnabledCriteria } from "@/app/(judge)/_lib/criteria";
-import { ALL_CRITERIA, DEFAULT_CRITERIA, formatScore, sameCriteria } from "@/app/(judge)/_lib/scoring";
+import { ALL_CRITERIA, DEFAULT_CRITERIA, formatScore, mean, rankByScore, sameCriteria } from "@/app/(judge)/_lib/scoring";
 import { SubmitButton } from "../submit-button";
 import { decideLateSave, setPublish } from "./actions";
 import { aiNotesConfigured, type AiNotesBody } from "@/app/(judge)/_lib/ai-notes";
@@ -74,10 +74,11 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
   const aiParam = showAi ? "&ai=1" : "";
 
   const admin = createAdminClient();
-  const [results, entries, assignments, judges, groups, memberships, teams, lateSaves, settings, aiNotes, enabled, lock] = await Promise.all([
+  const [results, entries, assignments, prelimScores, judges, groups, memberships, teams, lateSaves, settings, aiNotes, enabled, lock] = await Promise.all([
     admin.from("judge_entry_results").select("*"),
     admin.from("judge_entries").select("id, finalist_override"),
     admin.from("judge_assignments").select("entry_id, judge_id"),
+    admin.from("judge_scores").select("entry_id, judge_id, scores").eq("round", "prelim"),
     admin
       .from("profiles")
       .select("id, display_name, platform_role")
@@ -144,6 +145,33 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
     ...solo.map((j) => ({ value: `judge:${j.id}`, name: j.name, load: load.get(`judge:${j.id}`) ?? 0 })),
   ];
   const unitName = new Map(unitOptions.map((u) => [u.value, u.name]));
+
+  // Group standings: each group's (or lone judge's) entries ranked by the mean of its judges'
+  // entry scores, as judge_entry_results picks each group's finalist. For choosing extra
+  // finalists, such as second places.
+  const judgeScore = new Map((prelimScores.data ?? []).map((sc) => [`${sc.entry_id}:${sc.judge_id}`, mean(sc.scores as number[])]));
+  const resultById = new Map(rows.map((r) => [r.entry_id, r]));
+  const unitEntries = new Map<string, Map<string, { judges: number; scores: number[] }>>();
+  for (const a of assignments.data ?? []) {
+    if (!resultById.has(a.entry_id)) continue;
+    const unit = unitOfJudge(a.judge_id);
+    const byEntry = unitEntries.get(unit) ?? new Map();
+    const tally = byEntry.get(a.entry_id) ?? { judges: 0, scores: [] };
+    tally.judges++;
+    const score = judgeScore.get(`${a.entry_id}:${a.judge_id}`);
+    if (score !== undefined && score !== null) tally.scores.push(score);
+    byEntry.set(a.entry_id, tally);
+    unitEntries.set(unit, byEntry);
+  }
+  const standings = unitOptions
+    .filter((u) => unitEntries.has(u.value))
+    .map((u) => ({
+      ...u,
+      ranked: rankByScore(
+        [...unitEntries.get(u.value)!].map(([id, t]) => ({ result: resultById.get(id)!, judges: t.judges, scored: t.scores.length, groupMean: mean(t.scores) })),
+        (e) => e.groupMean,
+      ),
+    }));
 
   const compare =
     sort === "judge"
@@ -284,6 +312,56 @@ export default async function JudgingAdminPage({ searchParams }: PageProps<"/adm
         )}
         <CreateGroupForm key={groupList.length} world={isTest ? "test" : "real"} judges={solo} />
       </section>
+
+      {standings.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">Group standings</h2>
+          <p className="text-sm text-foreground/70">
+            Each group&apos;s entries ranked by the mean of its judges&apos; scores. The top entry goes to the final automatically
+            (an exact tie sends none); to add another, such as a second place, set its finalist to Yes. &ldquo;Judges&rdquo; is how
+            many of the group&apos;s judges have scored it.
+          </p>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {standings.map((u) => (
+              <div key={u.value} className="overflow-x-auto rounded border border-foreground/15">
+                <p className="bg-foreground/5 px-3 py-2 text-sm font-medium">{u.name}</p>
+                <table className="w-full text-left text-sm">
+                  <thead className="text-foreground/70">
+                    <tr>
+                      <th className={`${th} pl-3`}>#</th>
+                      <th className={th}>Team</th>
+                      <th className={th}>Group mean</th>
+                      <th className={th}>Judges</th>
+                      <th className={th}>Finalist</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {u.ranked.map((e) => (
+                      <tr key={e.result.entry_id} className={`border-t border-foreground/10 ${e.result.is_finalist ? "bg-accent-soft/40" : ""}`}>
+                        <td className={`${td} pl-3`}>
+                          {e.rank ?? "–"}
+                          {e.tied && <span className="block text-xs text-foreground/60">tie</span>}
+                        </td>
+                        <td className={td}>
+                          <span className="font-medium">{e.result.team_name}</span>
+                          <span className="block text-xs text-foreground/60">{e.result.title || "Untitled"}</span>
+                        </td>
+                        <td className={`${td} font-medium`}>{formatScore(e.groupMean)}</td>
+                        <td className={td}>
+                          {e.scored}/{e.judges}
+                        </td>
+                        <td className={td}>
+                          <FinalistForm entryId={e.result.entry_id} override={overrides.get(e.result.entry_id) ?? null} isFinalist={e.result.is_finalist} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-3">
