@@ -39,6 +39,17 @@ function GitHubMark() {
   );
 }
 
+// The GitHub tag's tooltip: usernames are changed on each person's own /profile page.
+function githubTip(t: Teammate, mine: boolean) {
+  const first = t.name.split(" ")[0];
+  if (t.githubByTeam) {
+    return mine
+      ? "A teammate added this for you. Set your own on your /profile page; it replaces this one."
+      : `A teammate added this. ${first} can set their own on their /profile page; it replaces this one.`;
+  }
+  return mine ? "Change your GitHub username on your /profile page." : `${first} can update their GitHub username on their /profile page.`;
+}
+
 // A missing GitHub username, highlighted, with a field anyone on the team can fill in. Not a form
 // (it sits inside the entry form), so Add and Enter call the action directly.
 function AddGithub({ teammate, closed, action }: { teammate: Teammate; closed: boolean; action: (formData: FormData) => Promise<PartState> }) {
@@ -335,15 +346,26 @@ export function Contributions({
                 {t.isLeader && <span className="rounded-full border border-line-strong px-2 py-0.5 font-mono text-xs">Team lead</span>}
                 {t.role && <span className="rounded-full border border-line px-2 py-0.5 font-mono text-xs text-fg-muted">{t.role}</span>}
                 {t.github && (
-                  <a
-                    href={`https://github.com/${t.github}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title={t.githubByTeam ? `${t.name}'s GitHub profile, added by a teammate` : `${t.name}'s GitHub profile`}
-                    className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-black px-2 py-0.5 font-mono text-xs text-white no-underline hover:bg-neutral-800"
-                  >
-                    <GitHubMark />@{t.github}
-                  </a>
+                  // Hover or keyboard focus shows where the username is changed. A tap on a phone
+                  // opens GitHub, as the tag is a link.
+                  <span className="group relative inline-flex">
+                    <a
+                      href={`https://github.com/${t.github}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-describedby={`github-tip-${t.id}`}
+                      className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-black px-2 py-0.5 font-mono text-xs text-white no-underline hover:bg-neutral-800"
+                    >
+                      <GitHubMark />@{t.github}
+                    </a>
+                    <span
+                      role="tooltip"
+                      id={`github-tip-${t.id}`}
+                      className="absolute bottom-full left-0 z-50 mb-2 hidden w-64 max-w-[calc(100vw-2rem)] rounded border border-line-strong bg-bg-raised p-2 text-xs text-fg shadow-lg group-focus-within:block group-hover:block"
+                    >
+                      {githubTip(t, mine)}
+                    </span>
+                  </span>
                 )}
               </div>
 
