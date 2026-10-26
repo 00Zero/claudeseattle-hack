@@ -82,7 +82,7 @@ export default async function SubmitPage() {
         // Teamwork is a judging criterion: the team says what each person did.
         contributions={
           teamwork
-            ? { teammates, me, closed: isPast, legacy: entry?.contributions ?? "", limit: LIMITS.contribution, githubAction: setTeammateGithub }
+            ? { teammates, me, legacy: entry?.contributions ?? "", limit: LIMITS.contribution, githubAction: setTeammateGithub }
             : null
         }
       />
@@ -93,7 +93,7 @@ export default async function SubmitPage() {
 function Deadline({ closesAt, isPast }: { closesAt: string; isPast: boolean }) {
   return isPast ? (
     <p className="rounded border border-accent bg-accent-soft px-3 py-2 text-sm" role="status">
-      <strong>Submissions closed</strong> {formatPacific(closesAt)}. You can still save, but your project will be marked as submitted late.
+      <strong>Submissions closed</strong> {formatPacific(closesAt)}. You can still save, but your project will be marked as submitted late. Who did what stays open too; sections saved now show as late.
     </p>
   ) : (
     <p className="rounded border border-line px-3 py-2 text-sm text-fg-muted">

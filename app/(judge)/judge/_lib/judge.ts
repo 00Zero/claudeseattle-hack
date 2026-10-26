@@ -129,7 +129,7 @@ export async function getEntryForJudge(judgeId: string, entryId: string, round: 
     .maybeSingle();
   if (!entry) return null;
 
-  const [assigned, finalists, scores, roster, parts, notes, { criteria }] = await Promise.all([
+  const [assigned, finalists, scores, roster, parts, notes, { criteria }, deadline] = await Promise.all([
     supabase.from("judge_assignments").select("entry_id").eq("entry_id", entryId).eq("judge_id", judgeId).maybeSingle(),
     supabase.rpc("judge_finalists"),
     myScores(judgeId, round),
@@ -141,16 +141,22 @@ export async function getEntryForJudge(judgeId: string, entryId: string, round: 
           .eq("status", "member")
       : Promise.resolve({ data: [] }),
     entry.team_id
-      ? supabase.from("judge_contributions").select("profile_id, body, github_username").eq("team_id", entry.team_id)
+      ? supabase.from("judge_contributions").select("profile_id, body, github_username, updated_at").eq("team_id", entry.team_id)
       : Promise.resolve({ data: [] }),
     supabase.from("judge_ai_notes").select("notes, model").eq("entry_id", entryId).maybeSingle(),
     getEnabledCriteria(supabase),
+    supabase.from("event_settings").select("submissions_close_at").eq("id", 1).maybeSingle(),
   ]);
 
   const isFinalist = ((finalists.data ?? []) as { entry_id: string }[]).some((f) => f.entry_id === entryId);
   const canScore = round === "prelim" ? Boolean(assigned.data) : isFinalist;
   // github_username there: added by a teammate for someone whose profile has none.
-  const partBy = new Map(((parts.data ?? []) as { profile_id: string; body: string; github_username: string | null }[]).map((p) => [p.profile_id, p]));
+  const partBy = new Map(
+    ((parts.data ?? []) as { profile_id: string; body: string; github_username: string | null; updated_at: string | null }[]).map((p) => [p.profile_id, p]),
+  );
+  // Parts stay editable after the deadline; judges see which were saved after it (maybe after they scored).
+  const closesAt = deadline.data?.submissions_close_at as string | undefined;
+  const lateAt = (at: string | null | undefined) => (at && closesAt && Date.parse(at) >= Date.parse(closesAt) ? at : null);
   type Member = { id: string; display_name: string; job_title: string | null; company: string | null; github_username: string | null };
   const members = ((roster.data ?? []) as unknown as { profiles: Member | null }[])
     .map((m) => m.profiles)
@@ -160,6 +166,7 @@ export async function getEntryForJudge(judgeId: string, entryId: string, round: 
       detail: [p.job_title, p.company].filter(Boolean).join(" at ") || null,
       github: normalizeGithubUsername(p.github_username) ?? partBy.get(p.id)?.github_username ?? null,
       contribution: partBy.get(p.id)?.body ?? null,
+      contributionLateAt: partBy.get(p.id)?.body ? lateAt(partBy.get(p.id)?.updated_at) : null,
     }));
 
   return {
