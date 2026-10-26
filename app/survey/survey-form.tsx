@@ -1,0 +1,222 @@
+"use client";
+
+import Link from "next/link";
+import { useState } from "react";
+import { CAME_TRACKS, gateFor, questionsFor, trackFor, type Answers, type Group, type Question, type Role } from "@/lib/followup/survey";
+import { submitSurvey } from "./actions";
+
+type Detail = Answers["detail"];
+
+// One answer as a row of pills. Real radio or checkbox inputs underneath, so keyboards and screen readers work.
+function Pills({ name, options, type, selected, onChange }: { name: string; options: string[]; type: "radio" | "checkbox"; selected: string[]; onChange: (value: string, checked: boolean) => void }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((option) => {
+        const on = selected.includes(option);
+        return (
+          <label
+            key={option}
+            className={`cursor-pointer rounded-full border px-3 py-1.5 text-sm transition-colors focus-within:ring-2 focus-within:ring-accent ${
+              on ? "border-accent bg-accent-soft text-fg" : "border-line text-fg-muted hover:border-line-strong hover:text-fg"
+            }`}
+          >
+            <input type={type} name={name} value={option} checked={on} onChange={(e) => onChange(option, e.target.checked)} className="sr-only" />
+            {option}
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
+function Field({ q, value, onChange, number }: { q: Question; value: Detail[string] | undefined; onChange: (value: Detail[string]) => void; number?: number }) {
+  const label = (
+    <legend className="mb-2 font-medium">
+      {number != null && <span className="mr-2 font-mono text-sm text-fg-faint">{number}.</span>}
+      {q.label}
+    </legend>
+  );
+  if (q.kind === "text") {
+    return (
+      <label className="block space-y-2">
+        <span className="block font-medium">{q.label}</span>
+        <textarea
+          rows={3}
+          maxLength={4000}
+          value={typeof value === "string" ? value : ""}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full rounded border border-line bg-bg px-3 py-2"
+        />
+      </label>
+    );
+  }
+  if (q.kind === "choice") {
+    return (
+      <fieldset>
+        {label}
+        <Pills name={q.id} type="radio" options={q.options} selected={typeof value === "string" ? [value] : []} onChange={(v) => onChange(v)} />
+      </fieldset>
+    );
+  }
+  if (q.kind === "multi") {
+    const picked = Array.isArray(value) ? value : [];
+    return (
+      <fieldset>
+        {label}
+        <p className="-mt-1 mb-2 text-sm text-fg-faint">Pick any.</p>
+        <Pills name={q.id} type="checkbox" options={q.options} selected={picked} onChange={(v, checked) => onChange(checked ? [...picked, v] : picked.filter((p) => p !== v))} />
+      </fieldset>
+    );
+  }
+  const rows = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  return (
+    <fieldset>
+      {label}
+      <div className="space-y-3">
+        {q.rows.map((row) => (
+          <div key={row} className="space-y-1.5">
+            <p className="text-sm">{row}</p>
+            <Pills name={`${q.id}:${row}`} type="radio" options={q.options} selected={rows[row] ? [rows[row]] : []} onChange={(v) => onChange({ ...rows, [row]: v })} />
+          </div>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+export function SurveyForm({
+  token,
+  firstName,
+  group,
+  role,
+  previous,
+  answeredAt,
+}: {
+  token: string | null; // null: an admin preview, nothing is saved
+  firstName: string | null;
+  group: Group;
+  role: Role;
+  previous: Answers | null;
+  answeredAt: string | null;
+}) {
+  const gate = gateFor(group);
+  const [came, setCame] = useState<string | undefined>(previous?.came);
+  const [quick, setQuick] = useState<Record<string, string>>(previous?.quick ?? {});
+  const [more, setMore] = useState<boolean | null>(previous ? previous.more : null);
+  const [detail, setDetail] = useState<Detail>(previous?.detail ?? {});
+  const [additional, setAdditional] = useState(previous?.additional ?? "");
+  const [status, setStatus] = useState<"idle" | "saving" | "done">("idle");
+  const [error, setError] = useState<string | null>(null);
+
+  const track = trackFor(group, role, came);
+  const questions = track ? questionsFor(track, role) : null;
+  const quickDone = Boolean(questions && questions.quick.every((q) => quick[q.id]));
+
+  async function submit() {
+    if (!track || !quickDone || more === null) return;
+    setError(null);
+    if (!token) {
+      setStatus("done");
+      return;
+    }
+    setStatus("saving");
+    const result = await submitSurvey(token, { came, quick, more, detail: more ? detail : {}, additional: more ? undefined : additional });
+    if (result.ok) setStatus("done");
+    else {
+      setStatus("idle");
+      setError(result.message);
+    }
+  }
+
+  if (status === "done") {
+    const cameToEvent = track ? CAME_TRACKS.includes(track) : false;
+    return (
+      <div className="mx-auto max-w-xl space-y-6">
+        <p className="eyebrow text-accent">Claude Impact Lab Hackathon</p>
+        <h1 className="font-display text-5xl font-light leading-tight">Thank you{firstName ? `, ${firstName}` : ""}.</h1>
+        {!token && <p className="rounded border border-line bg-bg-raised px-3 py-2 text-sm text-fg-muted">Preview: nothing was saved.</p>}
+        <p className="text-fg-muted">We read every answer, and they shape the next Seattle Claude events.</p>
+        {cameToEvent && (
+          <div className="space-y-3 rounded-lg border border-line bg-bg-raised p-5">
+            <p className="font-medium">Share your photos and videos from the event</p>
+            <p className="text-sm text-fg-muted">Upload them on the Resources page. Sign in with the email you used on Luma if you aren&apos;t already.</p>
+            <Link href="/login?next=/resources" className="btn">
+              Upload photos and videos
+            </Link>
+          </div>
+        )}
+        <div className="flex flex-wrap gap-3">
+          <Link href="/results" className="btn btn-ghost">
+            See every project
+          </Link>
+          <a href="https://luma.com/adamburgh" target="_blank" rel="noopener noreferrer" className="btn btn-ghost">
+            Upcoming events
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  let n = 0;
+  return (
+    <div className="mx-auto max-w-2xl space-y-10">
+      <header className="space-y-3">
+        <p className="eyebrow text-accent">Claude Impact Lab Hackathon · feedback</p>
+        <h1 className="font-display text-[clamp(2.2rem,5vw,3.2rem)] font-light leading-[1.05]">
+          {firstName ? `Hi ${firstName}, ` : ""}
+          <em className="text-fg-muted">how did it go?</em>
+        </h1>
+        <p className="text-fg-muted">A few quick questions first, about a minute. Then you choose whether to say more.</p>
+        {!token && <p className="rounded border border-line bg-bg-raised px-3 py-2 text-sm text-fg-muted">Preview of what this group sees ({group}, {role}). Nothing is saved.</p>}
+        {answeredAt && (
+          <p className="rounded border border-line bg-bg-raised px-3 py-2 text-sm text-fg-muted">
+            You already answered. Your answers are below; sending again replaces them.
+          </p>
+        )}
+      </header>
+
+      <section className="space-y-7">
+        {gate && <Field q={gate} number={++n} value={came} onChange={(v) => setCame(v as string)} />}
+        {questions?.quick.map((q) => (
+          <Field key={q.id} q={q} number={++n} value={quick[q.id]} onChange={(v) => setQuick({ ...quick, [q.id]: v as string })} />
+        ))}
+      </section>
+
+      {questions && (
+        <section className="space-y-5 border-t border-line pt-8">
+          <p className="font-medium">Want to tell us more? It&apos;s optional, about 3 more minutes.</p>
+          <div className="flex flex-wrap gap-3">
+            <button type="button" onClick={() => setMore(true)} className={`btn ${more === true ? "" : "btn-ghost"}`} aria-pressed={more === true}>
+              Yes, I&apos;ll say more
+            </button>
+            <button type="button" onClick={() => setMore(false)} className={`btn ${more === false ? "" : "btn-ghost"}`} aria-pressed={more === false}>
+              No, I&apos;m done
+            </button>
+          </div>
+          {more === true && (
+            <div className="space-y-7 pt-2">
+              {questions.detail.map((q) => (
+                <Field key={q.id} q={q} value={detail[q.id]} onChange={(v) => setDetail({ ...detail, [q.id]: v })} />
+              ))}
+            </div>
+          )}
+          {more === false && (
+            <label className="block space-y-2">
+              <span className="block font-medium">Any additional feedback?</span>
+              <textarea rows={4} maxLength={4000} value={additional} onChange={(e) => setAdditional(e.target.value)} className="w-full rounded border border-line bg-bg px-3 py-2" />
+            </label>
+          )}
+        </section>
+      )}
+
+      <div className="space-y-3 border-t border-line pt-6">
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        {!quickDone && <p className="text-sm text-fg-faint">Answer the questions above to send.</p>}
+        {quickDone && more === null && <p className="text-sm text-fg-faint">Choose whether to say more, then send.</p>}
+        <button type="button" onClick={submit} disabled={!quickDone || more === null || status === "saving"} className="btn disabled:opacity-40">
+          {status === "saving" ? "Sending…" : "Send feedback"}
+        </button>
+      </div>
+    </div>
+  );
+}
