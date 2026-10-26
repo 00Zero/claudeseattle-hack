@@ -73,11 +73,24 @@ async function loadFinalists(test: boolean) {
   return { finalists, judgeCount: judges.count ?? 0, settings: settings.data, audience: (audience.data ?? []) as AudienceResult[], ballotCount: ballots.count ?? 0 };
 }
 
-function FinalistCard({ finalist, big = false, fresh = false }: { finalist: Finalist; big?: boolean; fresh?: boolean }) {
+// compact: the fixed-height card for the reveal grid, so five fit on one screen; long names and
+// taglines are cut with an ellipsis. big: one team at a time on the place slides.
+function FinalistCard({ finalist, big = false, compact = false, fresh = false }: { finalist: Finalist; big?: boolean; compact?: boolean; fresh?: boolean }) {
+  const showTitle = finalist.title && finalist.title !== finalist.team;
+  if (compact) {
+    return (
+      <div className={`${fresh ? styles.enter : ""} flex h-full flex-col gap-2 overflow-hidden rounded-2xl border border-line bg-bg-raised px-6 py-5`}>
+        <span className="line-clamp-2 font-display text-[32px] font-light leading-[1.12]">{finalist.team}</span>
+        {showTitle && <span className="line-clamp-1 text-[20px] font-semibold leading-snug">{finalist.title}</span>}
+        {finalist.tagline && <span className="line-clamp-2 text-[18px] leading-snug text-fg-muted">{finalist.tagline}</span>}
+        {finalist.members.length > 0 && <span className="mt-auto line-clamp-1 font-mono text-[15px] text-fg-faint">{finalist.members.join(" · ")}</span>}
+      </div>
+    );
+  }
   return (
     <div className={`${fresh ? styles.enter : ""} flex flex-col gap-3 rounded-2xl border border-line bg-bg-raised p-7`}>
       <span className={`font-display font-light leading-tight ${big ? "text-[64px]" : "text-[40px]"}`}>{finalist.team}</span>
-      {finalist.title && finalist.title !== finalist.team && <span className={`font-semibold leading-snug ${big ? "text-[32px]" : "text-[23px]"}`}>{finalist.title}</span>}
+      {showTitle && <span className={`font-semibold leading-snug ${big ? "text-[32px]" : "text-[23px]"}`}>{finalist.title}</span>}
       {finalist.tagline && <span className={`leading-snug text-fg-muted ${big ? "text-[26px]" : "text-[20px]"}`}>{finalist.tagline}</span>}
       {finalist.members.length > 0 && <span className={`font-mono text-fg-faint ${big ? "text-[22px]" : "text-[17px]"}`}>{finalist.members.join(" · ")}</span>}
     </div>
@@ -136,23 +149,21 @@ export default async function AwardsPage({ searchParams }: PageProps<"/slides/aw
           still: true,
           content: (
             <div className="flex h-full flex-col gap-8">
-              <Sig call="Read(finalists.md)" title={n === 1 ? "Your finalist" : `Your ${countWord(n)} finalists`} />
-              <div className="flex flex-wrap justify-center gap-6">
+              <div className="flex items-end justify-between gap-10">
+                <Sig call="Read(finalists.md)" title={n === 1 ? "Your finalist" : `Your ${countWord(n)} finalists`} />
+                {step === n - 1 && <PublishButton field="publish_finalists" published={Boolean(settings?.publish_finalists)} disabledReason={testNote} label="Publish finalists to the website" />}
+              </div>
+              <div className="flex flex-wrap content-start justify-center gap-6">
                 {finalists.map((f, i) => (
-                  <div key={i <= step ? f.entryId : `hidden-${i}`} className="w-[440px]">
+                  <div key={i <= step ? f.entryId : `hidden-${i}`} className="h-[250px] w-[440px]">
                     {i <= step ? (
-                      <FinalistCard finalist={f} fresh={i === step} />
+                      <FinalistCard finalist={f} compact fresh={i === step} />
                     ) : (
-                      <div className="flex h-[200px] items-center justify-center rounded-2xl border-2 border-dashed border-line font-display text-[80px] font-light text-fg-faint">?</div>
+                      <div className="flex h-full items-center justify-center rounded-2xl border-2 border-dashed border-line font-display text-[80px] font-light text-fg-faint">?</div>
                     )}
                   </div>
                 ))}
               </div>
-              {step === n - 1 && (
-                <div className="mt-auto">
-                  <PublishButton field="publish_finalists" published={Boolean(settings?.publish_finalists)} disabledReason={testNote} label="Publish finalists to the website" />
-                </div>
-              )}
             </div>
           ),
         }));
@@ -166,7 +177,7 @@ export default async function AwardsPage({ searchParams }: PageProps<"/slides/aw
           <Eyebrow className="text-[22px] text-accent">
             Finalist {i + 1} of {n} · up next
           </Eyebrow>
-          <h2 className="font-display text-[110px] font-light leading-[0.95]">{f.team}</h2>
+          <h2 className={`line-clamp-3 font-display font-light leading-[0.95] ${f.team.length > 28 ? "text-[76px]" : "text-[110px]"}`}>{f.team}</h2>
           {f.title && f.title !== f.team && <p className="text-[38px] font-semibold leading-snug">{f.title}</p>}
           {f.tagline && <p className="text-[28px] leading-snug text-fg-muted">{f.tagline}</p>}
           {f.members.length > 0 && <p className="font-mono text-[24px] text-fg-faint">{f.members.join(" · ")}</p>}
