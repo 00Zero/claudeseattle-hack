@@ -214,7 +214,7 @@ export default async function Home() {
           {hasWifi && <Wifi openAt={openAt} closeAt={closeAt} />}
           {/* Everyone sees it; signed out goes through sign-in first (/login?next=), and /resources checks approval. */}
           <section aria-label="Share your photos and videos" className="snake-border grid gap-3 rounded-lg p-4 font-mono text-xs text-fg-muted">
-            <span className="text-sm text-fg">Share your photos and videos from the event</span>
+            <span className="text-[13px] text-fg">Share your photos/videos from the event</span>
             <Link href={profile ? "/resources#upload-media" : "/login?next=/resources%23upload-media"} className="btn pulse-ring justify-self-start font-sans">
               Upload media
             </Link>
@@ -223,7 +223,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <SkylineBand venueName={venue.name} />
+      <SkylineBand venueName={venue.name} winners={winners.map((w) => ({ prize: w.prize, title: w.title }))} />
 
       <div className="mx-auto max-w-3xl">
         <section className="grid gap-6 border-b border-line py-12">

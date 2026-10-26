@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { isValidEmail, maskEmail, normalizeEmail, sendEmail } from "@/lib/email";
 import { getOrigin } from "@/lib/site-url";
+import { registrationMode, registrationOpen } from "@/lib/registration";
 import { SIGN_IN_NEXT_COOKIE, SIGN_IN_NEXT_MAX_AGE, safeNextPath } from "@/lib/sign-in-next";
 
 // How long after a link is sent before we send another to the same account. Supabase keeps
@@ -27,9 +28,10 @@ export type LoginState =
   | {
       // No link sent. linked: the email is linked to an account that signs in with another
       // address. claude: it's the Claude-account email on a Luma registration. unregistered:
-      // not on Luma. requested / declined: a sign-in request for it exists.
+      // not on Luma. requested / declined: a sign-in request for it exists. closed: new accounts
+      // are closed (Admin -> Settings) and this email has none.
       status: "not_sent";
-      reason: "linked" | "claude" | "unregistered" | "requested" | "declined";
+      reason: "linked" | "claude" | "unregistered" | "requested" | "declined" | "closed";
       typed: string;
       // The address to use instead (masked), for linked and claude.
       useInstead: string | null;
@@ -103,6 +105,16 @@ async function tryClassify(email: string) {
   }
 }
 
+// Whether this email may create an account: registration is open (lib/registration.ts), or the
+// guest checked in on Luma, so attendees can still sign in to upload photos after it closes.
+async function mayCreateAccount(email: string) {
+  const admin = createAdminClient();
+  const { data: settings } = await admin.from("event_settings").select("*").eq("id", 1).maybeSingle();
+  if (registrationOpen(registrationMode(settings?.registration), settings?.event_ends_at)) return true;
+  const { data: guest } = await admin.from("luma_guests").select("guest_id").eq("email", email).not("checked_in_at", "is", null).limit(1).maybeSingle();
+  return Boolean(guest);
+}
+
 const LOOKUP_FAILED = "We couldn't check that email just now. Wait a few seconds and try again.";
 
 // Sends a magic link to the typed email if it has an account or is a Luma registration email.
@@ -116,6 +128,9 @@ export async function sendMagicLink(_prev: LoginState, formData: FormData): Prom
 
   const what = await tryClassify(typed);
   if (!what) return { status: "error", message: LOOKUP_FAILED };
+  if (what.kind === "registered" && !(await mayCreateAccount(typed))) {
+    return { status: "not_sent", reason: "closed", typed, useInstead: null };
+  }
   if (what.kind === "linked" || what.kind === "claude" || what.kind === "unregistered") {
     const { data: request, error } = await createAdminClient()
       .from("login_requests")
@@ -123,8 +138,10 @@ export async function sendMagicLink(_prev: LoginState, formData: FormData): Prom
       .eq("email", typed)
       .maybeSingle();
     if (error) console.error("login lookup failed (login_requests):", error.message);
+    // A new sign-in request would create an account, so it's offered only while registration is open.
+    const closed = what.kind !== "linked" && !request && !(await mayCreateAccount(typed));
     const reason =
-      request?.status === "pending" ? "requested" : request?.status === "declined" ? "declined" : what.kind;
+      request?.status === "pending" ? "requested" : request?.status === "declined" ? "declined" : closed ? "closed" : what.kind;
     const useInstead =
       what.kind === "linked" ? maskEmail(what.authEmail) : what.kind === "claude" ? maskEmail(what.lumaEmail) : null;
     return { status: "not_sent", reason, typed, useInstead };
@@ -152,7 +169,8 @@ export async function sendMagicLink(_prev: LoginState, formData: FormData): Prom
     email: typed,
     // The email templates link to {{ .RedirectTo }}?token_hash=…, so this also
     // decides which deployment (localhost, preview, production) the link opens.
-    options: { emailRedirectTo: `${await getOrigin()}/auth/confirm` },
+    // Only a Luma registration that passed mayCreateAccount() above may create its account here.
+    options: { emailRedirectTo: `${await getOrigin()}/auth/confirm`, shouldCreateUser: what.kind === "registered" },
   });
   if (error) {
     // Supabase's own per-account limit says how long to wait ("…after 42 seconds").
@@ -218,6 +236,10 @@ export async function requestAccess(_prev: RequestState, formData: FormData): Pr
   }
   if (what.kind === "linked") {
     return { status: "error", message: "This email is linked to an account. Sign in with that account's email." };
+  }
+
+  if (!(await mayCreateAccount(email))) {
+    return { status: "error", message: "New accounts are closed now that the event is over." };
   }
 
   const admin = createAdminClient();

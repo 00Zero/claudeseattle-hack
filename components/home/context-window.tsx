@@ -106,7 +106,7 @@ export function ContextWindow({ openAt, closeAt, moments, slots }: { openAt: str
       {!current && !next && (
         <div className="grid gap-1 border-t border-dashed border-line pt-3">
           <span className="text-fg-faint">Wrapped</span>
-          <b className="font-semibold text-fg">Winners announced. See you at the next one.</b>
+          <b className="font-semibold text-fg">Winners announced. See you at the next one!</b>
         </div>
       )}
       {upcoming.length > 0 && (

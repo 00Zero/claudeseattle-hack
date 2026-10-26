@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { FloorPlan, OFF_LIMITS_HATCH, offLimitsList } from "@/components/venue/floor-plan";
 import { DriveFolderCard } from "./drive-folder-card";
 import { OfferCard } from "./offer-card";
+import { DeleteUploadButton } from "./delete-upload-button";
 import { UploadForm } from "./upload-form";
 
 // Links for approved attendees: credits, the name tag form, the small business data folder.
@@ -15,11 +16,11 @@ import { UploadForm } from "./upload-form";
 // Admins edit the list in /admin/settings.
 // Sponsor offers (lib/offers.ts) lead the Credits section; attendee_offers() leaves out their links
 // until the person has checked in, where an admin requires it. Admins manage them in /admin/offers.
-// At the bottom, approved attendees upload photos and videos to a restricted Google Drive folder
-// (lib/media.ts); they never see the folder. "Your uploads" lists only the viewer's own (RLS).
+// At the top, approved attendees upload photos and videos to a restricted Google Drive folder
+// (lib/media.ts); they never see the folder. "Your uploads" lists the viewer's own, each with Delete.
 export default async function ResourcesPage() {
   const access = await getCurrentAccess();
-  if (!access) redirect("/login");
+  if (!access) redirect("/login?next=/resources");
   if (access === "blocked") redirect("/declined");
 
   if (access !== "full") {
@@ -44,9 +45,13 @@ export default async function ResourcesPage() {
   ]);
   const resources = (data ?? []) as Resource[];
   const offers = (offerRows ?? []) as AttendeeOffer[];
+  // The viewer's own only (admins could read everyone's through RLS).
+  const { data: claims } = await supabase.auth.getClaims();
   const { data: uploads } = await supabase
     .from("media_uploads")
     .select("id, file_name, size_bytes")
+    .eq("profile_id", claims?.claims.sub ?? "")
+    .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(100);
 
@@ -56,6 +61,30 @@ export default async function ResourcesPage() {
         <h1 className="text-2xl font-semibold">Resources</h1>
         <p className="text-fg-muted">For attendees of the Claude Impact Lab Hackathon. Please don&apos;t share these links outside the event.</p>
       </div>
+      <section id="upload-media" className="snake-border scroll-mt-20 space-y-3 rounded-lg p-4 sm:p-5">
+        <h2 className="text-lg font-semibold">Share your photos/videos from the event</h2>
+        <p className="text-fg-muted">They go to the organizers; other attendees can&apos;t see them. Uploaded the wrong file? Delete it below.</p>
+        <p className="rounded border border-line bg-bg-raised px-3 py-2 text-sm text-fg-muted">
+          By registering for this website or the event, or attending it, you agree that the hosts and their affiliates may use your
+          name, image, and likeness, and the photos and videos you upload, to publicize the event.{" "}
+          <Link href="/terms#media">Read the full terms</Link>.
+        </p>
+        <UploadForm />
+        {uploads && uploads.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="font-medium">Your uploads ({uploads.length})</h3>
+            <ul className="divide-y divide-line rounded border border-line text-sm">
+              {uploads.map((u) => (
+                <li key={u.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                  <span className="min-w-0 grow truncate">{u.file_name}</span>
+                  <span className="shrink-0 text-fg-muted">{(u.size_bytes / 1024 / 1024).toFixed(1)} MB</span>
+                  <DeleteUploadButton id={u.id} name={u.file_name} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </section>
       {resources.length === 0 && offers.length === 0 && <p className="text-fg-muted">Nothing here yet. Check back closer to the event.</p>}
       {RESOURCE_SECTIONS.map((section) => {
         const items = resources.filter((r) => r.section === section.key);
@@ -99,29 +128,6 @@ export default async function ResourcesPage() {
           </section>
         );
       })}
-      <section id="upload-media" className="scroll-mt-20 space-y-3 border-t border-line pt-8">
-        <h2 className="text-lg font-semibold">Upload photos and videos</h2>
-        <p className="text-fg-muted">Share your photos and videos from the event. They go to the organizers; other attendees can&apos;t see them.</p>
-        <p className="rounded border border-line bg-bg-raised px-3 py-2 text-sm text-fg-muted">
-          By registering for this website or the event, or attending it, you agree that the hosts and their affiliates may use your
-          name, image, and likeness, and the photos and videos you upload, to publicize the event.{" "}
-          <Link href="/terms#media">Read the full terms</Link>.
-        </p>
-        <UploadForm />
-        {uploads && uploads.length > 0 && (
-          <div className="space-y-2">
-            <h3 className="font-medium">Your uploads ({uploads.length})</h3>
-            <ul className="divide-y divide-line rounded border border-line text-sm">
-              {uploads.map((u) => (
-                <li key={u.id} className="flex items-center justify-between gap-3 px-3 py-2">
-                  <span className="min-w-0 truncate">{u.file_name}</span>
-                  <span className="shrink-0 text-fg-muted">{(u.size_bytes / 1024 / 1024).toFixed(1)} MB</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </section>
       <section id="floor-plan" className="scroll-mt-20 space-y-3 border-t border-line pt-8">
         <h2 className="text-lg font-semibold">Floor plan: bottom floor</h2>
         <p className="text-fg-muted">

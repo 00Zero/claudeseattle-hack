@@ -146,6 +146,11 @@ function NotSentNotice({ state }: { state: NotSent }) {
           sign-in link to that address.
         </p>
       )}
+      {state.reason === "closed" && (
+        <p>
+          New accounts are closed now that the event is over. If you already have an account, log in with the email it uses.
+        </p>
+      )}
       {state.reason === "declined" && (
         <p>An organizer declined the request to sign in with {typed}. Please find an organizer at the event.</p>
       )}
