@@ -167,7 +167,43 @@ h1, h2, h3 {
     var(--evergreen);
 }
 
+/* A clay light running around a card's border (the photo upload card on the home page). */
+@property --snake-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+.snake-border {
+  border: 2px solid transparent;
+  background:
+    linear-gradient(var(--bg-raised), var(--bg-raised)) padding-box,
+    conic-gradient(from var(--snake-angle), var(--line) 0 62%, var(--accent) 82%, var(--clay-soft) 92%, var(--line) 100%) border-box;
+  animation: snake-border 3.5s linear infinite;
+}
+@keyframes snake-border {
+  to {
+    --snake-angle: 360deg;
+  }
+}
+/* A soft clay ring pulsing out from a button. */
+.pulse-ring {
+  animation: pulse-ring 2.2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 14px color-mix(in srgb, var(--accent) 0%, transparent);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .snake-border {
+    border-color: var(--accent);
+    background: var(--bg-raised);
+  }
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
