@@ -26,6 +26,7 @@ function authorize() {
 
 // Body: { secret, action: 'start', name, mimeType, size, origin } returns { uploadUrl }.
 //       { secret, action: 'check', fileId } returns { name, mimeType, size } if the file is in the folder.
+//       { secret, action: 'trash', fileId } moves the file to Drive's trash (kept 30 days) if it's in the folder.
 function doPost(e) {
   let body;
   try {
@@ -38,6 +39,7 @@ function doPost(e) {
   try {
     if (body.action === 'start') return json_(start_(body));
     if (body.action === 'check') return json_(check_(body));
+    if (body.action === 'trash') return json_(trash_(body));
     return json_({ error: 'Unknown action' });
   } catch (err) {
     console.error(err);
@@ -77,13 +79,22 @@ function start_(body) {
 }
 
 function check_(body) {
-  const file = DriveApp.getFileById(String(body.fileId || ''));
+  const file = inFolder_(body.fileId);
+  return { name: file.getName(), mimeType: file.getMimeType(), size: file.getSize() };
+}
+
+// The site checks that the person deleting is the one who uploaded it.
+function trash_(body) {
+  inFolder_(body.fileId).setTrashed(true);
+  return { ok: true };
+}
+
+function inFolder_(fileId) {
+  const file = DriveApp.getFileById(String(fileId || ''));
   const folderId = folder_().getId();
   const parents = file.getParents();
   while (parents.hasNext()) {
-    if (parents.next().getId() === folderId) {
-      return { name: file.getName(), mimeType: file.getMimeType(), size: file.getSize() };
-    }
+    if (parents.next().getId() === folderId) return file;
   }
   throw new Error('Not in the media folder');
 }

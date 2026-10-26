@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { getCurrentAccess } from "@/lib/access";
-import { checkDriveUpload, startDriveUpload } from "@/lib/media";
+import { checkDriveUpload, startDriveUpload, trashDriveUpload } from "@/lib/media";
 import { mediaType } from "@/lib/media-types";
 import { getOrigin } from "@/lib/site-url";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -72,6 +72,31 @@ export async function recordMediaUpload(fileId: string): Promise<Result<object>>
     console.error("Media upload log failed", error.message);
     return { ok: false, message: "Uploaded, but it couldn't be logged. Tell an organizer." };
   }
+  revalidatePath("/resources");
+  return { ok: true };
+}
+
+// Deletes one of the viewer's own uploads: the file goes to Drive's trash, and the row keeps
+// deleted_at so admins can see what was removed.
+export async function deleteMediaUpload(id: string): Promise<Result<object>> {
+  const who = await uploader();
+  if (!who) return { ok: false, message: "Log in with an approved registration to delete uploads." };
+  const admin = createAdminClient();
+  const { data: upload } = await admin
+    .from("media_uploads")
+    .select("id, drive_file_id")
+    .eq("id", id)
+    .eq("profile_id", who.userId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!upload) return { ok: false, message: "That upload is already gone." };
+  try {
+    await trashDriveUpload(upload.drive_file_id);
+  } catch {
+    return { ok: false, message: "It couldn't be deleted just now. Try again in a minute, or tell an organizer." };
+  }
+  const { error } = await admin.from("media_uploads").update({ deleted_at: new Date().toISOString() }).eq("id", upload.id);
+  if (error) console.error("Media delete log failed", error.message);
   revalidatePath("/resources");
   return { ok: true };
 }

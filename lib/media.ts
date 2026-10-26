@@ -40,3 +40,9 @@ export async function startDriveUpload(file: { name: string; mimeType: string; s
 export async function checkDriveUpload(fileId: string) {
   return callScript<{ name: string; mimeType: string; size: number }>({ action: "check", fileId });
 }
+
+// Moves the file to Drive's trash (the folder owner can restore it for 30 days); throws if it isn't
+// in the media folder.
+export async function trashDriveUpload(fileId: string) {
+  await callScript<{ ok: true }>({ action: "trash", fileId });
+}
