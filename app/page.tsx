@@ -349,7 +349,11 @@ export default async function Home() {
           · hack.claudeseattle.org ·{" "}
           <a href="mailto:support@claudeseattle.org" className="underline-offset-2 hover:text-accent hover:underline">
             support@claudeseattle.org
-          </a>
+          </a>{" "}
+          ·{" "}
+          <Link href="/terms" className="underline-offset-2 hover:text-accent hover:underline">
+            Terms
+          </Link>
         </span>
         <span>Co-authored by Clawd</span>
       </footer>
