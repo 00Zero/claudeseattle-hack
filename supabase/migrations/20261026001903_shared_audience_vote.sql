@@ -1,4 +1,4 @@
--- 20261025235312_shared_audience_vote.sql
+-- 20261026001903_shared_audience_vote.sql
 -- Audience choice: checked-in guests rank the finalists on /vote, first to third. First place
 -- gets 3 points, second 2, third 1; the most points wins, ties broken by first-place votes.
 -- - event_settings.audience_voting_enabled: the feature switch in /admin/settings. NULL (the
