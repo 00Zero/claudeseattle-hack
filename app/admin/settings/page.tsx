@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPacific, isoToPacificInput } from "@/lib/time";
 import { nameTagsStatus } from "@/lib/name-tags";
 import { setNameTagsEnabled } from "./name-tag-actions";
+import { setAudienceVotingEnabled, setAudienceVotingState } from "./audience-voting-actions";
 import { feedbackAudience, slackWebhookConfigured } from "@/lib/feedback";
 import { setFeedbackAudience } from "./feedback-actions";
 import { SubmitButton } from "../submit-button";
@@ -53,6 +54,8 @@ export default async function SettingsPage() {
   const resources = (resourceRows ?? []) as Resource[];
   const nameTags = nameTagsStatus(settings);
   const feedback = feedbackAudience(settings?.feedback_audience);
+  const audienceOn = settings?.audience_voting_enabled === true;
+  const voting = settings?.audience_voting as "open" | "closed" | null | undefined;
   const { data: recentTags } = await admin
     .from("name_tag_prints")
     .select("id, first_name, last_name, requested_at")
@@ -176,6 +179,29 @@ export default async function SettingsPage() {
             </ul>
           </div>
         )}
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">Audience voting</h2>
+        <p className="text-sm text-foreground/70">
+          Checked-in guests rank the finalists first to third on /vote (3, 2 and 1 points). While this is off, /vote doesn&apos;t
+          exist and the awards deck leaves out its audience slides. Once it&apos;s on, open and close voting here or from the deck.
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <span className={`rounded px-2 py-0.5 text-sm ${audienceOn ? "bg-green-600/15 text-green-700" : "bg-foreground/10"}`}>
+            {!audienceOn ? "Off" : voting === "open" ? "On: voting is open" : voting === "closed" ? "On: voting is closed" : "On: voting hasn't opened"}
+          </span>
+          <form action={setAudienceVotingEnabled}>
+            <input type="hidden" name="enabled" value={audienceOn ? "false" : "true"} />
+            <SubmitButton className={button}>{audienceOn ? "Turn off audience voting" : "Turn on audience voting"}</SubmitButton>
+          </form>
+          {audienceOn && (
+            <form action={setAudienceVotingState}>
+              <input type="hidden" name="state" value={voting === "open" ? "closed" : "open"} />
+              <SubmitButton className={button}>{voting === "open" ? "Close voting" : voting === "closed" ? "Reopen voting" : "Open voting"}</SubmitButton>
+            </form>
+          )}
+        </div>
       </section>
 
       <section className="space-y-3">

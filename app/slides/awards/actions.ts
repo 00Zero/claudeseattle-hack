@@ -17,3 +17,16 @@ export async function publishResults(field: "publish_finalists" | "publish_winne
   revalidatePath("/slides/awards");
   return { ok: true as const };
 }
+
+// Opens or closes audience voting on /vote (event_settings.audience_voting), from the deck's
+// "Audience vote" and "Audience choice" slides.
+export async function setAudienceVoting(state: "open" | "closed") {
+  await assertSuperAdmin();
+  if (state !== "open" && state !== "closed") throw new Error("Bad request.");
+  const { error } = await createAdminClient().from("event_settings").update({ audience_voting: state }).eq("id", 1);
+  if (error) return { ok: false as const, message: error.message };
+  revalidatePath("/vote");
+  revalidatePath("/");
+  revalidatePath("/slides/awards");
+  return { ok: true as const };
+}
