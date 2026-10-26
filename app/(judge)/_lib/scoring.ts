@@ -55,6 +55,15 @@ export function scoresByKey(score: { scores: number[]; criteria: string[] | null
   return new Map(keys.map((k, i) => [k, score.scores[i]] as const));
 }
 
+// A one-word label for score tables ("Ease" for "Ease of implementation for a small business").
+const SHORT: Record<CriterionKey, string> = { works: "Works", ease: "Ease", impact: "Impact", creativity: "Creativity", teamwork: "Teamwork" };
+export const shortName = (key: string) => SHORT[key as CriterionKey] ?? key;
+
+// A stored score as "Works 6 · Ease 5 · …", in its own criteria's order.
+export function ratingsLine(score: { scores: number[]; criteria: string[] | null }) {
+  return [...scoresByKey(score)].map(([k, v]) => `${shortName(k)} ${v}`).join(" · ");
+}
+
 // The score form's field name for a criterion.
 export const fieldName = (criterion: Criterion) => `c_${criterion.key}`;
 
