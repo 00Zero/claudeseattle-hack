@@ -91,9 +91,10 @@ export default async function AnswersPage() {
       {tracks.map((track) => {
         const these = rows.filter((r) => r.answers.track === track);
         // Both versions of the contract question, both happy hour variants and the standby extras.
-        const { quick: ownerQuick, detail: came } = questionsFor(track, "standby", { happyHour: true, owner: true });
-        const quick = [...ownerQuick, ...questionsFor(track, "standby").quick.filter((q) => !ownerQuick.some((o) => o.id === q.id))];
-        const detail = [...came, ...questionsFor(track, "standby").detail.filter((q) => !came.some((c) => c.id === q.id))];
+        const owner = questionsFor(track, "standby", { happyHour: true, owner: true });
+        const other = questionsFor(track, "standby");
+        const quick = [...owner.quick, ...other.quick.filter((q) => !owner.quick.some((o) => o.id === q.id))];
+        const detail = [...owner.detail, ...other.detail.filter((q) => !owner.detail.some((o) => o.id === q.id))];
         const texts = [...detail.filter((q) => q.kind === "text"), { id: "additional", kind: "text" as const, label: "Any additional feedback?" }];
         return (
           <section key={track} className="space-y-4 rounded border border-foreground/20 p-4">

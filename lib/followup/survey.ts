@@ -347,12 +347,42 @@ function contractQuestion(track: Track, owner: boolean): Question {
   };
 }
 
+// Optional follow-ups to the contract question, right after the open questions, for people who came.
+const OWNER_FOLLOWUPS: Question[] = [
+  { id: "want_built", kind: "text", label: "If you'd hire someone, what would you most want built or set up for your business?" },
+  {
+    id: "budget",
+    kind: "choice",
+    label: "What rough budget would you consider for a project like that?",
+    options: ["Under $1,000", "$1,000 to $3,000", "$3,000 to $10,000", "Over $10,000", "Not sure yet"],
+  },
+];
+const WORKER_FOLLOWUPS: Question[] = [
+  {
+    id: "hourly_rate",
+    kind: "choice",
+    label: "If you'd take on contract work, what hourly rate would you expect?",
+    options: ["Under $50", "$50 to $100", "$100 to $150", "$150 or more", "Not sure yet"],
+  },
+  {
+    id: "availability",
+    kind: "multi",
+    label: "When could you do contract work?",
+    options: ["Full-time", "Part-time", "Nights", "Weekends"],
+    none: "Not available right now",
+  },
+];
+
 export type Who = { happyHour?: boolean; owner?: boolean };
 
 export function questionsFor(track: Track, role: Role, who: Who = {}) {
-  const { quick: base, detail } = TRACKS[track];
-  // The contract question goes just before the last required question ("would you come again").
-  const quick = CAME_TRACKS.includes(track) ? [...base.slice(0, -1), contractQuestion(track, Boolean(who.owner)), ...base.slice(-1)] : base;
+  const { quick: base, detail: baseDetail } = TRACKS[track];
+  const came = CAME_TRACKS.includes(track);
+  // The contract question goes just before the last required question ("would you come again"), and its
+  // follow-ups right after the four open questions that start every attendee's optional part.
+  const quick = came ? [...base.slice(0, -1), contractQuestion(track, Boolean(who.owner)), ...base.slice(-1)] : base;
+  const followups = who.owner ? OWNER_FOLLOWUPS : WORKER_FOLLOWUPS;
+  const detail = came ? [...baseDetail.slice(0, OPEN.length), ...followups, ...baseDetail.slice(OPEN.length)] : baseDetail;
   const happyHour = Boolean(who.happyHour);
   if (track !== "attended") return { quick, detail };
   const at = detail.findIndex((q) => q.id === "team_formed") + 1;
