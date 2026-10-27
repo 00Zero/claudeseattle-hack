@@ -1,0 +1,70 @@
+<!doctype html>
+<!-- Link preview card generator: the home page's pixel skyline (lib/pixel/skyline.js) under a neon sign.
+     Serve the repo root and open /docs/design/share-image/compose.html?look=dusk (or ?look=day), or run render.mjs.
+     Optional params: t (ISO time; defaults per look), sign1 and sign2 (the two sign lines). -->
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Tilt+Neon&family=Yellowtail&display=block">
+<style>
+  html, body { margin: 0; background: #000; }
+  #stage { position: relative; width: 1200px; height: 630px; overflow: hidden; }
+  #out { position: absolute; inset: 0; }
+  #src { position: absolute; left: -9999px; width: 720px; } /* 720 CSS px -> the renderer picks 240 x 96 logical pixels */
+  .sign { position: absolute; left: 0; right: 0; top: 16px; display: flex; flex-direction: column; align-items: center; }
+  .line1 { font-family: Yellowtail; font-size: 118px; line-height: 1; }
+  .line2 { font-family: "Tilt Neon"; font-size: 62px; letter-spacing: 18px; padding-left: 18px; margin-top: 4px; }
+  /* Neon tube: near-white core, colored inner glow, wide soft halo */
+  .clay { color: #fff1e8; text-shadow: 0 0 2px #fff, 0 0 6px #ffb08a, 0 0 14px #ff8a5c, 0 0 28px #e8663c, 0 0 52px #d9573a, 0 0 90px rgba(217,87,58,.6); }
+  .cyan { color: #eafcff; text-shadow: 0 0 2px #fff, 0 0 6px #9ff3ff, 0 0 14px #4fe0ff, 0 0 28px #1fb8f0, 0 0 52px #1a8fd6, 0 0 90px rgba(26,143,214,.55); }
+  /* By day the glow washes out on the pale sky, so the tubes sit on a dark board */
+  .day .sign { top: 14px; }
+  .day .board { background: #1f2430; border: 4px solid #2c3340; box-shadow: 0 6px 0 rgba(20,20,19,.25); padding: 6px 44px 18px; display: flex; flex-direction: column; align-items: center; }
+  .day .line1 { font-size: 100px; line-height: 1.05; }
+  .day .line2 { font-size: 52px; letter-spacing: 16px; padding-left: 16px; margin-top: 2px; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="out" width="1200" height="630"></canvas>
+  <div class="sign"><div class="board"><div class="line1 clay" id="sign1"></div><div class="line2 cyan" id="sign2"></div></div></div>
+</div>
+<canvas id="src"></canvas>
+<script type="module">
+import { initSkyline } from "/lib/pixel/skyline.js";
+
+const q = new URLSearchParams(location.search);
+const look = q.get("look") === "day" ? "day" : "dusk";
+// Oct 25, 2026 at the venue: dusk is 18:20 (sunset 18:02), day is 15:30. Clawd moves off the crane by day (same clay color).
+const LOOKS = { dusk: { t: "2026-10-25T18:20:00-07:00", clawdX: 1110 }, day: { t: "2026-10-25T15:30:00-07:00", clawdX: 735 } };
+const PX = 5, CROP = 8; // logical pixel -> 5 image pixels; drop 8 rows of water
+
+document.body.classList.add(look);
+document.getElementById("sign1").textContent = q.get("sign1") ?? "Claude Seattle";
+document.getElementById("sign2").textContent = q.get("sign2") ?? "IMPACT LAB";
+
+const src = document.getElementById("src");
+const sky = initSkyline({ canvas: src, theme: "light" });
+sky.setWeather({ code: 0, isDay: 1, windMph: 4, tempF: 52, sunrise: "2026-10-25T07:52", sunset: "2026-10-25T18:02" });
+sky.setTime(new Date(q.get("t") ?? LOOKS[look].t));
+await document.fonts.ready;
+await new Promise((r) => setTimeout(r, 1400)); // let the 15 fps loop draw a few frames
+
+const W = src.width, H = src.height, rows = H - CROP, bandH = rows * PX, ext = 630 - bandH;
+const out = document.getElementById("out").getContext("2d");
+out.imageSmoothingEnabled = false;
+// Extend the sky upward with the top row's most common color, plus stars on the same pixel grid.
+const top = src.getContext("2d").getImageData(0, 0, W, 1).data, counts = {};
+for (let i = 0; i < top.length; i += 4) { const k = `${top[i]},${top[i + 1]},${top[i + 2]}`; counts[k] = (counts[k] || 0) + 1; }
+out.fillStyle = `rgb(${Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0]})`;
+out.fillRect(0, 0, 1200, ext);
+let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+for (let i = 0; i < 70; i++) { const x = Math.floor(rnd() * W) * PX, y = Math.floor(rnd() * (ext / PX)) * PX; out.fillStyle = `rgba(250,249,245,${0.25 + rnd() * 0.5})`; out.fillRect(x, y, PX, PX); }
+out.drawImage(src, 0, 0, W, rows, 0, ext, W * PX, bandH);
+// Clawd (the site icon) on the waterfront
+const clawd = new Image(); clawd.src = "/app/icon.svg"; await clawd.decode();
+out.drawImage(clawd, LOOKS[look].clawdX, ext + (H - 16) * PX - 15 * PX + 5, 16 * PX, 15 * PX);
+window.done = true;
+</script>
+</body>
+</html>

@@ -11,6 +11,8 @@ Standalone HTML prototypes for the hack.claudeseattle.org homepage, built from t
 | `b-terminal.html` | The page as a Claude Code session | Superseded by D |
 | `c-poster.html` | Gig poster | Rejected |
 
+The link preview card (`app/opengraph-image.png`), its alternatives, and the generator are in `share-image/`.
+
 Demo flags for D go in the URL hash, comma-separated: theme `light` / `dark` / `auto`, daylight `day` / `night` / `dusk`, weather `clear` / `partly` / `overcast` / `fog` / `drizzle` / `rain` / `showers` / `snow` / `thunder`. Example: `d-pixel.html#dark,night,snow`. Without flags the page follows the real clock and the real weather at the venue.
 
 ## Shared pieces (carry these into the real site)
