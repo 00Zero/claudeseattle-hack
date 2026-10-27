@@ -15,7 +15,7 @@ export type Skyline = {
   height: number;
   setWeather(weather: WeatherInput): void;
   setTheme(theme: "light" | "dark"): void;
-  // The winners on the blimp's sign, a one-line ticker of each prize and its project; null or [] hides it.
+  // The winners on the blimp's sign, one line at a time: each prize, then its project; null or [] hides it.
   setBlimp(winners: { prize: string; title: string }[] | null): void;
   forceDaylight(value: number | null): void;
   setTime(time: Date | number | null): void; // preview another time of day; null follows the clock
