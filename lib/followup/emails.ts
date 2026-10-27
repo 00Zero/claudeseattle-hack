@@ -24,12 +24,12 @@ const SIGNOFF = "Thank you,\nAdam\nClaude Community Seattle";
 
 export const DEFAULT_EMAILS: Record<Group, { subject: string; body: string }> = {
   attended: {
-    subject: "How was Sunday? 2 minutes of feedback, and your photos",
+    subject: "How was Sunday? 3 minutes of feedback, and your photos",
     body: `Hi {first_name},
 
 Thank you for building with us at the Claude Impact Lab Hackathon on Sunday. 22 teams shipped tools for small businesses, and every project is open source. ${WINNERS} See every project: {results_link}
 
-Would you take 2 minutes to tell us how it went? A few quick questions come first; the rest is optional.
+Would you take 3 minutes to tell us how it went? A few quick questions come first; the rest is optional.
 
 {survey_link}
 
@@ -40,12 +40,12 @@ Did you take photos or videos? Please upload them so we can share the day. Sign 
 ${SIGNOFF}`,
   },
   unsure: {
-    subject: "How was Sunday? 2 minutes of feedback",
+    subject: "How was Sunday? 3 minutes of feedback",
     body: `Hi {first_name},
 
 Thank you for being part of the Claude Impact Lab Hackathon. 22 teams shipped tools for small businesses on Sunday, and every project is open source. ${WINNERS} See every project: {results_link}
 
-Whether or not you made it on Sunday, would you take 2 minutes to tell us how it went? A few quick questions come first; the rest is optional.
+Whether or not you made it on Sunday, would you take 3 minutes to tell us how it went? A few quick questions come first; the rest is optional.
 
 {survey_link}
 
@@ -56,12 +56,12 @@ If you were there and took photos or videos, please upload them. Sign in with {s
 ${SIGNOFF}`,
   },
   crew: {
-    subject: "Thank you for helping on Sunday, and 2 quick questions",
+    subject: "Thank you for helping on Sunday, and a few quick questions",
     body: `Hi {first_name},
 
 Thank you for {role} at the Claude Impact Lab Hackathon on Sunday. 22 teams shipped tools for small businesses, and the day ran because of you. ${WINNERS} See every project: {results_link}
 
-Would you take 2 minutes to tell us what worked and what to change? A few quick questions come first; the rest is optional.
+Would you take 3 minutes to tell us what worked and what to change? A few quick questions come first; the rest is optional.
 
 {survey_link}
 
@@ -72,7 +72,7 @@ If you took photos or videos, please upload them. Sign in with {sign_in_email}:
 ${SIGNOFF}`,
   },
   no_show: {
-    subject: "We missed you on Sunday: 3 quick questions",
+    subject: "We missed you on Sunday: 4 quick questions",
     body: `Hi {first_name},
 
 We're sorry we didn't see you at the Claude Impact Lab Hackathon on Sunday. 22 teams shipped open-source tools for small businesses. ${WINNERS} See every project: {results_link}
@@ -105,7 +105,7 @@ ${SIGNOFF}`,
 
 Thank you for joining the standby list for Sunday's Claude Impact Lab Hackathon, and for being flexible. 22 teams shipped open-source tools for small businesses. ${WINNERS} See every project: {results_link}
 
-Standby was new for us. Would you tell us how it worked for you? It takes under a minute:
+We're always looking for creative ways to admit as many people as possible, and standby was an experiment. Every standby guest who checked in on Sunday got a spot on a team. We'd love your feedback on how it worked for you. It takes under a minute:
 
 {survey_link}
 

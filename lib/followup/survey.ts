@@ -273,6 +273,13 @@ const TRACKS: Record<Track, { quick: Question[]; detail: Question[] }> = {
         options: ["My plans changed", "I was sick", "Work came up", "I wasn't sure I was confirmed", "The day was too long", "I didn't have a team", "Transportation or parking", "I forgot", "Something else"],
       },
       { id: "knew_cancel", kind: "choice", label: "Did you know you could cancel on Luma to give your spot to someone on the waitlist?", options: ["Yes", "No"] },
+      {
+        id: "best_times",
+        kind: "multi",
+        label: "When do events work best for you?",
+        options: ["Weekday daytime", "Weekday evenings", "Weekend daytime", "Weekend evenings"],
+        other: true,
+      },
       { id: "future", kind: "choice", label: "Would you like to come to a future Claude Seattle event?", options: AGAIN },
     ],
     detail: [
