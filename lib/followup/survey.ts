@@ -323,8 +323,37 @@ const HAPPY_HOUR_SKIPPED: Question = {
   options: ["I didn't know about it", "I couldn't make it", "I didn't think I needed it", "I already had a team", "Something else"],
 };
 
-export function questionsFor(track: Track, role: Role, happyHour = false) {
-  const { quick, detail } = TRACKS[track];
+// Luma "professional role" answers that get the business owner version of the contract question.
+export const OWNER_ROLES = ["Small business owner", "Small business executive", "Startup founder"];
+export const isBusinessOwner = (professionalRole: string | null | undefined) => OWNER_ROLES.includes(professionalRole ?? "");
+
+// For people who came: business owners and founders say whether they'd hire implementers; everyone else
+// whether they'd do the implementing. Asked just before "would you come again".
+function contractQuestion(track: Track, owner: boolean): Question {
+  if (owner) {
+    const who = track === "attended" ? "your hackathon teammates" : "the hackathon's participants";
+    return {
+      id: "hire_interest",
+      kind: "choice",
+      label: `If it were available, would you be interested in hiring people like ${who} on a short-term contract to build or set up a project like the ones from the hackathon for your business?`,
+      options: ["Yes", "Maybe, depending on cost and scope", "Not right now", "No"],
+    };
+  }
+  return {
+    id: "contract_interest",
+    kind: "choice",
+    label: "If it were available, would you be interested in short-term contract work building or setting up projects like the ones from the hackathon for small businesses?",
+    options: ["Yes", "Maybe, depending on the project and pay", "Not right now", "No"],
+  };
+}
+
+export type Who = { happyHour?: boolean; owner?: boolean };
+
+export function questionsFor(track: Track, role: Role, who: Who = {}) {
+  const { quick: base, detail } = TRACKS[track];
+  // The contract question goes just before the last required question ("would you come again").
+  const quick = CAME_TRACKS.includes(track) ? [...base.slice(0, -1), contractQuestion(track, Boolean(who.owner)), ...base.slice(-1)] : base;
+  const happyHour = Boolean(who.happyHour);
   if (track !== "attended") return { quick, detail };
   const at = detail.findIndex((q) => q.id === "team_formed") + 1;
   const withHappyHour = [...detail.slice(0, at), ...(happyHour ? [HAPPY_HOUR_CAME, HAPPY_HOUR_BETTER] : [HAPPY_HOUR_SKIPPED]), ...detail.slice(at)];
@@ -369,7 +398,7 @@ export const CAME_TRACKS: Track[] = ["attended", "mentor", "judge", "volunteer"]
 const MAX_TEXT = 4000;
 
 // Checks a submitted survey against the questions this invite sees. Returns the cleaned answers or an error.
-export function checkAnswers(group: Group, role: Role, happyHour: boolean, raw: unknown): { ok: true; answers: Answers } | { ok: false; message: string } {
+export function checkAnswers(group: Group, role: Role, who: Who, raw: unknown): { ok: true; answers: Answers } | { ok: false; message: string } {
   if (!raw || typeof raw !== "object") return { ok: false, message: "Something went wrong. Try again." };
   const input = raw as Partial<Answers>;
   const gate = gateFor(group);
@@ -377,7 +406,7 @@ export function checkAnswers(group: Group, role: Role, happyHour: boolean, raw: 
   if (gate && !gate.options.includes(String(came))) return { ok: false, message: "Please answer the first question." };
   const track = trackFor(group, role, came);
   if (!track) return { ok: false, message: "Please answer the first question." };
-  const { quick, detail } = questionsFor(track, role, happyHour);
+  const { quick, detail } = questionsFor(track, role, who);
 
   const quickOut: Answers["quick"] = {};
   for (const q of quick) {

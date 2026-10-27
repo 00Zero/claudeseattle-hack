@@ -112,6 +112,7 @@ export function SurveyForm({
   group,
   role,
   happyHour,
+  owner,
   signInEmail,
   previous,
   answeredAt,
@@ -121,6 +122,7 @@ export function SurveyForm({
   group: Group;
   role: Role;
   happyHour: boolean;
+  owner: boolean; // a business owner or founder: the hiring version of the contract question
   signInEmail: string | null; // their account's sign-in email, when it isn't the one this survey was sent to
   previous: Answers | null;
   answeredAt: string | null;
@@ -135,7 +137,7 @@ export function SurveyForm({
   const [error, setError] = useState<string | null>(null);
 
   const track = trackFor(group, role, came);
-  const questions = track ? questionsFor(track, role, happyHour) : null;
+  const questions = track ? questionsFor(track, role, { happyHour, owner }) : null;
   const quickDone = Boolean(questions && questions.quick.every((q) => isAnswered(q, quick[q.id])));
 
   async function submit() {
