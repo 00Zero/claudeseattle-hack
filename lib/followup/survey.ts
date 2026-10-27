@@ -84,7 +84,7 @@ const SCHEDULE_OVERALL: Question = { id: "schedule", kind: "choice", label: "The
 // What people loved, didn't like, missed and would improve: the top of every attendee's optional part.
 const OPEN: Question[] = [
   { id: "loved", kind: "text", label: "What did you love that we should keep doing?" },
-  { id: "stop", kind: "text", label: "What didn't you like that we should stop doing?" },
+  { id: "stop", kind: "text", label: "What did you not like that we should stop doing?" },
   { id: "missing", kind: "text", label: "What was missing that we should add?" },
   { id: "improve", kind: "text", label: "What else could we improve?" },
 ];
@@ -113,32 +113,16 @@ const WEBSITE_PARTS: Question = {
   options: ["Easy", "Okay", "Difficult", "Didn't use"],
 };
 const AGREE = ["Agree", "Neutral", "Disagree", "Not sure"];
-const INVOLVE: Question = { id: "involve", kind: "multi", label: "How would you like to be involved next time?", options: ["Participant", "Mentor", "Volunteer", "Judge", "Sponsor (credits, food or venue)"] };
+const INVOLVE: Question = {
+  id: "involve",
+  kind: "multi",
+  label: "How would you like to be involved next time?",
+  options: ["Participant", "Mentor", "Volunteer", "Judge", "Sponsor (credits, food or venue)"],
+  none: "I'm good for now",
+};
 
 // What mentors helped with, asked of mentors and of participants.
 const HELP_TOPICS = ["Small business needs", "Scoping the project", "Getting started with Claude Code", "GitHub", "API credits and keys", "Debugging", "Demo and pitch"];
-// Services for the "used" and "would like as credit sponsors" questions.
-const SERVICES = [
-  "OpenAI",
-  "Google Gemini",
-  "Cursor",
-  "GitHub Copilot",
-  "Vercel",
-  "Supabase",
-  "Firebase",
-  "AWS",
-  "Google Cloud",
-  "Azure",
-  "Cloudflare",
-  "Lovable",
-  "Replit",
-  "Bolt",
-  "ElevenLabs",
-  "Twilio",
-  "Stripe",
-  "Zapier, Make or n8n",
-];
-
 const TRACKS: Record<Track, { quick: Question[]; detail: Question[] }> = {
   attended: {
     quick: [
@@ -152,23 +136,23 @@ const TRACKS: Record<Track, { quick: Question[]; detail: Question[] }> = {
         id: "agents",
         kind: "multi",
         label: "Which coding agents did you mainly use?",
-        options: ["Claude Code", "Codex", "Gemini CLI", "Cursor", "GitHub Copilot", "Windsurf", "Cline"],
+        options: ["Claude Code", "Codex", "Cursor", "Antigravity", "Gemini CLI", "GitHub Copilot", "Cline"],
         other: true,
         none: "None",
       },
       {
-        // Who claimed each credit is already known from the offer clicks; this asks whether it went into the project.
+        // Offer clicks show who opened each redeem link; this asks who redeemed it and whether it went into the project.
         id: "credits",
         kind: "matrix",
-        label: "Did you actually use each sponsored credit for your project?",
+        label: "Which sponsored credit options did you use?",
         rows: ["Claude API credits ($100)", "OpenRouter credits ($10)", "Tavily credits (8,000)", "Wispr Flow Pro"],
-        options: ["Yes, in our project", "Yes, but not for the project", "No", "Not sure"],
+        options: ["Yes, in our project", "Yes, redeemed but didn't use", "Did not redeem"],
       },
       { id: "again", kind: "choice", label: "Would you come to another Claude Seattle hackathon?", options: AGAIN },
     ],
     detail: [
       ...OPEN,
-      { id: "mentor_help", kind: "multi", label: "What did mentors help you with?", options: HELP_TOPICS },
+      { id: "mentor_help", kind: "multi", label: "What did mentors help you with?", options: HELP_TOPICS, other: true },
       { id: "mentor_standouts", kind: "text", label: "Were there particular mentors who helped you especially? Who, and how?" },
       {
         id: "team_formed",
@@ -187,9 +171,8 @@ const TRACKS: Record<Track, { quick: Question[]; detail: Question[] }> = {
         label: "If your project didn't use some of the credits, why not?",
         options: ["I didn't know how to claim them", "I already had my own subscription or credits", "Our team used one person's account", "Setting them up took too long", "Our project didn't need them"],
       },
-      { id: "services_used", kind: "multi", label: "Which other services did your team use?", options: SERVICES },
-      { id: "services_wanted", kind: "multi", label: "Which services would you like to see as credit sponsors at future hackathons?", options: SERVICES },
-      { id: "services_other", kind: "text", label: "Any other services you used, or would like credits for?" },
+      { id: "services_used", kind: "text", label: "Which other services did your team use?" },
+      { id: "services_wanted", kind: "text", label: "Which services would you like to see as credit sponsors at future hackathons?" },
       { id: "keep_building", kind: "choice", label: "Will your team keep working on the project?", options: AGAIN },
       INVOLVE,
     ],
