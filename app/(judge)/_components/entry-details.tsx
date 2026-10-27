@@ -43,7 +43,8 @@ function ExternalLink({ href, children }: { href: string; children: React.ReactN
   );
 }
 
-export function EntryDetails({ entry, roster }: { entry: EntryDetailsData; roster?: RosterMember[] }) {
+// snapshotHref: the entry's folder in the project showcase (lib/showcase.ts), on the public entry page only.
+export function EntryDetails({ entry, roster, snapshotHref }: { entry: EntryDetailsData; roster?: RosterMember[]; snapshotHref?: string | null }) {
   const video = entry.video_url ? parseVideo(entry.video_url) : null;
   const videoHref = safeHref(entry.video_url);
   const repoHref = safeHref(entry.repo_url);
@@ -85,6 +86,11 @@ export function EntryDetails({ entry, roster }: { entry: EntryDetailsData; roste
           </li>
         ) : (
           <li className="rounded-full border border-dashed border-line px-3 py-1 text-fg-faint">No repo link</li>
+        )}
+        {snapshotHref && (
+          <li>
+            <ExternalLink href={snapshotHref}>GitHub showcase</ExternalLink>
+          </li>
         )}
         {videoHref && video && (
           <li>

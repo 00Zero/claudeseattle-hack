@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { getProjects } from "@/lib/small-business";
+import { showcaseRepoUrl } from "@/lib/showcase";
 import { getSubmissionDeadline } from "@/app/(judge)/submit/_lib/entry";
 import { formatPacific } from "@/lib/time";
 import { PageHeader, Sig } from "@/app/(judge)/_components/ui";
@@ -48,6 +49,13 @@ export default async function SmallBusinessesPage() {
 
           <section id="projects" className="scroll-mt-20 space-y-4">
             <Sig call="Read(projects.md)" title="Every project" />
+            <p className="max-w-[60ch] text-fg-muted">
+              Every hackathon project is also copied into one GitHub repo, so you can browse or download them all in one place:{" "}
+              <a href={showcaseRepoUrl} target="_blank" rel="noopener noreferrer">
+                the project showcase ↗
+              </a>
+              .
+            </p>
             <p className="max-w-[60ch] text-fg-muted">
               Summaries are written by Claude from each team&apos;s submission and README. Open the GitHub repo for setup instructions, or the submission for the demo
               video.
