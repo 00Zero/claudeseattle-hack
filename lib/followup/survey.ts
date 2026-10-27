@@ -311,9 +311,11 @@ const STANDBY_EXTRAS: Question[] = [
   { id: "standby_better", kind: "text", label: "What would make standby better?" },
 ];
 
-// Participants who checked in at Saturday's happy hour (a separate Luma event) say how useful it was;
-// everyone else says why they skipped it. Asked right after when their team came together.
+// Participants who checked in at Saturday's happy hour (a separate Luma event) say how useful it was and
+// what would have made it more useful; everyone else says why they skipped it. Asked right after when
+// their team came together.
 const HAPPY_HOUR_CAME: Question = { id: "happy_hour", kind: "choice", label: "How useful was Saturday's team formation happy hour?", options: ["Very useful", "Somewhat useful", "Not useful"] };
+const HAPPY_HOUR_BETTER: Question = { id: "happy_hour_better", kind: "text", label: "What would have made the happy hour more useful?" };
 const HAPPY_HOUR_SKIPPED: Question = {
   id: "happy_hour_skipped",
   kind: "choice",
@@ -325,7 +327,7 @@ export function questionsFor(track: Track, role: Role, happyHour = false) {
   const { quick, detail } = TRACKS[track];
   if (track !== "attended") return { quick, detail };
   const at = detail.findIndex((q) => q.id === "team_formed") + 1;
-  const withHappyHour = [...detail.slice(0, at), happyHour ? HAPPY_HOUR_CAME : HAPPY_HOUR_SKIPPED, ...detail.slice(at)];
+  const withHappyHour = [...detail.slice(0, at), ...(happyHour ? [HAPPY_HOUR_CAME, HAPPY_HOUR_BETTER] : [HAPPY_HOUR_SKIPPED]), ...detail.slice(at)];
   return { quick, detail: role === "standby" ? [...withHappyHour, ...STANDBY_EXTRAS] : withHappyHour };
 }
 
