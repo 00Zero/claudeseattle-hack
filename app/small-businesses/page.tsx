@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { getProjects } from "@/lib/small-business";
+import { getProjectStream } from "@/lib/small-business";
 import { showcaseRepoUrl } from "@/lib/showcase";
 import { getSubmissionDeadline } from "@/app/(judge)/submit/_lib/entry";
 import { formatPacific } from "@/lib/time";
@@ -70,8 +70,9 @@ export default async function SmallBusinessesPage() {
   );
 }
 
-// Streams in: the first view after a team edits its entry writes that entry's summary.
+// The list shows as soon as the entries load; each card's summary streams in on its own (a summary
+// is written the first time it's needed, e.g. after a team edits its entry).
 async function Projects() {
-  const projects = await getProjects();
-  return <ProjectBrowser projects={projects} />;
+  const projects = await getProjectStream();
+  return <ProjectBrowser projects={projects} all={Promise.all(projects.map((p) => p.full))} />;
 }

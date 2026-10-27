@@ -170,50 +170,75 @@ async function summarize(entry: EntryRow): Promise<Summary | null> {
   }
 }
 
-// Runs `fn` over `items`, at most `limit` at a time, so a cold cache doesn't fire every
-// summary (and every GitHub README request) at once.
-async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let next = 0;
-  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (next < items.length) {
-      const i = next++;
-      results[i] = await fn(items[i]);
-    }
-  });
-  await Promise.all(workers);
-  return results;
+// Starts `fn` over `items` in order, at most `limit` at a time, so a cold cache doesn't fire every
+// summary (and every GitHub README request) at once, and the first items finish first.
+function startLimited<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R>[] {
+  let running = 0;
+  const waiting: (() => void)[] = [];
+  return items.map(
+    (item) =>
+      new Promise<R>((resolve, reject) => {
+        const run = () => {
+          running++;
+          fn(item)
+            .then(resolve, reject)
+            .finally(() => {
+              running--;
+              waiting.shift()?.();
+            });
+        };
+        if (running < limit) run();
+        else waiting.push(run);
+      }),
+  );
 }
 
-// Every public entry, winners first, then by title. Empty before submissions close.
-export async function getProjects(): Promise<Project[]> {
+// Every public entry with its place: winners first, then by title. Empty before submissions close.
+async function publicEntries() {
   const supabase = await createClient();
   const [{ data: entries }, { data: results }] = await Promise.all([
     supabase.from("public_judge_entries").select("id, team_name, title, tagline, description_short, description_long, repo_url"),
     supabase.from("public_judge_results").select("entry_id, place"),
   ]);
   const places = new Map((results ?? []).map((r) => [r.entry_id as string, r.place as number | null]));
-  const rows = (entries ?? []) as EntryRow[];
-  const summaries = await mapLimit(rows, 6, summarize);
-  return rows
-    .map((entry, i): Project => {
-      const s = summaries[i];
-      return {
-        id: entry.id,
-        title: entry.title || entry.team_name,
-        by: entry.team_name,
-        summary: s?.summary ?? (clip(entry.tagline, 300) || clip(joinDescription(entry.description_short, entry.description_long), 300)),
-        forWhom: s?.for_whom ?? null,
-        industries: s?.industries ?? [],
-        areas: s?.areas ?? [],
-        setup: s?.setup ?? null,
-        repoUrl: entry.repo_url,
-        entryPath: `/entries/${entry.id}`,
-        externalUrl: null,
-        place: places.get(entry.id) ?? null,
-      };
-    })
-    .sort((a, b) => (a.place ?? 99) - (b.place ?? 99) || a.title.localeCompare(b.title));
+  const title = (e: EntryRow) => e.title || e.team_name;
+  return ((entries ?? []) as EntryRow[])
+    .map((entry) => ({ entry, place: places.get(entry.id) ?? null }))
+    .sort((a, b) => (a.place ?? 99) - (b.place ?? 99) || title(a.entry).localeCompare(title(b.entry)));
+}
+
+// Without a summary (none yet, or the model failed), the card falls back to the team's own tagline.
+function toProject(entry: EntryRow, place: number | null, s: Summary | null): Project {
+  return {
+    id: entry.id,
+    title: entry.title || entry.team_name,
+    by: entry.team_name,
+    summary: s?.summary ?? (clip(entry.tagline, 300) || clip(joinDescription(entry.description_short, entry.description_long), 300)),
+    forWhom: s?.for_whom ?? null,
+    industries: s?.industries ?? [],
+    areas: s?.areas ?? [],
+    setup: s?.setup ?? null,
+    repoUrl: entry.repo_url,
+    entryPath: `/entries/${entry.id}`,
+    externalUrl: null,
+    place,
+  };
+}
+
+// Every project with its summary, for the finder, which needs the whole catalog at once.
+export async function getProjects(): Promise<Project[]> {
+  const entries = await publicEntries();
+  const summaries = await Promise.all(startLimited(entries, 6, ({ entry }) => summarize(entry)));
+  return entries.map(({ entry, place }, i) => toProject(entry, place, summaries[i]));
+}
+
+// The browse list, streamed: every project right away without its summary (base), plus a promise of
+// it with the summary (full), so a card fills in as soon as its own summary is ready. Summaries are
+// started in list order, so the winners come first. summarize() never rejects.
+export async function getProjectStream(): Promise<{ base: Project; full: Promise<Project> }[]> {
+  const entries = await publicEntries();
+  const summaries = startLimited(entries, 6, ({ entry }) => summarize(entry));
+  return entries.map(({ entry, place }, i) => ({ base: toProject(entry, place, null), full: summaries[i].then((s) => toProject(entry, place, s)) }));
 }
 
 // ---------------------------------------------------------------------------------------

@@ -5,8 +5,8 @@ import type { Project } from "@/lib/small-business-options";
 const FIT = { strong: "Strong fit", good: "Good fit", partial: "Partial fit" };
 
 // One project on /small-businesses, in the browse list and in the finder's matches (with the fit
-// and the reason it was picked).
-export function ProjectCard({ project, fit, reason }: { project: Project; fit?: keyof typeof FIT; reason?: string }) {
+// and the reason it was picked). loading: the browse list's placeholder while the summary is written.
+export function ProjectCard({ project, fit, reason, loading }: { project: Project; fit?: keyof typeof FIT; reason?: string; loading?: boolean }) {
   const plugin = Boolean(project.externalUrl);
   return (
     <article className={`flex h-full flex-col gap-3 rounded-lg border p-4 ${plugin ? "border-accent bg-accent-soft" : "border-line bg-bg-raised"}`}>
@@ -24,7 +24,15 @@ export function ProjectCard({ project, fit, reason }: { project: Project; fit?: 
           <span className="font-medium">How it could help you:</span> {reason}
         </p>
       )}
-      {project.summary && <p className="text-sm">{project.summary}</p>}
+      {loading && (
+        <div className="space-y-2" role="status">
+          <span className="sr-only">Loading the summary</span>
+          <div aria-hidden className="h-3 w-full animate-pulse rounded bg-fg/10" />
+          <div aria-hidden className="h-3 w-11/12 animate-pulse rounded bg-fg/10" />
+          <div aria-hidden className="h-3 w-2/3 animate-pulse rounded bg-fg/10" />
+        </div>
+      )}
+      {!loading && project.summary && <p className="text-sm">{project.summary}</p>}
       {project.forWhom && (
         <p className="text-sm text-fg-muted">
           <span className="font-medium text-fg">Best for:</span> {project.forWhom}
