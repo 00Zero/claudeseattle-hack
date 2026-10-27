@@ -231,6 +231,11 @@ export function SurveyForm({
     );
   }
 
+  // People who came answer the long version; everyone else a few questions.
+  const cameTrack = track ? CAME_TRACKS.includes(track) : group === "attended" || group === "crew";
+  const quickTime = cameTrack ? "about 3 minutes" : "about a minute";
+  const moreTime = cameTrack ? "about 5 more minutes" : "about a minute more";
+
   let n = 0;
   return (
     <div className="mx-auto max-w-2xl space-y-10">
@@ -243,7 +248,13 @@ export function SurveyForm({
         <p className="text-fg-muted">
           We experimented with a lot of different concepts of this hackathon and would love your input to understand which ones to keep, remove, or improve.
         </p>
-        <p className="text-fg-muted">A few quick questions first, about a minute. Then you choose whether to say more.</p>
+        {group === "standby" && (
+          <p className="text-fg-muted">
+            We&apos;re always looking for creative ways to admit as many people as possible, and standby was an experiment, so we&apos;d love your
+            feedback.
+          </p>
+        )}
+        <p className="text-fg-muted">A few quick questions first, {quickTime}. Then you choose whether to say more.</p>
         {!token && <p className="rounded border border-line bg-bg-raised px-3 py-2 text-sm text-fg-muted">Preview of what this group sees ({group}, {role}). Nothing is saved.</p>}
         {answeredAt && (
           <p className="rounded border border-line bg-bg-raised px-3 py-2 text-sm text-fg-muted">
@@ -261,7 +272,7 @@ export function SurveyForm({
 
       {questions && (
         <section className="space-y-5 border-t border-line pt-8">
-          <p className="font-medium">Want to tell us more? It&apos;s optional, about 5 more minutes.</p>
+          <p className="font-medium">Want to tell us more? It&apos;s optional, {moreTime}.</p>
           <div className="flex flex-wrap gap-3">
             <button type="button" onClick={() => setMore(true)} className={`btn ${more === true ? "" : "btn-ghost"}`} aria-pressed={more === true}>
               Yes, I&apos;ll say more
