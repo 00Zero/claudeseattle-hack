@@ -9,6 +9,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPacific } from "@/lib/time";
 import { SubmitButton } from "../submit-button";
 import { prepareRecipients, resetTemplate, saveTemplate, sendGroup, sendTest } from "./actions";
+import { CollapsibleGroup } from "./collapsible-group";
 import { ConfirmButton } from "./confirm-button";
 
 const input = "w-full rounded border border-foreground/20 bg-background px-2 py-1";
@@ -80,12 +81,7 @@ function GroupCard({ grp, template, invites, answered, origin, live }: { grp: Gr
   ] as const;
 
   return (
-    <section id={grp} className="scroll-mt-20 space-y-4 rounded border border-foreground/20 p-4">
-      <div>
-        <h2 className="text-lg font-semibold">{GROUP_INFO[grp].label}</h2>
-        <p className="text-sm text-foreground/70">{GROUP_INFO[grp].rule}</p>
-      </div>
-
+    <CollapsibleGroup id={grp} title={GROUP_INFO[grp].label} rule={GROUP_INFO[grp].rule} recipients={invites.length}>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-4">
         {stats.map(([label, value]) => (
           <div key={label}>
@@ -189,7 +185,7 @@ function GroupCard({ grp, template, invites, answered, origin, live }: { grp: Gr
           </ConfirmButton>
         </form>
       </div>
-    </section>
+    </CollapsibleGroup>
   );
 }
 
