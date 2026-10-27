@@ -65,7 +65,8 @@ export async function prepareRecipients() {
 export async function saveTemplate(formData: FormData) {
   const profile = await assertAdmin();
   const subject = field(formData, "subject");
-  const body = field(formData, "body");
+  // Browser forms send \r\n; store plain \n so the text matches the defaults.
+  const body = field(formData, "body").replace(/\r\n?/g, "\n");
   if (!subject || !body) throw new Error("An email needs a subject and a body.");
   if (!body.includes("{survey_link}")) throw new Error("The body needs {survey_link}.");
   const { error } = await createAdminClient()

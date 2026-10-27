@@ -135,13 +135,16 @@ export function renderEmail(
     "{upload_link}": { url: values.uploadUrl, label: "Upload photos and videos" },
     "{results_link}": { url: values.resultsUrl, label: values.resultsUrl.replace(/^https?:\/\//, "") },
   };
+  // Saved edits come from a browser form, which sends Windows line breaks (\r\n); paragraphs and buttons
+  // depend on blank lines, so treat every line break the same.
+  const body = template.body.replace(/\r\n?/g, "\n");
   const words = (s: string) =>
     s.replaceAll("{first_name}", firstName).replaceAll("{role}", ROLE_WORDS[values.role] ?? "helping").replaceAll("{sign_in_email}", signIn);
 
-  const text = words(template.body).replace(/\{(survey|upload|results)_link\}/g, (key) => links[key].url);
+  const text = words(body).replace(/\{(survey|upload|results)_link\}/g, (key) => links[key].url);
   const footer = "You're getting this because you registered for the Claude Impact Lab Hackathon on Luma.";
 
-  const html = words(template.body)
+  const html = words(body)
     .split(/\n{2,}/)
     .map((para) => {
       const trimmed = para.trim();
