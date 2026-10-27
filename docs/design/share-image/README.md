@@ -10,13 +10,13 @@ The image LinkedIn, Slack, iMessage, and X show for hack.claudeseattle.org is `a
 
 ## Re-rendering
 
-`compose.html` draws the card from `lib/pixel/skyline.js` and `app/icon.svg`; `render.js` screenshots it with Playwright. From the repo root:
+`compose.html` draws the card from `lib/pixel/skyline.js` and `app/icon.svg`; `render.mjs` screenshots it with Playwright. From the repo root:
 
 ```sh
 python3 -m http.server 8765 &
-node docs/design/share-image/render.js dusk app/opengraph-image.png   # or: day docs/design/share-image/c-day.png
+node docs/design/share-image/render.mjs dusk app/opengraph-image.png   # or: day docs/design/share-image/c-day.png
 ```
 
-For another event, change the sign with `?sign1=...&sign2=...` and the time with `?t=` (ISO, venue time) in `compose.html`, or edit its `LOOKS`. Render in `America/Los_Angeles` (render.js does): the skyline reads sunrise and sunset as local times. After deploying a new image, run the URL through https://www.linkedin.com/post-inspector/ so LinkedIn drops its cached copy.
+For another event, change the sign with `?sign1=...&sign2=...` and the time with `?t=` (ISO, venue time) in `compose.html`, or edit its `LOOKS`. Render in `America/Los_Angeles` (render.mjs does): the skyline reads sunrise and sunset as local times. After deploying a new image, run the URL through https://www.linkedin.com/post-inspector/ so LinkedIn drops its cached copy.
 
 To use an alternative, copy it over `app/opengraph-image.png` and update the alt text.
