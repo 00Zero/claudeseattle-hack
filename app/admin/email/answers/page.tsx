@@ -90,9 +90,10 @@ export default async function AnswersPage() {
       {rows.length === 0 && <p className="text-foreground/70">No answers yet.</p>}
       {tracks.map((track) => {
         const these = rows.filter((r) => r.answers.track === track);
-        // Both happy hour variants and the standby extras, so every answer has a question to count under.
-        const { quick, detail: came } = questionsFor(track, "standby", true);
-        const detail = [...came, ...questionsFor(track, "standby", false).detail.filter((q) => !came.some((c) => c.id === q.id))];
+        // Both versions of the contract question, both happy hour variants and the standby extras.
+        const { quick: ownerQuick, detail: came } = questionsFor(track, "standby", { happyHour: true, owner: true });
+        const quick = [...ownerQuick, ...questionsFor(track, "standby").quick.filter((q) => !ownerQuick.some((o) => o.id === q.id))];
+        const detail = [...came, ...questionsFor(track, "standby").detail.filter((q) => !came.some((c) => c.id === q.id))];
         const texts = [...detail.filter((q) => q.kind === "text"), { id: "additional", kind: "text" as const, label: "Any additional feedback?" }];
         return (
           <section key={track} className="space-y-4 rounded border border-foreground/20 p-4">

@@ -2,7 +2,11 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { checkAnswers, type Group, type Role } from "@/lib/followup/survey";
+import { checkAnswers, isBusinessOwner, type Group, type Role } from "@/lib/followup/survey";
+
+// Business owners and founders (by their Luma "professional role") get the hiring version of the contract question.
+const ownerOf = (invite: { luma_guests: unknown }) =>
+  isBusinessOwner((invite.luma_guests as { professional_role: string | null } | null)?.professional_role);
 
 export type SubmitResult = { ok: true } | { ok: false; message: string };
 
@@ -11,10 +15,10 @@ export type SubmitResult = { ok: true } | { ok: false; message: string };
 export async function submitSurvey(token: string, raw: unknown): Promise<SubmitResult> {
   if (typeof token !== "string" || !/^[0-9a-f]{32}$/.test(token)) return { ok: false, message: "This survey link isn't valid." };
   const admin = createAdminClient();
-  const { data: invite } = await admin.from("followup_invites").select("id, grp, role, happy_hour").eq("token", token).maybeSingle();
+  const { data: invite } = await admin.from("followup_invites").select("id, grp, role, happy_hour, luma_guests(professional_role)").eq("token", token).maybeSingle();
   if (!invite) return { ok: false, message: "This survey link isn't valid." };
 
-  const checked = checkAnswers(invite.grp as Group, invite.role as Role, invite.happy_hour, raw);
+  const checked = checkAnswers(invite.grp as Group, invite.role as Role, { happyHour: invite.happy_hour, owner: ownerOf(invite) }, raw);
   if (!checked.ok) return checked;
 
   const { data: claims } = await (await createClient()).auth.getClaims();

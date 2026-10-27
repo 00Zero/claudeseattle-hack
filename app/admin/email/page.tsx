@@ -145,14 +145,16 @@ function GroupCard({ grp, template, invites, answered, origin, live }: { grp: Gr
           </div>
           <p className="text-sm">
             Survey this group sees:{" "}
-            {previewRoles.flatMap((r) => (grp === "attended" && r === "participant" ? [`${r}`, `${r}&hh=1`] : [r])).map((r, k) => (
-              <span key={r}>
-                {k > 0 && " · "}
-                <Link href={`/survey/preview?group=${grp}&role=${r}`} target="_blank">
-                  {r.replace("&hh=1", ", came to the happy hour")}
-                </Link>
-              </span>
-            ))}
+            {previewRoles
+              .flatMap((r) => (grp === "attended" && r === "participant" ? [r, `${r}&hh=1`, `${r}&owner=1`] : grp === "crew" ? [r, `${r}&owner=1`] : [r]))
+              .map((r, k) => (
+                <span key={r}>
+                  {k > 0 && " · "}
+                  <Link href={`/survey/preview?group=${grp}&role=${r}`} target="_blank">
+                    {r.replace("&hh=1", ", came to the happy hour").replace("&owner=1", ", business owner")}
+                  </Link>
+                </span>
+              ))}
           </p>
         </div>
       </div>

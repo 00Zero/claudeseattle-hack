@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import type { Answers, Group, Role } from "@/lib/followup/survey";
+import { isBusinessOwner, type Answers, type Group, type Role } from "@/lib/followup/survey";
 import { SurveyForm } from "../survey-form";
 
 export const metadata: Metadata = { title: "Hackathon feedback", robots: { index: false } };
@@ -12,7 +12,7 @@ export default async function SurveyPage({ params }: PageProps<"/survey/[token]"
   const { token } = await params;
   const admin = createAdminClient();
   const { data: invite } = /^[0-9a-f]{32}$/.test(token)
-    ? await admin.from("followup_invites").select("id, email, profile_id, first_name, grp, role, happy_hour, first_visit_at, visits").eq("token", token).maybeSingle()
+    ? await admin.from("followup_invites").select("id, email, profile_id, first_name, grp, role, happy_hour, first_visit_at, visits, luma_guests(professional_role)").eq("token", token).maybeSingle()
     : { data: null };
 
   if (!invite) {
@@ -49,6 +49,7 @@ export default async function SurveyPage({ params }: PageProps<"/survey/[token]"
       group={invite.grp as Group}
       role={invite.role as Role}
       happyHour={invite.happy_hour}
+      owner={isBusinessOwner((invite.luma_guests as unknown as { professional_role: string | null } | null)?.professional_role)}
       signInEmail={signInEmail}
       previous={(response?.answers as Answers | undefined) ?? null}
       answeredAt={response?.updated_at ?? null}
