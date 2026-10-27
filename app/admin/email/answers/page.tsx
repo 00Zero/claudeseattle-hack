@@ -15,11 +15,27 @@ const TRACK_LABELS: Record<Track, string> = {
 
 type Row = { answers: Answers; updated_at: string; followup_invites: { first_name: string | null; email: string; role: Role } };
 
-// Counts for a choice, multi or matrix question across these answers.
+// Counts for a choice, multi or matrix question across these answers; for dollars, the median and range.
 function Tally({ q, rows, from }: { q: Question; rows: Row[]; from: "quick" | "detail" }) {
   if (q.kind === "text") return null;
   const values = rows.map((r) => (from === "quick" ? r.answers.quick[q.id] : r.answers.detail[q.id])).filter((v) => v != null);
   if (!values.length) return null;
+  if (q.kind === "dollars") {
+    const amounts = values.map(Number).filter((n) => n > 0).sort((a, b) => a - b);
+    if (!amounts.length) return null;
+    const mid = Math.floor(amounts.length / 2);
+    const median = amounts.length % 2 ? amounts[mid] : Math.round((amounts[mid - 1] + amounts[mid]) / 2);
+    return (
+      <div className="space-y-1">
+        <p className="font-medium">
+          {q.label} <span className="font-normal text-foreground/60">({amounts.length})</span>
+        </p>
+        <p className="text-sm tabular-nums">
+          Median <strong>${median}</strong>/hour · range ${amounts[0]} to ${amounts[amounts.length - 1]}
+        </p>
+      </div>
+    );
+  }
   if (q.kind === "matrix") {
     return (
       <div className="space-y-1">

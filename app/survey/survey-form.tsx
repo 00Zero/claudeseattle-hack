@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { CAME_TRACKS, OTHER, gateFor, isAnswered, questionsFor, trackFor, type Answers, type Group, type Question, type Role } from "@/lib/followup/survey";
 import { submitSurvey } from "./actions";
 
@@ -29,6 +29,34 @@ function Pills({ name, options, type, selected, onChange }: { name: string; opti
   );
 }
 
+// Whole dollars per hour, up to 3 digits. Other characters are dropped. After a "." or "," the digits typed
+// next are ignored until something is deleted, so "85.50" stays 85 rather than 855; a pasted "$75" or
+// "12.50" becomes 75 or 12. Works from the input events, since phone keyboards don't report key names.
+function DollarsInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const afterPoint = useRef(false);
+  return (
+    <span className="flex items-center gap-2">
+      <span className="text-fg-muted">$</span>
+      <input
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        value={value}
+        onChange={(e) => {
+          const raw = e.target.value;
+          const input = e.nativeEvent as InputEvent;
+          if (input.inputType?.startsWith("delete")) afterPoint.current = false;
+          if (/[.,]/.test(raw)) afterPoint.current = true;
+          else if (afterPoint.current && input.inputType === "insertText") return; // digits after the point
+          onChange(raw.split(/[.,]/)[0].replace(/\D/g, "").slice(0, 3));
+        }}
+        className="w-24 rounded border border-line bg-bg px-3 py-2 tabular-nums"
+      />
+      <span className="text-fg-muted">per hour</span>
+    </span>
+  );
+}
+
 function Field({ q, value, onChange, number }: { q: Question; value: Detail[string] | undefined; onChange: (value: Detail[string]) => void; number?: number }) {
   const label = (
     <legend className="mb-2 font-medium">
@@ -36,6 +64,14 @@ function Field({ q, value, onChange, number }: { q: Question; value: Detail[stri
       {q.label}
     </legend>
   );
+  if (q.kind === "dollars") {
+    return (
+      <label className="block space-y-2">
+        <span className="block font-medium">{q.label}</span>
+        <DollarsInput value={typeof value === "string" ? value : ""} onChange={onChange} />
+      </label>
+    );
+  }
   if (q.kind === "text") {
     return (
       <label className="block space-y-2">
