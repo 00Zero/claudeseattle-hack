@@ -223,7 +223,7 @@ export function SurveyForm({
 
       {questions && (
         <section className="space-y-5 border-t border-line pt-8">
-          <p className="font-medium">Want to tell us more? It&apos;s optional, about 3 more minutes.</p>
+          <p className="font-medium">Want to tell us more? It&apos;s optional, about 5 more minutes.</p>
           <div className="flex flex-wrap gap-3">
             <button type="button" onClick={() => setMore(true)} className={`btn ${more === true ? "" : "btn-ghost"}`} aria-pressed={more === true}>
               Yes, I&apos;ll say more
