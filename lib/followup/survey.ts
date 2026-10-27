@@ -9,7 +9,9 @@ export type Question =
   // other: adds "Other" with a text box, saved as "Other: <text>". none: an option that clears the rest.
   | { id: string; kind: "multi"; label: string; options: string[]; other?: boolean; none?: string }
   | { id: string; kind: "matrix"; label: string; rows: string[]; options: string[] }
-  | { id: string; kind: "text"; label: string; help?: string };
+  | { id: string; kind: "text"; label: string; help?: string }
+  // Whole dollars per hour, at most 3 digits; saved as a number.
+  | { id: string; kind: "dollars"; label: string };
 
 type Choice = Extract<Question, { kind: "choice" }>;
 
@@ -356,13 +358,13 @@ const OWNER_FOLLOWUPS: Question[] = [
     label: "What rough budget would you consider for a project like that?",
     options: ["Under $1,000", "$1,000 to $3,000", "$3,000 to $10,000", "Over $10,000", "Not sure yet"],
   },
+  { id: "pay_per_hour", kind: "dollars", label: "How much would you pay per hour, per person?" },
 ];
 const WORKER_FOLLOWUPS: Question[] = [
   {
     id: "hourly_rate",
-    kind: "choice",
+    kind: "dollars",
     label: "If you'd take on contract work, what hourly rate would you expect?",
-    options: ["Under $50", "$50 to $100", "$100 to $150", "$150 or more", "Not sure yet"],
   },
   {
     id: "availability",
@@ -452,6 +454,7 @@ export function checkAnswers(group: Group, role: Role, who: Who, raw: unknown): 
       const value = input.detail?.[q.id];
       if (value == null) continue;
       if (q.kind === "text" && typeof value === "string" && value.trim()) detailOut[q.id] = value.trim().slice(0, MAX_TEXT);
+      if (q.kind === "dollars" && /^\d{1,3}$/.test(String(value)) && Number(value) > 0) detailOut[q.id] = String(Number(value));
       if (q.kind === "choice" && typeof value === "string" && q.options.includes(value)) detailOut[q.id] = value;
       if (q.kind === "multi") {
         const picked = multiPicks(q, value);
