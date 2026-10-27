@@ -160,7 +160,7 @@ function NotSentNotice({ state }: { state: NotSent }) {
   );
 }
 
-export function LoginForm({ next }: { next?: string | null }) {
+export function LoginForm({ next, defaultEmail }: { next?: string | null; defaultEmail?: string | null }) {
   const [state, formAction, pending] = useActionState<LoginState, FormData>(sendMagicLink, { status: "idle" });
 
   if (state.status === "sent") {
@@ -178,6 +178,7 @@ export function LoginForm({ next }: { next?: string | null }) {
           type="email"
           name="email"
           required
+          defaultValue={defaultEmail ?? undefined}
           autoComplete="email"
           placeholder="you@example.com"
           className="w-full rounded border border-foreground/20 bg-background px-3 py-2"

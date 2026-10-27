@@ -112,6 +112,7 @@ export function SurveyForm({
   group,
   role,
   happyHour,
+  signInEmail,
   previous,
   answeredAt,
 }: {
@@ -120,6 +121,7 @@ export function SurveyForm({
   group: Group;
   role: Role;
   happyHour: boolean;
+  signInEmail: string | null; // their account's sign-in email, when it isn't the one this survey was sent to
   previous: Answers | null;
   answeredAt: string | null;
 }) {
@@ -163,8 +165,18 @@ export function SurveyForm({
         {cameToEvent && (
           <div className="space-y-3 rounded-lg border border-line bg-bg-raised p-5">
             <p className="font-medium">Share your photos/videos from the event</p>
-            <p className="text-sm text-fg-muted">Upload them on the Resources page. Sign in with the email you used on Luma if you aren&apos;t already.</p>
-            <Link href="/login?next=/resources" className="btn">
+            <p className="text-sm text-fg-muted">
+              Upload them on the Resources page. If you aren&apos;t signed in, sign in with{" "}
+              {signInEmail ? (
+                <>
+                  your account&apos;s email, <strong>{signInEmail}</strong>
+                </>
+              ) : (
+                "the email address this survey was sent to"
+              )}
+              .
+            </p>
+            <Link href={token ? `/login?next=/resources&invite=${token}` : "/login?next=/resources"} className="btn">
               Upload photos and videos
             </Link>
           </div>
