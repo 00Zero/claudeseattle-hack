@@ -4,10 +4,10 @@ import type { Group, Role } from "./survey";
 // The feedback emails: default text per group (an admin's edits in followup_emails win), how the
 // placeholders fill in, and sending through Resend's batch API.
 
-// email.claudeseattle.org is the domain verified in Resend (lib/email.ts). Replies can't come back to
-// it, so they go to FOLLOWUP_REPLY_TO, or the events address from the hackathon emails.
+// email.claudeseattle.org is the domain verified in Resend (lib/email.ts). It can't receive mail, so
+// replies go to adam@claudeseattle.org (forwarded by Cloudflare Email Routing), or FOLLOWUP_REPLY_TO if set.
 export const FOLLOWUP_FROM = "Adam from Claude Seattle <adam@email.claudeseattle.org>";
-export const followupReplyTo = () => process.env.FOLLOWUP_REPLY_TO || "events@webuildwithai.org";
+export const followupReplyTo = () => process.env.FOLLOWUP_REPLY_TO || "adam@claudeseattle.org";
 
 export const PLACEHOLDERS: { key: string; meaning: string }[] = [
   { key: "{first_name}", meaning: "first name from Luma (\"there\" if missing)" },
