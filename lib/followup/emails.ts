@@ -11,6 +11,7 @@ export const followupReplyTo = () => process.env.FOLLOWUP_REPLY_TO || "adam@clau
 
 export const PLACEHOLDERS: { key: string; meaning: string }[] = [
   { key: "{first_name}", meaning: "first name from Luma (\"there\" if missing)" },
+  { key: "{sign_in_email}", meaning: "\"this email address\", or the account's own email if they sign in with a different one" },
   { key: "{survey_link}", meaning: "their personal survey link (a button in the email)" },
   { key: "{upload_link}", meaning: "sign in, then upload photos and videos on Resources" },
   { key: "{results_link}", meaning: "the results page with every project" },
@@ -32,7 +33,7 @@ Would you take 2 minutes to tell us how it went? A few quick questions come firs
 
 {survey_link}
 
-Did you take photos or videos? Please upload them so we can share the day. Sign in with the email you used on Luma:
+Did you take photos or videos? Please upload them so we can share the day. Sign in with {sign_in_email}:
 
 {upload_link}
 
@@ -48,7 +49,7 @@ Whether or not you made it on Sunday, would you take 2 minutes to tell us how it
 
 {survey_link}
 
-If you were there and took photos or videos, please upload them. Sign in with the email you used on Luma:
+If you were there and took photos or videos, please upload them. Sign in with {sign_in_email}:
 
 {upload_link}
 
@@ -64,7 +65,7 @@ Would you take 2 minutes to tell us what worked and what to change? A few quick 
 
 {survey_link}
 
-If you took photos or videos, please upload them. Sign in with the email you used on Luma:
+If you took photos or videos, please upload them. Sign in with {sign_in_email}:
 
 {upload_link}
 
@@ -122,14 +123,20 @@ const escapeHtml = (text: string) =>
   text.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 // Fills the placeholders. A placeholder alone on its line becomes a button in the HTML version.
-export function renderEmail(template: { subject: string; body: string }, values: { firstName: string | null; role: Role; surveyUrl: string; uploadUrl: string; resultsUrl: string }): Rendered {
+// signInEmail: the address their account signs in with, when it isn't the one this email goes to.
+export function renderEmail(
+  template: { subject: string; body: string },
+  values: { firstName: string | null; role: Role; signInEmail?: string | null; surveyUrl: string; uploadUrl: string; resultsUrl: string },
+): Rendered {
   const firstName = values.firstName || "there";
+  const signIn = values.signInEmail ? `your account's email, ${values.signInEmail}` : "this email address";
   const links: Record<string, { url: string; label: string }> = {
     "{survey_link}": { url: values.surveyUrl, label: "Take the survey" },
     "{upload_link}": { url: values.uploadUrl, label: "Upload photos and videos" },
     "{results_link}": { url: values.resultsUrl, label: values.resultsUrl.replace(/^https?:\/\//, "") },
   };
-  const words = (s: string) => s.replaceAll("{first_name}", firstName).replaceAll("{role}", ROLE_WORDS[values.role] ?? "helping");
+  const words = (s: string) =>
+    s.replaceAll("{first_name}", firstName).replaceAll("{role}", ROLE_WORDS[values.role] ?? "helping").replaceAll("{sign_in_email}", signIn);
 
   const text = words(template.body).replace(/\{(survey|upload|results)_link\}/g, (key) => links[key].url);
   const footer = "You're getting this because you registered for the Claude Impact Lab Hackathon on Luma.";

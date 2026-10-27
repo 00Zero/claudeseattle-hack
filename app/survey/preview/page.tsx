@@ -12,5 +12,5 @@ export default async function SurveyPreviewPage({ searchParams }: PageProps<"/su
   const { group, role, hh } = await searchParams;
   const g = (GROUPS as readonly string[]).includes(String(group)) ? (group as Group) : "attended";
   const r = (ROLES as readonly string[]).includes(String(role)) ? (role as Role) : "participant";
-  return <SurveyForm token={null} firstName="Alex" group={g} role={r} happyHour={hh === "1"} previous={null} answeredAt={null} />;
+  return <SurveyForm token={null} firstName="Alex" group={g} role={r} happyHour={hh === "1"} signInEmail={null} previous={null} answeredAt={null} />;
 }

@@ -28,7 +28,8 @@ function group(formData: FormData): Group {
 function links(origin: string, token: string | null, grp: Group, role: Role) {
   return {
     surveyUrl: token ? `${origin}/survey/${token}` : `${origin}/survey/preview?group=${grp}&role=${role}`,
-    uploadUrl: `${origin}/login?next=/resources`,
+    // The survey token lets the login page fill in their sign-in email (app/login/page.tsx).
+    uploadUrl: token ? `${origin}/login?next=/resources&invite=${token}` : `${origin}/login?next=/resources`,
     resultsUrl: `${origin}/results`,
   };
 }
@@ -85,6 +86,18 @@ export async function sendTest(formData: FormData) {
   await sendEmail({ to, subject: `[Test] ${rendered.subject}`, text: rendered.text, html: rendered.html });
 }
 
+// Each account's sign-in email by profile id, for recipients whose account signs in with an address
+// other than the one the survey goes to ({sign_in_email} in lib/followup/emails.ts).
+async function signInEmails(admin: ReturnType<typeof createAdminClient>) {
+  const byId = new Map<string, string>();
+  for (let page = 1; ; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw new Error(error.message);
+    for (const u of data.users) if (u.email) byId.set(u.id, u.email.toLowerCase());
+    if (data.users.length < 1000) return byId;
+  }
+}
+
 // Sends the group's email to everyone in it who hasn't been sent one, 100 per Resend call.
 export async function sendGroup(formData: FormData) {
   await assertAdmin();
@@ -92,15 +105,20 @@ export async function sendGroup(formData: FormData) {
   if (origin !== PRODUCTION_ORIGIN) throw new Error(`Send from ${PRODUCTION_ORIGIN}/admin/email, so the links point to the live site.`);
   const grp = group(formData);
   const admin = createAdminClient();
-  const [template, { data: invites, error }] = await Promise.all([
+  const [template, { data: invites, error }, accounts] = await Promise.all([
     getTemplates().then((t) => t[grp]),
-    admin.from("followup_invites").select("id, email, first_name, role, token").eq("grp", grp).is("sent_at", null).order("email"),
+    admin.from("followup_invites").select("id, email, first_name, role, token, profile_id").eq("grp", grp).is("sent_at", null).order("email"),
+    signInEmails(admin),
   ]);
+  const otherSignIn = (inv: { email: string; profile_id: string | null }) => {
+    const account = inv.profile_id ? accounts.get(inv.profile_id) : undefined;
+    return account && account !== inv.email ? account : null;
+  };
   if (error) throw new Error(error.message);
 
   for (let i = 0; i < (invites ?? []).length; i += 100) {
     const chunk = invites!.slice(i, i + 100);
-    const messages = chunk.map((inv) => ({ to: inv.email, ...renderEmail(template, { firstName: inv.first_name, role: inv.role as Role, ...links(origin, inv.token, grp, inv.role as Role) }) }));
+    const messages = chunk.map((inv) => ({ to: inv.email, ...renderEmail(template, { firstName: inv.first_name, role: inv.role as Role, signInEmail: otherSignIn(inv), ...links(origin, inv.token, grp, inv.role as Role) }) }));
     try {
       const ids = await sendBatch(messages, `followup-${chunk[0].id}-${chunk.length}`);
       const sentAt = new Date().toISOString();

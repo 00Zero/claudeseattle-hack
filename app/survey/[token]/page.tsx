@@ -12,7 +12,7 @@ export default async function SurveyPage({ params }: PageProps<"/survey/[token]"
   const { token } = await params;
   const admin = createAdminClient();
   const { data: invite } = /^[0-9a-f]{32}$/.test(token)
-    ? await admin.from("followup_invites").select("id, first_name, grp, role, happy_hour, first_visit_at, visits").eq("token", token).maybeSingle()
+    ? await admin.from("followup_invites").select("id, email, profile_id, first_name, grp, role, happy_hour, first_visit_at, visits").eq("token", token).maybeSingle()
     : { data: null };
 
   if (!invite) {
@@ -25,6 +25,9 @@ export default async function SurveyPage({ params }: PageProps<"/survey/[token]"
   }
 
   const { data: claims } = await (await createClient()).auth.getClaims();
+  // The address to sign in with for photo uploads: their account's, if it isn't the one the survey went to.
+  const account = invite.profile_id ? (await admin.auth.admin.getUserById(invite.profile_id)).data.user?.email?.toLowerCase() : undefined;
+  const signInEmail = account && account !== invite.email ? account : null;
   const now = new Date().toISOString();
   const [, { data: response }] = await Promise.all([
     admin
@@ -46,6 +49,7 @@ export default async function SurveyPage({ params }: PageProps<"/survey/[token]"
       group={invite.grp as Group}
       role={invite.role as Role}
       happyHour={invite.happy_hour}
+      signInEmail={signInEmail}
       previous={(response?.answers as Answers | undefined) ?? null}
       answeredAt={response?.updated_at ?? null}
     />
