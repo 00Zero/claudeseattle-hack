@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { showcaseFolderUrl } from "@/lib/showcase";
 import { EntryDetails, type EntryDetailsData } from "../../_components/entry-details";
 import { PageHeader } from "../../_components/ui";
 
@@ -32,7 +33,11 @@ export default async function PublicEntryPage({ params }: PageProps<"/entries/[i
         </Link>
         <PageHeader eyebrow={entry.team_name} title={entry.title || entry.team_name} />
       </div>
-      <EntryDetails entry={{ ...(entry as EntryDetailsData), links: Array.isArray(entry.links) ? entry.links : [] }} roster={roster} />
+      <EntryDetails
+        entry={{ ...(entry as EntryDetailsData), links: Array.isArray(entry.links) ? entry.links : [] }}
+        roster={roster}
+        snapshotHref={showcaseFolderUrl(entry.id)}
+      />
     </div>
   );
 }
