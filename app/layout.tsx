@@ -33,8 +33,9 @@ const newsreader = Newsreader({
 export const metadata: Metadata = {
   title: "Claude Impact Lab Hackathon",
   description: "Teams, submissions, and judging for the Claude Impact Lab Hackathon in Seattle.",
-  // Link previews. The image is app/opengraph-image.tsx; Next resolves its URL against the Vercel
-  // production domain (or the preview's own URL on a preview deploy).
+  // Link previews. The image is app/opengraph-image.png (the home page's pixel skyline at dusk under
+  // a neon sign); Next resolves its URL against the Vercel production domain (or the preview's own
+  // URL on a preview deploy).
   openGraph: {
     type: "website",
     siteName: "Claude Community Seattle",
