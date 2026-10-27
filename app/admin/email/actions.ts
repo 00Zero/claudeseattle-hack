@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { assertAdmin } from "@/lib/admin";
 import { sendEmail } from "@/lib/email";
 import { renderEmail, sendBatch } from "@/lib/followup/emails";
-import { computeRecipients } from "@/lib/followup/groups";
+import { accountEmails, computeRecipients } from "@/lib/followup/groups";
 import { GROUPS, type Group, type Role } from "@/lib/followup/survey";
 import { getTemplates } from "@/lib/followup/templates";
 import { getOrigin } from "@/lib/site-url";
@@ -35,12 +35,15 @@ function links(origin: string, token: string | null, grp: Group, role: Role) {
 }
 
 // Builds or refreshes everyone's invite from the latest data. Invites already sent keep their group.
+// An unsent invite that no longer matches anyone (say, its address changed to the account's sign-in
+// email) is removed, unless someone already opened or answered its survey.
 export async function prepareRecipients() {
   await assertAdmin();
   const admin = createAdminClient();
-  const [recipients, { data: existing, error }] = await Promise.all([
+  const [recipients, { data: existing, error }, { data: answered }] = await Promise.all([
     computeRecipients(),
-    admin.from("followup_invites").select("email, sent_at"),
+    admin.from("followup_invites").select("id, email, sent_at, first_visit_at"),
+    admin.from("followup_responses").select("invite_id"),
   ]);
   if (error) throw new Error(error.message);
   const sent = new Set((existing ?? []).filter((i) => i.sent_at).map((i) => i.email));
@@ -48,6 +51,13 @@ export async function prepareRecipients() {
   for (let i = 0; i < rows.length; i += 500) {
     const { error: upsertError } = await admin.from("followup_invites").upsert(rows.slice(i, i + 500), { onConflict: "email" });
     if (upsertError) throw new Error(upsertError.message);
+  }
+  const current = new Set(recipients.map((r) => r.email));
+  const kept = new Set((answered ?? []).map((r) => r.invite_id));
+  const stale = (existing ?? []).filter((i) => !current.has(i.email) && !i.sent_at && !i.first_visit_at && !kept.has(i.id)).map((i) => i.id);
+  if (stale.length) {
+    const { error: deleteError } = await admin.from("followup_invites").delete().in("id", stale);
+    if (deleteError) throw new Error(deleteError.message);
   }
   revalidatePath("/admin/email");
 }
@@ -86,18 +96,6 @@ export async function sendTest(formData: FormData) {
   await sendEmail({ to, subject: `[Test] ${rendered.subject}`, text: rendered.text, html: rendered.html });
 }
 
-// Each account's sign-in email by profile id, for recipients whose account signs in with an address
-// other than the one the survey goes to ({sign_in_email} in lib/followup/emails.ts).
-async function signInEmails(admin: ReturnType<typeof createAdminClient>) {
-  const byId = new Map<string, string>();
-  for (let page = 1; ; page++) {
-    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
-    if (error) throw new Error(error.message);
-    for (const u of data.users) if (u.email) byId.set(u.id, u.email.toLowerCase());
-    if (data.users.length < 1000) return byId;
-  }
-}
-
 // Sends the group's email to everyone in it who hasn't been sent one, 100 per Resend call.
 export async function sendGroup(formData: FormData) {
   await assertAdmin();
@@ -108,7 +106,7 @@ export async function sendGroup(formData: FormData) {
   const [template, { data: invites, error }, accounts] = await Promise.all([
     getTemplates().then((t) => t[grp]),
     admin.from("followup_invites").select("id, email, first_name, role, token, profile_id").eq("grp", grp).is("sent_at", null).order("email"),
-    signInEmails(admin),
+    accountEmails(admin),
   ]);
   const otherSignIn = (inv: { email: string; profile_id: string | null }) => {
     const account = inv.profile_id ? accounts.get(inv.profile_id) : undefined;
