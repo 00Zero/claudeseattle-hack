@@ -3,7 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { TEST_GUEST_PREFIX } from "@/lib/test-accounts";
 import type { Group, Role } from "./survey";
 
-// Who gets which feedback email, from the Luma import and what happened on the site.
+// Who gets which feedback email, from the Luma import and what happened on the site. Each one goes to
+// the address the person's account signs in with, or their Luma email if they have no account.
 // "Came" means any sign of it: a Luma check-in, a printed name tag, or an approved standby check-in.
 // Team membership alone doesn't count, since teams formed online before the event.
 
@@ -36,6 +37,17 @@ export type Recipient = {
   happy_hour: boolean;
 };
 
+// Each account's sign-in email by profile id (Supabase Auth; at most 1,000 users per page).
+export async function accountEmails(admin: ReturnType<typeof createAdminClient>) {
+  const byId = new Map<string, string>();
+  for (let page = 1; ; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw new Error(error.message);
+    for (const u of data.users) if (u.email) byId.set(u.id, u.email.toLowerCase());
+    if (data.users.length < 1000) return byId;
+  }
+}
+
 const pacificDay = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
 
 // Supabase returns at most 1,000 rows per request.
@@ -63,6 +75,7 @@ export async function computeRecipients(): Promise<Recipient[]> {
     all<{ profile_id: string }>((a, b) => admin.from("team_members").select("profile_id").eq("status", "member").order("profile_id").range(a, b)),
     admin.from("event_settings").select("event_ends_at").eq("id", 1).single(),
   ]);
+  const accounts = await accountEmails(admin);
 
   const eventDay = settings?.event_ends_at ? pacificDay(settings.event_ends_at) : null;
   const profileByGuest = new Map(profiles.filter((p) => p.luma_guest_id).map((p) => [p.luma_guest_id!, p]));
@@ -90,7 +103,7 @@ export async function computeRecipients(): Promise<Recipient[]> {
     }
     if (!grp) continue;
 
-    const email = g.email.trim().toLowerCase();
+    const email = (profile ? accounts.get(profile.id) : undefined) ?? g.email.trim().toLowerCase();
     if (out.has(email)) continue;
     const firstName = g.first_name?.trim() || g.name?.trim().split(/\s+/)[0] || null;
     // A cancelled guest has no ticket role that matters; their questions don't depend on it.
