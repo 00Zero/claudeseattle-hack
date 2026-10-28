@@ -53,3 +53,11 @@ export function formatPacific(iso: string) {
     .replace(" PM", " pm");
   return `${day}, ${time}`;
 }
+
+// The instant at Pacific wall time `time` ("00:01"), `days` calendar days after the Pacific date of
+// `iso`, so a daylight saving change in between doesn't shift it.
+export function pacificDaysAfter(iso: string, days: number, time: string) {
+  const [year, month, day] = isoToPacificInput(iso).slice(0, 10).split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+  return pacificInputToIso(`${date}T${time}`);
+}
