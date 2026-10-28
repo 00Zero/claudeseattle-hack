@@ -4,6 +4,7 @@ import { audience, eventDate, eventCloseAt, eventName, eventOpenAt, ambassadors,
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/supabase/profile";
+import { pacificDaysAfter } from "@/lib/time";
 import { getEnabledCriteria } from "@/app/(judge)/_lib/criteria";
 import { countWord } from "@/app/(judge)/_lib/scoring";
 import { Agenda } from "@/components/home/agenda";
@@ -85,6 +86,13 @@ function Entries({ entries }: { entries: Entry[] }) {
   );
 }
 
+// The photos card comes down for everyone at 12:01 am Pacific, 8 days after the event ends
+// (Nov 2 for an Oct 25 event); uploading on /resources stays open.
+function photosCardOpen(eventEndsAt: string) {
+  const until = pacificDaysAfter(eventEndsAt, 8, "00:01");
+  return !until || Date.now() < Date.parse(until);
+}
+
 // One section per non-empty list.
 function Groups({ groups }: { groups: { id: string; call: string; title: string; entries: Entry[] }[] }) {
   return groups
@@ -136,6 +144,7 @@ export default async function Home() {
   const openAt = settings?.event_starts_at ?? eventOpenAt;
   const closeAt = settings?.event_ends_at ?? eventCloseAt;
   const lumaCalendarUrl = settings?.luma_calendar_url ?? defaultLumaUrl;
+  const showPhotosCard = photosCardOpen(closeAt);
   // Only whether Wi-Fi is set reaches the page; the values themselves load when someone clicks to reveal them.
   const hasWifi = Boolean(settings?.wifi_network && settings?.wifi_password);
   const venue = {
@@ -237,13 +246,15 @@ export default async function Home() {
         <div className="grid min-w-0 gap-3">
           <ContextWindow openAt={openAt} closeAt={closeAt} moments={moments} slots={slots} />
           {hasWifi && <Wifi openAt={openAt} closeAt={closeAt} />}
-          {/* Everyone sees it; signed out goes through sign-in first (/login?next=), and /resources checks approval. */}
-          <section aria-label="Share your photos and videos" className="snake-border grid gap-3 rounded-lg p-4 font-mono text-xs text-fg-muted">
-            <span className="text-[13px] text-fg">Share your photos/videos from the event</span>
-            <Link href={profile ? "/resources#upload-media" : "/login?next=/resources%23upload-media"} className="btn pulse-ring justify-self-start font-sans">
-              Upload media
-            </Link>
-          </section>
+          {/* Everyone sees it until the cutoff; signed out goes through sign-in first (/login?next=), and /resources checks approval. */}
+          {showPhotosCard && (
+            <section aria-label="Share your photos and videos" className="snake-border grid gap-3 rounded-lg p-4 font-mono text-xs text-fg-muted">
+              <span className="text-[13px] text-fg">Share your photos/videos from the event</span>
+              <Link href={profile ? "/resources#upload-media" : "/login?next=/resources%23upload-media"} className="btn pulse-ring justify-self-start font-sans">
+                Upload media
+              </Link>
+            </section>
+          )}
           {winners.length > 0 && <WinnersCard winners={winners} />}
         </div>
       </section>
