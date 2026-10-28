@@ -63,10 +63,6 @@ export default async function ResultsPage() {
             <span className="font-display text-2xl font-light">{prizes.everyone.replace("Every participant gets ", "").replace(".", "")}</span>
             <span className="eyebrow">Every participant</span>
           </div>
-          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2 rounded-lg bg-accent px-4 py-4 text-accent-fg">
-            <span className="font-display text-2xl font-light">{prizes.winnersValue}</span>
-            <span className="text-xs font-semibold uppercase tracking-[0.14em]">Winning team</span>
-          </div>
           {prizes.winners.map((prize) => (
             <div key={prize} className="flex flex-wrap items-baseline justify-between gap-2 border-t border-line py-4">
               <span className="font-display text-xl font-light">{prize}</span>
@@ -79,6 +75,10 @@ export default async function ResultsPage() {
               <span className="eyebrow">Top 3 teams</span>
             </div>
           ))}
+        </div>
+        <div className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg bg-accent px-4 py-4 text-accent-fg">
+          <span className="font-display text-2xl font-light">{prizes.winnersValue}</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.14em]">Winning team</span>
         </div>
       </section>
 
