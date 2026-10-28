@@ -301,10 +301,7 @@ export default async function Home() {
                 <span className="eyebrow sm:text-right">Top 3 teams</span>
               </div>
             ))}
-            <div className="grid items-baseline gap-4 rounded-lg bg-accent px-4 py-5 text-accent-fg sm:grid-cols-[1fr_auto]">
-              <span className="font-display text-3xl font-light leading-tight">{prizes.winnersValue}</span>
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] sm:text-right">Winning team</span>
-            </div>
+            <p className="rounded-lg bg-accent px-4 py-5 font-display text-3xl font-light leading-tight text-accent-fg">{prizes.winnersValue}</p>
           </div>
         </section>
 

@@ -76,10 +76,7 @@ export default async function ResultsPage() {
             </div>
           ))}
         </div>
-        <div className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg bg-accent px-4 py-4 text-accent-fg">
-          <span className="font-display text-2xl font-light">{prizes.winnersValue}</span>
-          <span className="text-xs font-semibold uppercase tracking-[0.14em]">Winning team</span>
-        </div>
+        <p className="rounded-lg bg-accent px-4 py-4 font-display text-2xl font-light text-accent-fg">{prizes.winnersValue}</p>
       </section>
 
       {entries.length > 0 && (
