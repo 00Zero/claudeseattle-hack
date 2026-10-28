@@ -112,7 +112,9 @@ async function ForBusinesses({ id }: { id: string }) {
             ))}
           </ul>
           <p className="text-sm text-fg-muted">
-            Summary by Claude from the team&apos;s submission and README. <Link href="/small-businesses">Find more free AI tools for your business →</Link>
+            Summary by Claude from the team&apos;s submission and README. <Link href="/small-businesses" className="underline">
+              Find more free AI tools for your business →
+            </Link>
           </p>
         </>
       )}
