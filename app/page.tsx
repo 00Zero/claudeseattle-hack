@@ -289,6 +289,10 @@ export default async function Home() {
               <span className="font-display text-4xl font-light leading-tight">{prizes.everyone.replace("Every participant gets ", "").replace(".", "")}</span>
               <span className="eyebrow text-fg sm:text-right">Every participant</span>
             </div>
+            <div className="grid items-baseline gap-4 rounded-lg bg-accent px-4 py-5 text-accent-fg sm:grid-cols-[1fr_auto]">
+              <span className="font-display text-3xl font-light leading-tight">{prizes.winnersValue}</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] sm:text-right">Winning team</span>
+            </div>
             {prizes.winners.map((prize) => (
               <div key={prize} className="grid items-baseline gap-4 border-t border-line py-4 last:border-b sm:grid-cols-[1fr_auto]">
                 <span className="font-display text-2xl font-light leading-snug">{prize}</span>
@@ -301,7 +305,6 @@ export default async function Home() {
                 <span className="eyebrow sm:text-right">Top 3 teams</span>
               </div>
             ))}
-            <p className="text-sm text-fg-muted">{prizes.winnersValue}</p>
           </div>
         </section>
 
