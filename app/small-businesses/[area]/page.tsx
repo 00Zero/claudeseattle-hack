@@ -61,14 +61,16 @@ export default async function AreaPage({ params }: PageProps<"/small-businesses/
 
       <section className="space-y-3">
         <p>
-          <Link href="/small-businesses#find">Describe your business and find the tools that fit →</Link>
+          <Link href="/small-businesses#find" className="underline">Describe your business and find the tools that fit →</Link>
         </p>
         <p className="max-w-[65ch] text-fg-muted">
           Other areas:{" "}
           {AREAS.filter((other) => other !== area).map((other, i) => (
             <span key={other}>
               {i > 0 && " · "}
-              <Link href={`/small-businesses/${areaSlug(other)}`}>{other}</Link>
+              <Link href={`/small-businesses/${areaSlug(other)}`} className="underline">
+                {other}
+              </Link>
             </span>
           ))}
         </p>

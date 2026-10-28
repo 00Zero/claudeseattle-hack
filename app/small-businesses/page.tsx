@@ -48,6 +48,7 @@ function questions(lumaUrl: string): Question[] {
     {
       q: "Which tool should I start with?",
       a: "Use the finder on this page: describe your business and the challenges you want help with, and Claude suggests the tools that fit best, with the reason for each. Or browse the tools by area.",
+      link: { text: "the finder on this page", href: "#find" },
     },
     {
       q: "Who built these tools?",
@@ -72,7 +73,7 @@ function Answer({ a, link }: Question) {
   return (
     <>
       {before}
-      <a href={link.href} {...(external && { target: "_blank", rel: "noopener noreferrer" })}>
+      <a href={link.href} className="underline" {...(external && { target: "_blank", rel: "noopener noreferrer" })}>
         {link.text}
       </a>
       {after}
@@ -114,6 +115,13 @@ export default async function SmallBusinessesPage() {
           </div>
         ))}
       </dl>
+      {isPast && (
+        <p className="pt-2">
+          <a href="#find" className="btn">
+            Find tools for my business ↑
+          </a>
+        </p>
+      )}
     </section>
   );
 
@@ -134,7 +142,9 @@ export default async function SmallBusinessesPage() {
           </a>
         </div>
         <p className="text-sm text-fg-muted">
-          <a href="#questions">Questions: Is it free? Do I need a developer? ↓</a>
+          <a href="#questions" className="underline">
+            Questions? (Is it free? Do I need a developer?) ↓
+          </a>
         </p>
       </PageHeader>
 
@@ -157,7 +167,7 @@ export default async function SmallBusinessesPage() {
             <Sig call="Read(projects.md)" title="Every tool" />
             <p className="max-w-[60ch] text-fg-muted">
               Every hackathon project is also copied into one GitHub repo, so you can browse or download them all in one place:{" "}
-              <a href={showcaseRepoUrl} target="_blank" rel="noopener noreferrer">
+              <a href={showcaseRepoUrl} target="_blank" rel="noopener noreferrer" className="underline">
                 the project showcase ↗
               </a>
               .
@@ -171,7 +181,9 @@ export default async function SmallBusinessesPage() {
               {AREAS.map((area, i) => (
                 <span key={area}>
                   {i > 0 && " · "}
-                  <Link href={`/small-businesses/${areaSlug(area)}`}>{area}</Link>
+                  <Link href={`/small-businesses/${areaSlug(area)}`} className="underline">
+                    {area}
+                  </Link>
                 </span>
               ))}
             </p>
