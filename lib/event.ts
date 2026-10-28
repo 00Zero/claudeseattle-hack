@@ -44,8 +44,8 @@ export const sponsors: Entry[] = [
   { name: "Wispr Flow", logo: "/partners/wispr-flow.svg", description: "Free months of Wispr Flow Pro: AI voice dictation that works in every app.", website: "https://wisprflow.ai" },
 ];
 export const partners: Entry[] = [
+  { name: "WTIA", logo: "/partners/wtia.png", description: "The Washington Technology Industry Association connects the state's tech companies at every stage to community, capital, and influence.", website: "https://www.washingtontechnology.org" },
   { name: "thinkspace", logo: "/partners/thinkspace.svg", description: "Our venue: offices, coworking, and a startup community in South Lake Union.", website: "https://thinkspace.com" },
-  { name: "WTIA", logo: "/partners/wtia.png", description: "Washington Technology Industry Association. A one-year membership for the winners and Seattle AI Week tickets for the top three.", website: "https://www.washingtontechnology.org" },
 ];
 export const ambassadors: Entry[] = [];
 
