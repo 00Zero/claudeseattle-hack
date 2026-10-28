@@ -1,9 +1,10 @@
 import type { MetadataRoute } from "next";
 import { siteUrl } from "@/lib/site";
 
-// Search engines and AI crawlers get the public pages only: home, /results, /small-businesses, and
-// each /entries/[id]. Sign-in, event-day tools, judging, and admin are off limits. Pages also
-// default to noindex (app/layout.tsx), so a new route stays out of search until it opts in.
+// Search engines and AI crawlers get the public pages only: home, /results, /small-businesses and
+// its area pages, each /entries/[id], and /llms.txt. Sign-in, event-day tools, judging, and admin
+// are off limits. Pages also default to noindex (app/layout.tsx), so a new route stays out of
+// search until it opts in.
 const privatePaths = [
   "/admin",
   "/api",
