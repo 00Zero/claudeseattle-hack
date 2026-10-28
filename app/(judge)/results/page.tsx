@@ -76,7 +76,7 @@ export default async function ResultsPage() {
             </div>
           ))}
         </div>
-        <p className="rounded-lg bg-accent px-4 py-4 font-display text-2xl font-light text-accent-fg">{prizes.winnersValue}</p>
+        <p className="rounded-lg bg-accent px-4 py-4 text-center font-display text-2xl font-light text-accent-fg">{prizes.winnersValue}</p>
       </section>
 
       {entries.length > 0 && (
