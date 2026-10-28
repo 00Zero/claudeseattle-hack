@@ -58,13 +58,14 @@ export function ScoreForm({
         <fieldset key={criterion.key} className="space-y-2">
           <legend className="font-display text-xl font-light">{criterion.name}</legend>
           {criterion.note && <p className="text-sm text-fg-muted">{criterion.note}</p>}
-          <div className="grid grid-cols-8 gap-1">
+          {/* Hover clears when the mouse leaves the whole row, not each box, so crossing the gap
+              between two scores doesn't flash "Lowest score … Highest score". */}
+          <div className="grid grid-cols-8 gap-1" onPointerLeave={(event) => event.pointerType === "mouse" && hover(i, null)}>
             {VALUES.map((v) => (
               <label
                 key={v}
                 className="relative"
                 onPointerEnter={(event) => event.pointerType === "mouse" && hover(i, v)}
-                onPointerLeave={(event) => event.pointerType === "mouse" && hover(i, null)}
               >
                 <input
                   type="radio"
