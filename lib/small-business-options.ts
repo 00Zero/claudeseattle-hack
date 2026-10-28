@@ -27,6 +27,10 @@ export const AREAS = [
   "Insights & strategy",
 ] as const;
 
+// Each area's page, /small-businesses/<slug>: "Finance & bookkeeping" -> "finance-bookkeeping".
+export const areaSlug = (area: string) => area.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+export const areaFromSlug = (slug: string) => AREAS.find((area) => areaSlug(area) === slug) ?? null;
+
 export const SETUPS = ["No code", "Some technical help", "Needs a developer"] as const;
 
 export const TEAM_SIZES = ["Just me", "2–5", "6–20", "21–50", "51 or more"] as const;

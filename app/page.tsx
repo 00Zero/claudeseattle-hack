@@ -5,7 +5,8 @@ import { audience, eventDate, eventCloseAt, eventName, eventOpenAt, ambassadors,
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/supabase/profile";
-import { indexed } from "@/lib/site";
+import { indexed, siteUrl } from "@/lib/site";
+import { JsonLd, organizer } from "@/components/site/json-ld";
 import { pacificDaysAfter } from "@/lib/time";
 import { getEnabledCriteria } from "@/app/(judge)/_lib/criteria";
 import { countWord } from "@/app/(judge)/_lib/scoring";
@@ -173,6 +174,22 @@ export default async function Home() {
 
   return (
     <div>
+      {/* The event for search engines and AI answers. */}
+      <JsonLd
+        data={{
+          "@type": "Event",
+          name: eventName,
+          description: theme,
+          startDate: openAt,
+          endDate: closeAt,
+          eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+          eventStatus: "https://schema.org/EventScheduled",
+          location: { "@type": "Place", name: venue.name, address: venue.address, geo: { "@type": "GeoCoordinates", latitude: venue.lat, longitude: venue.lon } },
+          organizer: { ...organizer, sameAs: [lumaCalendarUrl] },
+          image: `${siteUrl}/opengraph-image.png`,
+          url: siteUrl,
+        }}
+      />
       {/* Hero */}
       <section className="grid items-start gap-8 pb-8 pt-4 md:grid-cols-[1.15fr_0.85fr]">
         <div>

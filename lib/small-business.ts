@@ -232,6 +232,12 @@ export async function getProjects(): Promise<Project[]> {
   return entries.map(({ entry, place }, i) => toProject(entry, place, summaries[i]));
 }
 
+// One project with its summary, for its entry page. Null when the entry isn't public.
+export async function getProject(id: string): Promise<Project | null> {
+  const found = (await publicEntries()).find(({ entry }) => entry.id === id);
+  return found ? toProject(found.entry, found.place, await summarize(found.entry)) : null;
+}
+
 // The browse list, streamed: every project right away without its summary (base), plus a promise of
 // it with the summary (full), so a card fills in as soon as its own summary is ready. Summaries are
 // started in list order, so the winners come first. summarize() never rejects.
