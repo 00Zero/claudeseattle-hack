@@ -301,7 +301,7 @@ export default async function Home() {
                 <span className="eyebrow sm:text-right">Top 3 teams</span>
               </div>
             ))}
-            <p className="text-sm text-fg-muted">{prizes.winnersValue}</p>
+            <p className="rounded-lg bg-accent px-4 py-5 text-center font-display text-3xl font-light leading-tight text-accent-fg">{prizes.winnersValue}</p>
           </div>
         </section>
 
