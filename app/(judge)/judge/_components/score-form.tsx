@@ -7,8 +7,19 @@ import type { ScoreState } from "../actions";
 const idle: ScoreState = { status: "idle" };
 const VALUES = Array.from({ length: SCORE_MAX - SCORE_MIN + 1 }, (_, i) => SCORE_MIN + i);
 
+// Each anchor pair has a colour, low to high: red 1–2, orange 3–4, yellow 5–6, green 7–8. The
+// border shows the band; the chosen score fills with it.
+const BANDS = [
+  "border-red-500 peer-checked:bg-red-500 peer-checked:text-white",
+  "border-orange-500 peer-checked:bg-orange-500 peer-checked:text-white",
+  "border-yellow-500 peer-checked:bg-yellow-400 peer-checked:text-black",
+  "border-green-600 peer-checked:bg-green-600 peer-checked:text-white",
+];
+const band = (v: number) => BANDS[Math.min(BANDS.length - 1, Math.floor((v - SCORE_MIN) / 2))];
+
 // The enabled criteria, each 1–8 with no middle, plus an optional comment. Built for a phone:
-// big tap targets, the anchor for the chosen score shown under each row, the mean at the bottom.
+// big tap targets coloured red to green, the anchor for the chosen score shown under each row,
+// the mean at the bottom.
 // `initial` is my saved score by criterion key; criteria it doesn't cover start empty.
 export function ScoreForm({
   action,
@@ -47,6 +58,10 @@ export function ScoreForm({
           The criteria changed since you saved this score. Score every criterion below and save again.
         </p>
       )}
+      <p className="flex justify-between font-mono text-xs text-fg-muted" aria-hidden="true">
+        <span>Lowest score</span>
+        <span>Highest score</span>
+      </p>
       {criteria.map((criterion, i) => (
         <fieldset key={criterion.key} className="space-y-2">
           <legend className="font-display text-xl font-light">{criterion.name}</legend>
@@ -63,14 +78,16 @@ export function ScoreForm({
                   className="peer sr-only"
                   required
                 />
-                <span className="flex h-11 items-center justify-center rounded border border-line-strong text-base font-mono transition-colors hover:border-accent peer-checked:border-accent peer-checked:bg-accent peer-checked:text-accent-fg peer-focus-visible:ring-2">
+                <span
+                  className={`flex h-11 items-center justify-center rounded border-2 text-base font-mono transition-colors hover:bg-fg/5 peer-focus-visible:ring-2 ${band(v)}`}
+                >
                   {v}
                 </span>
               </label>
             ))}
           </div>
           <p className="min-h-5 text-sm text-fg-muted">
-            {scores[i] !== null ? anchorFor(criterion, scores[i]!) : "Low end of a pair = weaker, high end = stronger."}
+            {scores[i] !== null ? anchorFor(criterion, scores[i]!) : ""}
           </p>
         </fieldset>
       ))}
