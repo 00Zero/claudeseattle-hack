@@ -5,14 +5,14 @@ import { PresentButton } from "@/components/site/present-button";
 import { ThinkingDots } from "@/components/site/thinking-dots";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
-const pages = [
-  { href: "/teams", label: "teams" },
-  { href: "/submit", label: "submit" },
-  { href: "/profile", label: "profile" },
-];
+const pages = [{ href: "/teams", label: "teams" }];
 
 // Signed-in people only; /resources itself checks approval.
-const signedInPages = [{ href: "/resources", label: "resources" }];
+const signedInPages = [
+  { href: "/submit", label: "submit" },
+  { href: "/profile", label: "profile" },
+  { href: "/resources", label: "resources" },
+];
 
 // Judges and admins: where they score. /judge itself checks the role.
 const judgePages = [{ href: "/judge", label: "judge" }];

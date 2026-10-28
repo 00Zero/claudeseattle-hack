@@ -1,8 +1,12 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { formatPacific } from "@/lib/time";
 import { EntryGrid, type EntryCard } from "../_components/entry-grid";
 import { PageHeader } from "../_components/ui";
 import { getSubmissionDeadline } from "../submit/_lib/entry";
+
+// Not indexed: /results lists the same entries.
+export const metadata: Metadata = { title: "Every entry" };
 
 // /entries: public list of submitted entries, readable without login once submissions close
 // (public_judge_entries returns nothing before then).
