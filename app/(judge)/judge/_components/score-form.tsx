@@ -8,9 +8,10 @@ const idle: ScoreState = { status: "idle" };
 const VALUES = Array.from({ length: SCORE_MAX - SCORE_MIN + 1 }, (_, i) => SCORE_MIN + i);
 
 // The enabled criteria, each 1–8 with no middle, plus an optional comment. Built for a phone:
-// big tap targets, the anchor for the chosen score shown under each row, the mean at the bottom.
-// The boxes stay one neutral style on purpose: colouring them by score (red to green) would cue
-// judges toward the green end (decided Oct 27).
+// big tap targets and the mean at the bottom. Under each row: "Lowest score … Highest score" until a
+// score is picked, the anchor for a score while the mouse is over it, and the chosen score's anchor
+// after that. The boxes stay one neutral style on purpose: colouring them by score (red to green)
+// would cue judges toward the green end (decided Oct 27).
 // `initial` is my saved score by criterion key; criteria it doesn't cover start empty.
 export function ScoreForm({
   action,
@@ -27,6 +28,10 @@ export function ScoreForm({
 }) {
   const [state, formAction, pending] = useActionState(action, idle);
   const [scores, setScores] = useState<(number | null)[]>(criteria.map((c) => initial?.byKey[c.key] ?? null));
+  // The score under the mouse per criterion, for its anchor. Mouse only: a tap picks the score anyway.
+  const [hovered, setHovered] = useState<(number | null)[]>(criteria.map(() => null));
+  const hover = (i: number, v: number | null) => setHovered((h) => h.map((x, j) => (j === i ? v : x)));
+  const shown = (i: number) => hovered[i] ?? scores[i];
   const complete = scores.every((s) => s !== null);
   const avg = complete ? mean(scores as number[]) : null;
   // My saved score used other criteria (the rubric changed in the test world): say so.
@@ -49,17 +54,18 @@ export function ScoreForm({
           The criteria changed since you saved this score. Score every criterion below and save again.
         </p>
       )}
-      <p className="flex justify-between font-mono text-xs text-fg-muted" aria-hidden="true">
-        <span>Lowest score</span>
-        <span>Highest score</span>
-      </p>
       {criteria.map((criterion, i) => (
         <fieldset key={criterion.key} className="space-y-2">
           <legend className="font-display text-xl font-light">{criterion.name}</legend>
           {criterion.note && <p className="text-sm text-fg-muted">{criterion.note}</p>}
           <div className="grid grid-cols-8 gap-1">
             {VALUES.map((v) => (
-              <label key={v} className="relative">
+              <label
+                key={v}
+                className="relative"
+                onPointerEnter={(event) => event.pointerType === "mouse" && hover(i, v)}
+                onPointerLeave={(event) => event.pointerType === "mouse" && hover(i, null)}
+              >
                 <input
                   type="radio"
                   name={fieldName(criterion)}
@@ -75,9 +81,14 @@ export function ScoreForm({
               </label>
             ))}
           </div>
-          <p className="min-h-5 text-sm text-fg-muted">
-            {scores[i] !== null ? anchorFor(criterion, scores[i]!) : ""}
-          </p>
+          {shown(i) !== null ? (
+            <p className="min-h-5 text-sm text-fg-muted">{anchorFor(criterion, shown(i)!)}</p>
+          ) : (
+            <p className="flex min-h-5 justify-between font-mono text-xs text-fg-muted">
+              <span>Lowest score</span>
+              <span>Highest score</span>
+            </p>
+          )}
         </fieldset>
       ))}
 
