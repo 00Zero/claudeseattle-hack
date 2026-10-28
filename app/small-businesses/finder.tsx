@@ -31,7 +31,7 @@ const EMPTY: BusinessInput = { name: "", email: "", website: "", industry: "", s
 
 // Hints under a field's label; fields without one show just the label.
 const HINTS: Partial<Record<keyof BusinessInput, string>> = {
-  email: "So we can follow up about the projects. Needed if you search more than once.",
+  email: "So we can follow up about the tools. Needed if you search more than once.",
   about: "What you sell or do, who your customers are, and how they find you and buy from you.",
   challenges: "What eats your time, what you keep putting off, where you lose customers or money.",
   opportunities: "Anything you've wondered about, tried, or worried about with AI. It's fine to say you don't know yet.",
@@ -212,7 +212,7 @@ export function Finder() {
             else match(questions, answers());
           }}
         >
-          <p>To keep searching, tell us how to reach you. We&apos;ll only use it to follow up about the projects.</p>
+          <p>To keep searching, tell us how to reach you. We&apos;ll only use it to follow up about the tools.</p>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <label htmlFor="sb-gate-email" className="block font-medium">
@@ -300,7 +300,7 @@ export function Finder() {
           ))}
           <div className="flex flex-wrap gap-3">
             <button type="submit" className="btn" disabled={pending}>
-              {pending ? "Finding projects…" : "Show my matches"}
+              {pending ? "Finding tools…" : "Show my matches"}
             </button>
             <button type="button" className="btn btn-ghost" onClick={() => go("challenges")} disabled={pending}>
               Back
@@ -312,10 +312,10 @@ export function Finder() {
       {step === "results" && matches && (
         <div className="space-y-5">
           {matches.length === 0 ? (
-            <p>None of the projects is a close fit for what you described. Claude for Small Business below may still help, or browse every project further down.</p>
+            <p>None of the tools is a close fit for what you described. Claude for Small Business below may still help, or browse every tool further down.</p>
           ) : (
             <p className="text-fg-muted">
-              {matches.length === 1 ? "This is" : `These ${matches.length} are`} the best fit for what you told us, best first. Every hackathon project is free and open source: the
+              {matches.length === 1 ? "This is" : `These ${matches.length} are`} the best fit for what you told us, best first. Every tool is free and open source: the
               GitHub repo has the code and setup instructions, and the submission page has a demo video.
             </p>
           )}

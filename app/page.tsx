@@ -1,9 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { audience, eventDate, eventCloseAt, eventName, eventOpenAt, ambassadors, hosts, judges, lumaCalendarUrl as defaultLumaUrl, openSourceNote, partners, prizes, sponsors, rubric, sundaySchedule, saturdaySchedule, theme, venue as defaultVenue, type Entry } from "@/lib/event";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/supabase/profile";
+import { indexed } from "@/lib/site";
 import { pacificDaysAfter } from "@/lib/time";
 import { getEnabledCriteria } from "@/app/(judge)/_lib/criteria";
 import { countWord } from "@/app/(judge)/_lib/scoring";
@@ -104,6 +106,8 @@ function Groups({ groups }: { groups: { id: string; call: string; title: string;
       </section>
     ));
 }
+
+export const metadata: Metadata = { robots: indexed, alternates: { canonical: "/" } };
 
 const PLACES = ["1st place", "2nd place", "3rd place"];
 

@@ -1,8 +1,17 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { eventName, prizes } from "@/lib/event";
+import { indexed } from "@/lib/site";
 import { EntryGrid, type EntryCard } from "../_components/entry-grid";
 import { PageHeader, Sig } from "../_components/ui";
+
+export const metadata: Metadata = {
+  title: "Winners and every project",
+  description: `The winners of the ${eventName} in Seattle and every project, each free and open source on GitHub.`,
+  robots: indexed,
+  alternates: { canonical: "/results" },
+};
 
 // /results: public. Shows only what event_settings allows: finalists once "publish finalists"
 // is on, places once "publish winners" is on. Never scores (public_judge_results has none).

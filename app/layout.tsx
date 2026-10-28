@@ -3,6 +3,8 @@ import { Geist, Geist_Mono, Newsreader } from "next/font/google";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { FEEDBACK_MAX_LENGTH, getFeedbackSender } from "@/lib/feedback";
 import { getLiveBanners } from "@/lib/banners";
+import { eventName } from "@/lib/event";
+import { siteName, siteUrl } from "@/lib/site";
 import { FeedbackButton } from "@/components/site/feedback-button";
 import { SiteBanners } from "@/components/site/site-banners";
 import { TestAccountBanner } from "@/components/site/test-account-banner";
@@ -30,18 +32,19 @@ const newsreader = Newsreader({
   display: "swap",
 });
 
+const description =
+  "Free, open-source AI tools, workflows, and playbooks for small businesses, built with Claude at a one-day hackathon in Seattle. See the winners and every project.";
+
 export const metadata: Metadata = {
-  title: "Claude Impact Lab Hackathon",
-  description: "Teams, submissions, and judging for the Claude Impact Lab Hackathon in Seattle.",
+  metadataBase: new URL(siteUrl),
+  title: { default: `${eventName} · Seattle`, template: `%s · ${eventName}` },
+  description,
+  // Out of search engines and AI crawlers unless a page opts in with `indexed` (lib/site.ts);
+  // app/robots.ts also keeps crawlers off the private sections.
+  robots: { index: false },
   // Link previews. The image is app/opengraph-image.png (the home page's pixel skyline at dusk under
-  // a neon sign); Next resolves its URL against the Vercel production domain (or the preview's own
-  // URL on a preview deploy).
-  openGraph: {
-    type: "website",
-    siteName: "Claude Community Seattle",
-    title: "Claude Impact Lab Hackathon",
-    description: "Free, open-source AI tools, workflows, and playbooks for small businesses, built with Claude in Seattle.",
-  },
+  // a neon sign).
+  openGraph: { type: "website", siteName, title: eventName, description },
   twitter: { card: "summary_large_image" },
 };
 
