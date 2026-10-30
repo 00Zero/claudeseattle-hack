@@ -19,6 +19,7 @@ export async function GET() {
     "",
     `- [Find tools for your business](${siteUrl}/small-businesses): describe your business and Claude suggests the tools that fit, or browse them all`,
     `- [Winners and every project](${siteUrl}/results)`,
+    `- [Event gallery](${siteUrl}/gallery): photos and videos from the hackathon`,
     ...AREAS.map((area) => `- [Tools for ${area.charAt(0).toLowerCase()}${area.slice(1)}](${siteUrl}/small-businesses/${areaSlug(area)})`),
     "",
     "## Tools",

@@ -46,3 +46,16 @@ export async function checkDriveUpload(fileId: string) {
 export async function trashDriveUpload(fileId: string) {
   await callScript<{ ok: true }>({ action: "trash", fileId });
 }
+
+// Makes one file viewable by anyone with its link (for /gallery), or private again; throws if it
+// isn't in the media folder.
+export async function shareDriveUpload(fileId: string, shared: boolean) {
+  await callScript<{ ok: true }>({ action: "share", fileId, shared });
+}
+
+// Drive's small preview of a file in the media folder (about 220 px), or null while Drive is still
+// making one (new videos).
+export async function driveThumbnail(fileId: string) {
+  const { mimeType, data } = await callScript<{ mimeType: string | null; data: string | null }>({ action: "thumbnail", fileId });
+  return mimeType && data ? { mimeType, bytes: Buffer.from(data, "base64") } : null;
+}
