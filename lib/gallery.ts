@@ -16,6 +16,9 @@ export type GalleryItem = {
   drive_file_id: string | null;
 };
 
+// The public_gallery columns the page reads, in GalleryItem's shape.
+export const GALLERY_COLUMNS = "id, highlighted, caption, credit, kind, thumbnail_url, image_url, link_url, drive_file_id";
+
 // width in CSS pixels; Drive converts .heic and other photo formats to JPEG for these.
 export function driveImage(fileId: string, width: number) {
   return `https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w${width}`;

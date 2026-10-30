@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { PageHeader } from "@/app/(judge)/_components/ui";
 import { eventName } from "@/lib/event";
-import { driveImage, type GalleryItem } from "@/lib/gallery";
+import { driveImage, GALLERY_COLUMNS, type GalleryItem } from "@/lib/gallery";
 import { indexed } from "@/lib/site";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { createClient } from "@/lib/supabase/server";
@@ -13,7 +13,7 @@ async function getItems() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("public_gallery")
-    .select("id, highlighted, caption, credit, kind, thumbnail_url, image_url, link_url, drive_file_id")
+    .select(GALLERY_COLUMNS)
     .order("position")
     .order("id");
   if (error) throw new Error(error.message);

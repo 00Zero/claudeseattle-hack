@@ -33,15 +33,7 @@ export function Gallery({ items, uploadHref }: { items: GalleryItem[]; uploadHre
   // The viewer steps through uploads in page order: videos, then audience photos.
   const viewable = sections.flatMap((s) => s.items).filter((i) => i.kind !== "external" && i.drive_file_id);
   const highlights = items.filter((i) => i.highlighted);
-  const [open, setOpen] = useState<number | null>(null);
-  const [leaving, setLeaving] = useState<GalleryItem | null>(null);
-
-  function onClick(event: React.MouseEvent, item: GalleryItem) {
-    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    event.preventDefault();
-    if (item.kind === "external") setLeaving(item);
-    else setOpen(viewable.indexOf(item));
-  }
+  const [onClick, overlays] = useOpeners(viewable);
 
   return (
     <>
@@ -75,10 +67,43 @@ export function Gallery({ items, uploadHref }: { items: GalleryItem[]; uploadHre
           );
         })}
       </div>
+      {overlays}
+    </>
+  );
+}
+
+// The carousel on its own (the home page, after the event). Clicks do what they do on /gallery;
+// the viewer steps through the highlighted uploads.
+export function Highlights({ items }: { items: GalleryItem[] }) {
+  const [onClick, overlays] = useOpeners(items.filter((i) => i.kind !== "external" && i.drive_file_id));
+  return (
+    <>
+      <Carousel items={items} onClick={onClick} />
+      {overlays}
+    </>
+  );
+}
+
+// What a click on a tile or slide does: an upload opens the viewer (stepping through `viewable`), a
+// photographer's photo plays the hand-off. Modified clicks fall through to the link.
+function useOpeners(viewable: GalleryItem[]) {
+  const [open, setOpen] = useState<number | null>(null);
+  const [leaving, setLeaving] = useState<GalleryItem | null>(null);
+
+  function onClick(event: React.MouseEvent, item: GalleryItem) {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    if (item.kind === "external") setLeaving(item);
+    else setOpen(viewable.indexOf(item));
+  }
+
+  const overlays = (
+    <>
       {open !== null && viewable[open] && <Viewer items={viewable} index={open} onIndex={setOpen} onClose={() => setOpen(null)} />}
       {leaving && <Handoff item={leaving} onClose={() => setLeaving(null)} />}
     </>
   );
+  return [onClick, overlays] as const;
 }
 
 // To the photo and video uploader on /resources (approved attendees; sign-in first if needed).
