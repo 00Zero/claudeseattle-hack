@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { PageHeader } from "@/app/(judge)/_components/ui";
 import { eventName } from "@/lib/event";
 import { driveImage, type GalleryItem } from "@/lib/gallery";
 import { indexed } from "@/lib/site";
+import { getCurrentProfile } from "@/lib/supabase/profile";
 import { createClient } from "@/lib/supabase/server";
-import { Gallery } from "./gallery";
+import { Gallery, UploadButton } from "./gallery";
 
 const description = `Photos and videos from ${eventName} in Seattle: recap videos, photos from the audience, and the event photographers' shots.`;
 
@@ -37,7 +37,9 @@ export async function generateMetadata(): Promise<Metadata> {
 // (uploaded on /resources), as arranged on /admin/gallery. Hidden items and deleted uploads never
 // reach the page.
 export default async function GalleryPage() {
-  const items = await getItems();
+  const [items, profile] = await Promise.all([getItems(), getCurrentProfile().catch(() => null)]);
+  // Uploading needs an approved sign-in, which /resources checks; signed-out visitors sign in first.
+  const uploadHref = profile ? "/resources#upload-media" : "/login?next=/resources%23upload-media";
   return (
     <div className="space-y-10">
       <PageHeader eyebrow="Claude Impact Lab · Seattle" title="Event" italic="gallery">
@@ -47,11 +49,12 @@ export default async function GalleryPage() {
         </p>
       </PageHeader>
       {items.length === 0 ? (
-        <p className="text-fg-muted">
-          Photos are on their way. Were you there? Upload yours on <Link href="/resources#upload-media">/resources</Link>.
-        </p>
+        <div className="space-y-3">
+          <p className="text-fg-muted">Photos are on their way. Were you there? Add yours.</p>
+          <UploadButton href={uploadHref} />
+        </div>
       ) : (
-        <Gallery items={items} />
+        <Gallery items={items} uploadHref={uploadHref} />
       )}
     </div>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   driveDownload,
@@ -24,9 +25,11 @@ const ALT = "Claude Impact Lab hackathon, Seattle";
 // The carousel of highlights, then the sections: videos (medium 16:9 tiles), each photographer's
 // photos and audience photos (small square tiles). Clicking a photo or video opens the viewer; a
 // photographer's photo plays the hand-off and opens it on their site in a new tab. Each tile is a
-// real link, so a middle-click or a new tab works too.
-export function Gallery({ items }: { items: GalleryItem[] }) {
+// real link, so a middle-click or a new tab works too. Audience photos always show, with an upload
+// button (uploadHref: the uploader on /resources, through /login when signed out).
+export function Gallery({ items, uploadHref }: { items: GalleryItem[]; uploadHref: string }) {
   const sections = gallerySections(items);
+  if (!sections.some((s) => s.key === "photo")) sections.push({ key: "photo", title: "Audience photos", credit: null, items: [] });
   // The viewer steps through uploads in page order: videos, then audience photos.
   const viewable = sections.flatMap((s) => s.items).filter((i) => i.kind !== "external" && i.drive_file_id);
   const highlights = items.filter((i) => i.highlighted);
@@ -48,21 +51,26 @@ export function Gallery({ items }: { items: GalleryItem[] }) {
           const home = section.credit ? galleryHome(section.items[0].link_url) : null;
           return (
             <section key={section.key} className="space-y-3">
-              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
                 <h2 className="font-display text-3xl font-light">{section.title}</h2>
                 {home && (
                   <a href={home} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm">
                     Download them all at {host(home)} <NewTabIcon className="h-3.5 w-3.5" />
                   </a>
                 )}
+                {section.key === "photo" && <UploadButton href={uploadHref} />}
               </div>
-              <ul className={`grid gap-2 ${section.key === "video" ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-2 sm:grid-cols-3 md:grid-cols-4"}`}>
-                {section.items.map((item) => (
-                  <li key={item.id}>
-                    <Tile item={item} onClick={(e) => onClick(e, item)} />
-                  </li>
-                ))}
-              </ul>
+              {section.items.length === 0 ? (
+                <p className="text-fg-muted">No audience photos yet. Were you there? Add yours.</p>
+              ) : (
+                <ul className={`grid gap-2 ${section.key === "video" ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-2 sm:grid-cols-3 md:grid-cols-4"}`}>
+                  {section.items.map((item) => (
+                    <li key={item.id}>
+                      <Tile item={item} onClick={(e) => onClick(e, item)} />
+                    </li>
+                  ))}
+                </ul>
+              )}
             </section>
           );
         })}
@@ -70,6 +78,18 @@ export function Gallery({ items }: { items: GalleryItem[] }) {
       {open !== null && viewable[open] && <Viewer items={viewable} index={open} onIndex={setOpen} onClose={() => setOpen(null)} />}
       {leaving && <Handoff item={leaving} onClose={() => setLeaving(null)} />}
     </>
+  );
+}
+
+// To the photo and video uploader on /resources (approved attendees; sign-in first if needed).
+export function UploadButton({ href }: { href: string }) {
+  return (
+    <Link href={href} prefetch={false} className="btn">
+      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M12 16V4M6 10l6-6 6 6M4 20h16" />
+      </svg>
+      Upload your photos and videos
+    </Link>
   );
 }
 
