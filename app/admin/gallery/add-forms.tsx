@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import { addPhotographer, addUploads, type FormState } from "./actions";
 
-export type PickableUpload = { id: string; kind: "photo" | "video"; thumb: string; who: string; when: string };
+export type PickableUpload = { id: string; kind: "photo" | "video"; thumb: string; view: string; who: string; when: string };
 
 const input = "w-full rounded border border-foreground/20 bg-transparent px-2 py-1 text-sm";
 const button = "rounded border border-foreground/20 px-3 py-1 text-sm hover:bg-foreground/5 disabled:cursor-wait disabled:opacity-40";
@@ -26,6 +26,20 @@ function Message({ state }: { state: FormState }) {
     <p role="status" className={`text-sm ${state.ok ? "text-evergreen" : "text-red-600"}`}>
       {state.message}
     </p>
+  );
+}
+
+// Opens an item in a new tab: uploads in Drive (for accounts that can see the folder), a
+// photographer's photo on their site.
+export function openItem(href: string) {
+  window.open(href, "_blank", "noreferrer");
+}
+
+export function ViewLink({ href }: { href: string }) {
+  return (
+    <a href={href} target="_blank" rel="noreferrer" draggable={false} className="absolute right-1 top-1 rounded bg-black/60 px-1 text-[10px] text-white no-underline hover:bg-black/80">
+      View
+    </a>
   );
 }
 
@@ -69,9 +83,10 @@ export function UploadPicker({ uploads }: { uploads: PickableUpload[] }) {
         {uploads.map((u) => (
           <li key={u.id}>
             <label className={`block cursor-pointer overflow-hidden rounded border-2 ${checked.has(u.id) ? "border-accent" : "border-transparent"}`}>
-              <span className="relative block aspect-square bg-foreground/5">
+              <span className="relative block aspect-square bg-foreground/5" onDoubleClick={() => openItem(u.view)}>
                 <Preview src={u.thumb} kind={u.kind} />
                 <input type="checkbox" name="upload" value={u.id} checked={checked.has(u.id)} onChange={() => toggle(u.id)} className="absolute left-1.5 top-1.5 h-4 w-4" />
+                <ViewLink href={u.view} />
                 {u.kind === "video" && <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1 text-[10px] text-white">▶ video</span>}
               </span>
               <span className="block truncate px-1 pt-1 text-xs" title={u.who}>

@@ -5,7 +5,7 @@ import { gallerySections } from "@/lib/gallery";
 import { ConfirmButton } from "../email/confirm-button";
 import { SubmitButton } from "../submit-button";
 import { removeItem, saveOrder, setHighlighted, setVisible, updateItem } from "./actions";
-import { Preview } from "./add-forms";
+import { openItem, Preview, ViewLink } from "./add-forms";
 
 export type ArrangedItem = {
   id: string;
@@ -18,6 +18,7 @@ export type ArrangedItem = {
   thumbnail_url: string | null;
   image_url: string | null;
   thumb: string;
+  view: string;
   who: string;
   deleted: boolean;
 };
@@ -34,7 +35,8 @@ function move<T>(list: T[], from: number, to: number) {
 
 // The gallery as the page shows it: videos, each photographer, then audience photos, as cards.
 // Drag a card (or use its arrows) to move it within its section; the new order saves right away
-// and also sets the carousel's order. Each card highlights, shows or hides, edits or removes its item.
+// and also sets the carousel's order. Double-click a card's preview, or use View, to see the item.
+// Each card highlights, shows or hides, edits or removes its item.
 export function Arranger({ items }: { items: ArrangedItem[] }) {
   const [order, setOrder] = useState(items);
   const [synced, setSynced] = useState(items);
@@ -103,6 +105,7 @@ export function Arranger({ items }: { items: ArrangedItem[] }) {
                   {/* The preview is the drag handle, so the fields below stay selectable. */}
                   <div
                     draggable
+                    onDoubleClick={() => openItem(item.view)}
                     onDragStart={(e) => {
                       dragging.current = item.id;
                       before.current = order.map((i) => i.id).join();
@@ -115,6 +118,7 @@ export function Arranger({ items }: { items: ArrangedItem[] }) {
                     className={`relative cursor-grab overflow-hidden rounded bg-foreground/5 active:cursor-grabbing ${item.kind === "video" ? "aspect-video" : "aspect-square"}`}
                   >
                     <Preview src={item.thumb} kind={item.kind} />
+                    <ViewLink href={item.view} />
                     <span className="absolute left-1 top-1 rounded bg-black/60 px-1 font-mono text-[10px] text-white">
                       {index + 1}
                       {item.highlighted ? " ★" : ""}
