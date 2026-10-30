@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { assertAdmin } from "@/lib/admin";
 import { shareDriveUpload } from "@/lib/media";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { youtubeIdFrom, youtubeWatch } from "@/lib/gallery";
 
 // Admin writes for /gallery (gallery_items, *_shared_gallery.sql). An upload is shared to anyone
 // with its link while it's visible in the gallery, and private again when hidden or removed.
@@ -153,6 +154,55 @@ export async function addPhotographer(_prev: FormState, formData: FormData): Pro
   }
 }
 
+// A video's title, and whether it can be embedded: YouTube answers 401 when embedding is off and 404
+// when the video is private or gone. A network failure doesn't block adding it, just the title.
+async function youtubeInfo(id: string) {
+  try {
+    const url = `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(youtubeWatch(id))}`;
+    const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (response.status === 401 || response.status === 403) return { problem: "doesn't allow embedding" };
+    if (response.status === 404 || response.status === 400) return { problem: "is private or doesn't exist" };
+    if (!response.ok) return { title: null };
+    const { title } = (await response.json()) as { title?: string };
+    return { title: title?.trim().slice(0, 200) || null };
+  } catch {
+    return { title: null };
+  }
+}
+
+// Adds YouTube videos, one link per line, with their YouTube titles as captions (editable on the card).
+export async function addYouTube(_prev: FormState, formData: FormData): Promise<FormState> {
+  await assertAdmin();
+  const lines = field(formData, "links")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (lines.length === 0) return { ok: false, message: "Paste at least one YouTube link." };
+  if (lines.length > 50) return { ok: false, message: "Add up to 50 videos at a time." };
+  const ids = [...new Set(lines.map(youtubeIdFrom))];
+  const bad = lines.findIndex((line) => !youtubeIdFrom(line));
+  if (bad >= 0) return { ok: false, message: `Line ${bad + 1} isn't a YouTube video link.` };
+
+  const admin = createAdminClient();
+  const { data: existing } = await admin.from("gallery_items").select("youtube_id").in("youtube_id", ids as string[]);
+  const taken = new Set((existing ?? []).map((r) => r.youtube_id));
+  const fresh = (ids as string[]).filter((id) => !taken.has(id));
+  if (fresh.length === 0) return { ok: false, message: "Those videos are already in the gallery." };
+
+  const infos = await Promise.all(fresh.map(youtubeInfo));
+  const problem = infos.findIndex((info) => info.problem);
+  if (problem >= 0) return { ok: false, message: `${youtubeWatch(fresh[problem])} ${infos[problem].problem}. Nothing was added.` };
+
+  const positions = await newPositions(fresh.length, field(formData, "where"));
+  const { error } = await admin
+    .from("gallery_items")
+    .insert(fresh.map((youtube_id, i) => ({ youtube_id, caption: infos[i].title ?? null, position: positions[i] })));
+  if (error) return { ok: false, message: error.message };
+  revalidate();
+  const skipped = (ids as string[]).length - fresh.length;
+  return { ok: true, message: `Added ${fresh.length} video${fresh.length === 1 ? "" : "s"}${skipped ? `; ${skipped} already in the gallery` : ""}.` };
+}
+
 // Saves the gallery's order: positions follow the list of ids.
 export async function saveOrder(ids: string[]) {
   await assertAdmin();
@@ -164,13 +214,24 @@ export async function saveOrder(ids: string[]) {
   revalidate();
 }
 
-type Row = { id: string; media_upload_id: string | null; media_uploads: { drive_file_id: string; deleted_at: string | null } | null };
+// Saves the carousel's order: positions follow the list of ids.
+export async function saveCarouselOrder(ids: string[]) {
+  await assertAdmin();
+  if (!Array.isArray(ids) || ids.length > 5000 || !ids.every((id) => typeof id === "string" && UUID.test(id))) throw new Error("Bad order.");
+  const admin = createAdminClient();
+  const results = await Promise.all(ids.map((id, highlight_position) => admin.from("gallery_items").update({ highlight_position }).eq("id", id)));
+  const failed = results.find((r) => r.error);
+  if (failed?.error) throw new Error(failed.error.message);
+  revalidate();
+}
+
+type Row = { id: string; media_upload_id: string | null; youtube_id: string | null; media_uploads: { drive_file_id: string; deleted_at: string | null } | null };
 
 async function item(id: string) {
   if (!UUID.test(id)) throw new Error("Unknown item.");
   const { data } = await createAdminClient()
     .from("gallery_items")
-    .select("id, media_upload_id, media_uploads(drive_file_id, deleted_at)")
+    .select("id, media_upload_id, youtube_id, media_uploads(drive_file_id, deleted_at)")
     .eq("id", id)
     .maybeSingle();
   if (!data) throw new Error("That item is already gone.");
@@ -193,13 +254,22 @@ export async function setVisible(formData: FormData) {
   revalidate();
 }
 
-// Puts an item in the carousel at the top of the page, or takes it out.
+// Puts an item at the end of the carousel, or takes it out.
 export async function setHighlighted(formData: FormData) {
   await assertAdmin();
   const row = await item(field(formData, "id"));
-  const { error } = await createAdminClient()
+  const admin = createAdminClient();
+  const highlighted = field(formData, "highlighted") === "true";
+  const { data: last } = await admin
     .from("gallery_items")
-    .update({ highlighted: field(formData, "highlighted") === "true" })
+    .select("highlight_position")
+    .not("highlight_position", "is", null)
+    .order("highlight_position", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const { error } = await admin
+    .from("gallery_items")
+    .update({ highlighted, highlight_position: highlighted ? (last?.highlight_position ?? -1) + 1 : null })
     .eq("id", row.id);
   if (error) throw new Error(error.message);
   revalidate();
@@ -209,7 +279,7 @@ export async function updateItem(formData: FormData) {
   await assertAdmin();
   const row = await item(field(formData, "id"));
   const changes: Record<string, unknown> = { caption: optional(field(formData, "caption"), 200, "caption") };
-  if (!row.media_upload_id) {
+  if (!row.media_upload_id && !row.youtube_id) {
     const credit = field(formData, "credit");
     if (!credit || credit.length > 100) throw new Error("Give the photographer's name (up to 100 characters).");
     changes.credit = credit;

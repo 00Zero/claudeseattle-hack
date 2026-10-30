@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { addPhotographer, addUploads, type FormState } from "./actions";
+import { addPhotographer, addUploads, addYouTube, type FormState } from "./actions";
 
 export type PickableUpload = { id: string; kind: "photo" | "video"; thumb: string; view: string; who: string; when: string };
 
@@ -97,6 +97,25 @@ export function UploadPicker({ uploads }: { uploads: PickableUpload[] }) {
           </li>
         ))}
       </ul>
+    </form>
+  );
+}
+
+export function AddYouTube() {
+  const [state, action, pending] = useActionState(addYouTube, null);
+  return (
+    <form action={action} className="grid max-w-2xl gap-3">
+      <label className="space-y-1 text-sm">
+        <span>YouTube links, one per line</span>
+        <textarea name="links" required rows={3} className={`${input} font-mono text-xs`} placeholder={"https://www.youtube.com/watch?v=...\nhttps://youtu.be/..."} />
+      </label>
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="submit" disabled={pending} className={button}>
+          {pending ? "Adding…" : "Add videos"}
+        </button>
+        <Where />
+        <Message state={state} />
+      </div>
     </form>
   );
 }
