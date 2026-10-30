@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/lib/admin";
-import { driveImage } from "@/lib/gallery";
+import { driveImage, driveView } from "@/lib/gallery";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPacific } from "@/lib/time";
 import { Arranger, type ArrangedItem } from "./arranger";
@@ -16,7 +16,7 @@ type Upload = {
   mime_type: string;
   created_at: string;
   deleted_at: string | null;
-  profiles: { first_name: string; last_name: string } | null;
+  profiles: { first_name: string; last_name: string; is_test: boolean } | null;
   teams: { name: string } | null;
 };
 
@@ -32,7 +32,7 @@ type Item = {
   media_uploads: Upload | null;
 };
 
-const uploadFields = "id, drive_file_id, mime_type, created_at, deleted_at, profiles(first_name, last_name), teams(name)";
+const uploadFields = "id, drive_file_id, mime_type, created_at, deleted_at, profiles(first_name, last_name, is_test), teams(name)";
 
 function uploader(u: Upload) {
   const name = `${u.profiles?.first_name ?? ""} ${u.profiles?.last_name ?? ""}`.trim() || "Guest";
@@ -72,6 +72,7 @@ export default async function GalleryAdminPage() {
         thumbnail_url: r.thumbnail_url,
         image_url: r.image_url,
         thumb: r.thumbnail_url ?? "",
+        view: r.link_url ?? "",
         who: r.credit ?? "Photographer",
         deleted: false,
       };
@@ -89,17 +90,20 @@ export default async function GalleryAdminPage() {
       thumbnail_url: null,
       image_url: null,
       thumb: shared ? driveImage(u.drive_file_id, 400) : adminThumbnail(u),
+      view: driveView(u.drive_file_id),
       who: uploader(u),
       deleted: Boolean(u.deleted_at),
     };
   });
 
   const pickable: PickableUpload[] = ((uploadData ?? []) as unknown as Upload[])
-    .filter((u) => !inGallery.has(u.id))
+    // Test accounts' uploads were only for trying the uploader; they stay listed on /admin/media.
+    .filter((u) => !inGallery.has(u.id) && !u.profiles?.is_test)
     .map((u) => ({
       id: u.id,
       kind: u.mime_type.startsWith("video/") ? "video" : "photo",
       thumb: adminThumbnail(u),
+      view: driveView(u.drive_file_id),
       who: uploader(u),
       when: formatPacific(u.created_at),
     }));
@@ -123,7 +127,7 @@ export default async function GalleryAdminPage() {
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Add uploads</h2>
         <p className="text-sm text-foreground/70">
-          Photos and videos from <Link href="/admin/media">Media</Link> that aren&apos;t in the gallery, newest first. Check the ones to show.
+          Photos and videos from <Link href="/admin/media">Media</Link> that aren&apos;t in the gallery, newest first. Check the ones to show; double-click one, or use View, to open it in Drive.
         </p>
         <UploadPicker uploads={pickable} />
       </section>

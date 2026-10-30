@@ -33,7 +33,8 @@ export function driveDownload(fileId: string) {
   return `https://drive.usercontent.google.com/download?id=${encodeURIComponent(fileId)}&export=download&confirm=t`;
 }
 
-// Drive's own player, for videos the browser can't play straight from the file.
+// Drive's own player. Drive won't serve a video file to another site's <video> tag, so this is the
+// only way to play one here; it can't autoplay or say when a video ends.
 export function drivePlayer(fileId: string) {
   return `https://drive.google.com/file/d/${encodeURIComponent(fileId)}/preview`;
 }

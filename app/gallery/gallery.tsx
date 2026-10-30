@@ -30,7 +30,7 @@ const ALT = "Claude Impact Lab hackathon, Seattle";
 export function Gallery({ items, uploadHref }: { items: GalleryItem[]; uploadHref: string }) {
   const sections = gallerySections(items);
   if (!sections.some((s) => s.key === "photo")) sections.push({ key: "photo", title: "Audience photos", credit: null, items: [] });
-  // The viewer steps through uploads in page order: videos, then audience photos.
+  // The viewer steps through the uploads of one kind, in page order.
   const viewable = sections.flatMap((s) => s.items).filter((i) => i.kind !== "external" && i.drive_file_id);
   const highlights = items.filter((i) => i.highlighted);
   const [onClick, overlays] = useOpeners(viewable);
@@ -84,22 +84,40 @@ export function Highlights({ items }: { items: GalleryItem[] }) {
   );
 }
 
-// What a click on a tile or slide does: an upload opens the viewer (stepping through `viewable`), a
-// photographer's photo plays the hand-off. Modified clicks fall through to the link.
+// Full screen has to start from the click itself, so it's the whole page and the viewer opens over
+// it. iPhones have no full screen for pages; the viewer fills the screen there.
+function enterFullscreen() {
+  document.documentElement.requestFullscreen?.().catch(() => {});
+}
+
+function leaveFullscreen() {
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+}
+
+// What a click on a tile or slide does: an upload opens the viewer, stepping through the `viewable`
+// items of its kind (videos full screen), and a photographer's photo plays the hand-off. Modified
+// clicks fall through to the link.
 function useOpeners(viewable: GalleryItem[]) {
-  const [open, setOpen] = useState<number | null>(null);
+  const [open, setOpen] = useState<{ kind: GalleryItem["kind"]; index: number } | null>(null);
   const [leaving, setLeaving] = useState<GalleryItem | null>(null);
+  const items = open ? viewable.filter((i) => i.kind === open.kind) : [];
 
   function onClick(event: React.MouseEvent, item: GalleryItem) {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
-    if (item.kind === "external") setLeaving(item);
-    else setOpen(viewable.indexOf(item));
+    if (item.kind === "external") return setLeaving(item);
+    if (item.kind === "video") enterFullscreen();
+    setOpen({ kind: item.kind, index: viewable.filter((i) => i.kind === item.kind).indexOf(item) });
+  }
+
+  function close() {
+    setOpen(null);
+    leaveFullscreen();
   }
 
   const overlays = (
     <>
-      {open !== null && viewable[open] && <Viewer items={viewable} index={open} onIndex={setOpen} onClose={() => setOpen(null)} />}
+      {open && items[open.index] && <Viewer items={items} index={open.index} onIndex={(index) => setOpen({ ...open, index })} onClose={close} />}
       {leaving && <Handoff item={leaving} onClose={() => setLeaving(null)} />}
     </>
   );
@@ -311,11 +329,13 @@ function useOverlay(onClose: () => void, onKey?: (e: KeyboardEvent) => void) {
 
 const overlayButton = "rounded-full bg-white/10 px-3 py-1.5 text-sm text-white no-underline hover:bg-white/20";
 
-// The full-size viewer for uploads: the photo with a download, or the video playing. Arrows step
-// through the uploads on the page.
+// The full-size viewer for uploads of one kind: the photo with a download, or the video in Drive's
+// player. Drive's player can't autoplay or say when a video ends, so videos get a film strip and a
+// Next button to move between them. Leaving full screen closes the viewer.
 function Viewer({ items, index, onIndex, onClose }: { items: GalleryItem[]; index: number; onIndex: (i: number) => void; onClose: () => void }) {
   const item = items[index];
   const fileId = item.drive_file_id ?? "";
+  const isVideo = item.kind === "video";
   const step = useCallback((by: number) => onIndex((index + by + items.length) % items.length), [index, items.length, onIndex]);
   const onKey = useCallback(
     (e: KeyboardEvent) => {
@@ -326,19 +346,27 @@ function Viewer({ items, index, onIndex, onClose }: { items: GalleryItem[]; inde
   );
   const first = useOverlay(onClose, onKey);
 
+  useEffect(() => {
+    function onChange() {
+      if (!document.fullscreenElement) onClose();
+    }
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, [onClose]);
+
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={item.kind === "video" ? "Video" : "Photo"}
+      aria-label={isVideo ? "Video" : "Photo"}
       className={`fixed inset-0 z-50 flex flex-col bg-black/90 p-3 text-white backdrop-blur-sm sm:p-6 ${styles.fade}`}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div className="flex flex-wrap items-center gap-2">
         <p className="mr-auto font-mono text-xs text-white/70">
-          {item.kind === "video" ? "Video" : "Photo"} {index + 1} of {items.length}
+          {isVideo ? "Video" : "Photo"} {index + 1} of {items.length}
         </p>
-        {item.kind === "photo" && (
+        {!isVideo && (
           <a href={driveDownload(fileId)} className={overlayButton}>
             Download
           </a>
@@ -357,9 +385,7 @@ function Viewer({ items, index, onIndex, onClose }: { items: GalleryItem[]; inde
             ←
           </button>
         )}
-        <div key={item.id} className={`h-full w-full max-w-6xl ${styles.zoom}`}>
-          {item.kind === "video" ? <Video fileId={fileId} /> : <Photo fileId={fileId} />}
-        </div>
+        <div key={item.id} className={`h-full w-full max-w-6xl ${styles.zoom}`}>{isVideo ? <Video fileId={fileId} /> : <Photo fileId={fileId} />}</div>
         {items.length > 1 && (
           <button type="button" onClick={() => step(1)} aria-label="Next" className={`${overlayButton} absolute right-0 z-10 hidden sm:block`}>
             →
@@ -367,21 +393,64 @@ function Viewer({ items, index, onIndex, onClose }: { items: GalleryItem[]; inde
         )}
       </div>
 
-      <div className="flex items-center justify-between gap-3">
-        {items.length > 1 ? (
-          <button type="button" onClick={() => step(-1)} className={`${overlayButton} sm:hidden`}>
-            ← Prev
+      {isVideo ? (
+        <FilmStrip items={items} index={index} onIndex={onIndex} />
+      ) : (
+        <div className="flex items-center justify-between gap-3">
+          {items.length > 1 ? (
+            <button type="button" onClick={() => step(-1)} className={`${overlayButton} sm:hidden`}>
+              ← Prev
+            </button>
+          ) : (
+            <span />
+          )}
+          <p className="min-w-0 truncate text-center text-sm text-white/80">{item.caption}</p>
+          {items.length > 1 ? (
+            <button type="button" onClick={() => step(1)} className={`${overlayButton} sm:hidden`}>
+              Next →
+            </button>
+          ) : (
+            <span />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Every video as a small tile, with the current one marked, and a Next button that wraps to the
+// first after the last.
+function FilmStrip({ items, index, onIndex }: { items: GalleryItem[]; index: number; onIndex: (i: number) => void }) {
+  const current = useRef<HTMLLIElement>(null);
+  useEffect(() => {
+    current.current?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [index]);
+
+  return (
+    <div className="space-y-2">
+      {items[index].caption && <p className="truncate text-center text-sm text-white/80">{items[index].caption}</p>}
+      <div className="flex items-center gap-3">
+        <ol className="flex min-w-0 flex-1 gap-2 overflow-x-auto p-0.5">
+          {items.map((video, i) => (
+            <li key={video.id} ref={i === index ? current : null} className="shrink-0">
+              <button
+                type="button"
+                onClick={() => onIndex(i)}
+                aria-label={`Video ${i + 1} of ${items.length}${video.caption ? `: ${video.caption}` : ""}`}
+                aria-current={i === index}
+                className={`relative block aspect-video h-12 overflow-hidden rounded ring-2 transition sm:h-16 ${i === index ? "ring-accent" : "opacity-60 ring-transparent hover:opacity-100"}`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- served by Google */}
+                <img src={driveImage(video.drive_file_id ?? "", 240)} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+                <span className="absolute bottom-0.5 left-0.5 rounded bg-black/60 px-1 font-mono text-[10px] text-white">{i === index ? "Now" : i + 1}</span>
+              </button>
+            </li>
+          ))}
+        </ol>
+        {items.length > 1 && (
+          <button type="button" onClick={() => onIndex((index + 1) % items.length)} className="btn shrink-0">
+            Next video →
           </button>
-        ) : (
-          <span />
-        )}
-        <p className="min-w-0 truncate text-center text-sm text-white/80">{item.caption}</p>
-        {items.length > 1 ? (
-          <button type="button" onClick={() => step(1)} className={`${overlayButton} sm:hidden`}>
-            Next →
-          </button>
-        ) : (
-          <span />
         )}
       </div>
     </div>
@@ -412,23 +481,28 @@ function Photo({ fileId }: { fileId: string }) {
   );
 }
 
-// Plays the file itself so it starts right away; if the browser can't (an iPhone .mov in some
-// browsers, or Drive answering with a page instead of the file), Drive's own player takes over.
+// Drive's player needs its own click to start, so a cue points at it until someone clicks in. The
+// page can't see inside the player; it can only tell the click happened because focus moved there.
 function Video({ fileId }: { fileId: string }) {
-  const [fallback, setFallback] = useState(false);
-  if (fallback) {
-    return <iframe src={drivePlayer(fileId)} title="Event video" allow="autoplay; fullscreen" allowFullScreen className="h-full w-full rounded-md bg-black" />;
-  }
+  const player = useRef<HTMLIFrameElement>(null);
+  const [started, setStarted] = useState(false);
+  useEffect(() => {
+    function onBlur() {
+      if (document.activeElement === player.current) setStarted(true);
+    }
+    window.addEventListener("blur", onBlur);
+    return () => window.removeEventListener("blur", onBlur);
+  }, []);
+
   return (
-    <video
-      src={driveDownload(fileId)}
-      poster={driveImage(fileId, 1280)}
-      controls
-      autoPlay
-      playsInline
-      onError={() => setFallback(true)}
-      className="h-full w-full rounded-md bg-black object-contain"
-    />
+    <div className="relative h-full w-full">
+      <iframe ref={player} src={drivePlayer(fileId)} title="Event video" allow="autoplay; fullscreen" allowFullScreen className="h-full w-full rounded-md bg-black" />
+      {!started && (
+        <span className="pointer-events-none absolute inset-x-0 top-[62%] flex justify-center">
+          <span className="rounded-full bg-black/70 px-4 py-2 text-sm font-medium text-white shadow-lg">Press ▶ to play</span>
+        </span>
+      )}
+    </div>
   );
 }
 
