@@ -17,8 +17,11 @@ const signedInPages = [
 // Judges and admins: where they score. /judge itself checks the role.
 const judgePages = [{ href: "/judge", label: "judge" }];
 
-// Everyone: /results shows only what the admin has published.
-const publicPages = [{ href: "/results", label: "results" }];
+// Everyone: /results shows only what the admin has published; /gallery only what admins added.
+const publicPages = [
+  { href: "/results", label: "results" },
+  { href: "/gallery", label: "gallery" },
+];
 
 // The site header, styled as a Claude Code title bar: thinking dots, a path, slash-command nav.
 // Its links don't prefetch: every page view would otherwise render all of them on the server at

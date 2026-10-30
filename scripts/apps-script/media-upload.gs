@@ -27,6 +27,10 @@ function authorize() {
 // Body: { secret, action: 'start', name, mimeType, size, origin } returns { uploadUrl }.
 //       { secret, action: 'check', fileId } returns { name, mimeType, size } if the file is in the folder.
 //       { secret, action: 'trash', fileId } moves the file to Drive's trash (kept 30 days) if it's in the folder.
+//       { secret, action: 'share', fileId, shared } makes one file in the folder viewable by anyone
+//         with its link (shared: true, for the /gallery page) or private again (false).
+//       { secret, action: 'thumbnail', fileId } returns { mimeType, data } (base64), Drive's small
+//         preview of a file in the folder, for the admin gallery page; data is null until Drive has one.
 function doPost(e) {
   let body;
   try {
@@ -40,6 +44,8 @@ function doPost(e) {
     if (body.action === 'start') return json_(start_(body));
     if (body.action === 'check') return json_(check_(body));
     if (body.action === 'trash') return json_(trash_(body));
+    if (body.action === 'share') return json_(share_(body));
+    if (body.action === 'thumbnail') return json_(thumbnail_(body));
     return json_({ error: 'Unknown action' });
   } catch (err) {
     console.error(err);
@@ -87,6 +93,20 @@ function check_(body) {
 function trash_(body) {
   inFolder_(body.fileId).setTrashed(true);
   return { ok: true };
+}
+
+// The site checks that the caller is an admin. Only this file's sharing changes; the folder's doesn't.
+function share_(body) {
+  const file = inFolder_(body.fileId);
+  if (body.shared === true) file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  else file.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
+  return { ok: true };
+}
+
+function thumbnail_(body) {
+  const blob = inFolder_(body.fileId).getThumbnail();
+  if (!blob) return { mimeType: null, data: null };
+  return { mimeType: blob.getContentType(), data: Utilities.base64Encode(blob.getBytes()) };
 }
 
 function inFolder_(fileId) {

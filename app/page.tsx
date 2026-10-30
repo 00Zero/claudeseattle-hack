@@ -15,6 +15,8 @@ import { ContextWindow } from "@/components/home/context-window";
 import { SkylineBand } from "@/components/home/skyline-band";
 import { Wifi } from "@/components/home/wifi";
 import { WinnersCard, type Winner } from "@/components/home/winners-card";
+import { Highlights } from "@/app/gallery/gallery";
+import { GALLERY_COLUMNS, type GalleryItem } from "@/lib/gallery";
 
 // Section header styled as a Claude Code tool call.
 function Sig({ call, title }: { call: string; title: string }) {
@@ -96,6 +98,15 @@ function photosCardOpen(eventEndsAt: string) {
   return !until || Date.now() < Date.parse(until);
 }
 
+// The gallery's highlights for the home page, once the event has ended. A failed read shows none
+// rather than breaking the page.
+async function getHighlights(supabase: Awaited<ReturnType<typeof createClient>>, eventEndsAt: string) {
+  if (Date.now() < Date.parse(eventEndsAt)) return [];
+  const { data, error } = await supabase.from("public_gallery").select(GALLERY_COLUMNS).eq("highlighted", true).order("position").order("id");
+  if (error) console.error("Gallery highlights read failed", error.message);
+  return (data ?? []) as GalleryItem[];
+}
+
 // One section per non-empty list.
 function Groups({ groups }: { groups: { id: string; call: string; title: string; entries: Entry[] }[] }) {
   return groups
@@ -150,6 +161,7 @@ export default async function Home() {
   const closeAt = settings?.event_ends_at ?? eventCloseAt;
   const lumaCalendarUrl = settings?.luma_calendar_url ?? defaultLumaUrl;
   const showPhotosCard = photosCardOpen(closeAt);
+  const highlights = await getHighlights(supabase, closeAt);
   // Only whether Wi-Fi is set reaches the page; the values themselves load when someone clicks to reveal them.
   const hasWifi = Boolean(settings?.wifi_network && settings?.wifi_password);
   const venue = {
@@ -283,6 +295,16 @@ export default async function Home() {
       <SkylineBand venueName={venue.name} winners={winners.map((w) => ({ prize: w.prize, title: w.title }))} />
 
       <div className="mx-auto max-w-3xl">
+        {/* After the event: the highlights admins picked on /admin/gallery. */}
+        {highlights.length > 0 && (
+          <section aria-label="Highlights from the day" className="grid gap-6 border-b border-line py-12" id="gallery">
+            <Sig call="Read(gallery/highlights)" title="Highlights from the day" />
+            <Highlights items={highlights} />
+            <Link href="/gallery" className="justify-self-start text-sm">
+              See every photo and video in the gallery →
+            </Link>
+          </section>
+        )}
         <section className="grid gap-6 border-b border-line py-12">
           <Sig call="Read(theme.md)" title="What you'll build" />
           <p className="max-w-[60ch] text-fg-muted">

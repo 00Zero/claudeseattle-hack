@@ -1,0 +1,93 @@
+/* The gallery's motion: the carousel's slow zoom, the viewer fading in, and the hand-off to a
+   photographer's site (the thumbnail lifts off toward a new-tab icon while a bar fills). */
+
+.kenburns {
+  animation: kenburns var(--rotate-ms) ease-out forwards;
+}
+
+.fade {
+  animation: fade 160ms ease-out;
+}
+
+.zoom {
+  animation: zoom 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.launch {
+  animation: launch var(--redirect-ms) cubic-bezier(0.5, 0, 0.75, 0) forwards;
+}
+
+.tab {
+  animation: tab var(--redirect-ms) ease-out forwards;
+}
+
+.progress {
+  transform-origin: left;
+  animation: progress var(--redirect-ms) linear forwards;
+}
+
+@keyframes kenburns {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.06);
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes zoom {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+@keyframes launch {
+  0%,
+  15% {
+    transform: none;
+    opacity: 1;
+  }
+  100% {
+    transform: translate(70%, -60%) scale(0.2) rotate(8deg);
+    opacity: 0;
+  }
+}
+
+@keyframes tab {
+  0%,
+  70% {
+    transform: none;
+  }
+  85% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kenburns,
+  .fade,
+  .zoom,
+  .launch,
+  .tab {
+    animation: none;
+  }
+}
