@@ -84,19 +84,9 @@ export function Highlights({ items }: { items: GalleryItem[] }) {
   );
 }
 
-// Full screen has to start from the click itself, so it's the whole page and the viewer opens over
-// it. iPhones have no full screen for pages; the viewer fills the screen there.
-function enterFullscreen() {
-  document.documentElement.requestFullscreen?.().catch(() => {});
-}
-
-function leaveFullscreen() {
-  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-}
-
 // What a click on a tile or slide does: an upload opens the viewer, stepping through the `viewable`
-// items of its kind (videos full screen), and a photographer's photo plays the hand-off. Modified
-// clicks fall through to the link.
+// items of its kind, and a photographer's photo plays the hand-off. Modified clicks fall through to
+// the link.
 function useOpeners(viewable: GalleryItem[]) {
   const [open, setOpen] = useState<{ kind: GalleryItem["kind"]; index: number } | null>(null);
   const [leaving, setLeaving] = useState<GalleryItem | null>(null);
@@ -106,18 +96,12 @@ function useOpeners(viewable: GalleryItem[]) {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
     if (item.kind === "external") return setLeaving(item);
-    if (item.kind === "video") enterFullscreen();
     setOpen({ kind: item.kind, index: viewable.filter((i) => i.kind === item.kind).indexOf(item) });
-  }
-
-  function close() {
-    setOpen(null);
-    leaveFullscreen();
   }
 
   const overlays = (
     <>
-      {open && items[open.index] && <Viewer items={items} index={open.index} onIndex={(index) => setOpen({ ...open, index })} onClose={close} />}
+      {open && items[open.index] && <Viewer items={items} index={open.index} onIndex={(index) => setOpen({ ...open, index })} onClose={() => setOpen(null)} />}
       {leaving && <Handoff item={leaving} onClose={() => setLeaving(null)} />}
     </>
   );
@@ -331,7 +315,7 @@ const overlayButton = "rounded-full bg-white/10 px-3 py-1.5 text-sm text-white n
 
 // The full-size viewer for uploads of one kind: the photo with a download, or the video in Drive's
 // player. Drive's player can't autoplay or say when a video ends, so videos get a film strip and a
-// Next button to move between them. Leaving full screen closes the viewer.
+// Next button to move between them.
 function Viewer({ items, index, onIndex, onClose }: { items: GalleryItem[]; index: number; onIndex: (i: number) => void; onClose: () => void }) {
   const item = items[index];
   const fileId = item.drive_file_id ?? "";
@@ -345,14 +329,6 @@ function Viewer({ items, index, onIndex, onClose }: { items: GalleryItem[]; inde
     [step],
   );
   const first = useOverlay(onClose, onKey);
-
-  useEffect(() => {
-    function onChange() {
-      if (!document.fullscreenElement) onClose();
-    }
-    document.addEventListener("fullscreenchange", onChange);
-    return () => document.removeEventListener("fullscreenchange", onChange);
-  }, [onClose]);
 
   return (
     <div
@@ -481,29 +457,8 @@ function Photo({ fileId }: { fileId: string }) {
   );
 }
 
-// Drive's player needs its own click to start, so a cue points at it until someone clicks in. The
-// page can't see inside the player; it can only tell the click happened because focus moved there.
 function Video({ fileId }: { fileId: string }) {
-  const player = useRef<HTMLIFrameElement>(null);
-  const [started, setStarted] = useState(false);
-  useEffect(() => {
-    function onBlur() {
-      if (document.activeElement === player.current) setStarted(true);
-    }
-    window.addEventListener("blur", onBlur);
-    return () => window.removeEventListener("blur", onBlur);
-  }, []);
-
-  return (
-    <div className="relative h-full w-full">
-      <iframe ref={player} src={drivePlayer(fileId)} title="Event video" allow="autoplay; fullscreen" allowFullScreen className="h-full w-full rounded-md bg-black" />
-      {!started && (
-        <span className="pointer-events-none absolute inset-x-0 top-[62%] flex justify-center">
-          <span className="rounded-full bg-black/70 px-4 py-2 text-sm font-medium text-white shadow-lg">Press ▶ to play</span>
-        </span>
-      )}
-    </div>
-  );
+  return <iframe src={drivePlayer(fileId)} title="Event video" allow="autoplay; fullscreen" allowFullScreen className="h-full w-full rounded-md bg-black" />;
 }
 
 function host(url: string) {
