@@ -16,7 +16,7 @@ import { SkylineBand } from "@/components/home/skyline-band";
 import { Wifi } from "@/components/home/wifi";
 import { WinnersCard, type Winner } from "@/components/home/winners-card";
 import { Highlights } from "@/app/gallery/gallery";
-import { GALLERY_COLUMNS, type GalleryItem } from "@/lib/gallery";
+import { carouselItems, GALLERY_COLUMNS, type GalleryItem } from "@/lib/gallery";
 
 // Section header styled as a Claude Code tool call.
 function Sig({ call, title }: { call: string; title: string }) {
@@ -104,7 +104,7 @@ async function getHighlights(supabase: Awaited<ReturnType<typeof createClient>>,
   if (Date.now() < Date.parse(eventEndsAt)) return [];
   const { data, error } = await supabase.from("public_gallery").select(GALLERY_COLUMNS).eq("highlighted", true).order("position").order("id");
   if (error) console.error("Gallery highlights read failed", error.message);
-  return (data ?? []) as GalleryItem[];
+  return carouselItems((data ?? []) as GalleryItem[]);
 }
 
 // One section per non-empty list.

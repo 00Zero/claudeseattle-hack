@@ -3,13 +3,16 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  carouselItems,
   driveDownload,
   driveImage,
   drivePlayer,
-  driveView,
   galleryHome,
   gallerySections,
   itemHref,
+  opensInViewer,
+  youtubePlayer,
+  youtubeThumbnail,
   type GalleryItem,
 } from "@/lib/gallery";
 import styles from "./gallery.module.css";
@@ -31,8 +34,8 @@ export function Gallery({ items, uploadHref }: { items: GalleryItem[]; uploadHre
   const sections = gallerySections(items);
   if (!sections.some((s) => s.key === "photo")) sections.push({ key: "photo", title: "Audience photos", credit: null, items: [] });
   // The viewer steps through the uploads of one kind, in page order.
-  const viewable = sections.flatMap((s) => s.items).filter((i) => i.kind !== "external" && i.drive_file_id);
-  const highlights = items.filter((i) => i.highlighted);
+  const viewable = sections.flatMap((s) => s.items).filter(opensInViewer);
+  const highlights = carouselItems(items);
   const [onClick, overlays] = useOpeners(viewable);
 
   return (
@@ -75,7 +78,7 @@ export function Gallery({ items, uploadHref }: { items: GalleryItem[]; uploadHre
 // The carousel on its own (the home page, after the event). Clicks do what they do on /gallery;
 // the viewer steps through the highlighted uploads.
 export function Highlights({ items }: { items: GalleryItem[] }) {
-  const [onClick, overlays] = useOpeners(items.filter((i) => i.kind !== "external" && i.drive_file_id));
+  const [onClick, overlays] = useOpeners(items.filter(opensInViewer));
   return (
     <>
       <Carousel items={items} onClick={onClick} />
@@ -121,11 +124,13 @@ export function UploadButton({ href }: { href: string }) {
 }
 
 function thumbnailSrc(item: GalleryItem) {
+  if (item.youtube_id) return youtubeThumbnail(item.youtube_id);
   if (item.kind === "external") return item.thumbnail_url ?? "";
   return driveImage(item.drive_file_id ?? "", item.kind === "video" ? 960 : 480);
 }
 
 function slideSrc(item: GalleryItem) {
+  if (item.youtube_id) return youtubeThumbnail(item.youtube_id);
   if (item.kind === "external") return item.image_url ?? item.thumbnail_url ?? "";
   return driveImage(item.drive_file_id ?? "", 1600);
 }
@@ -313,9 +318,8 @@ function useOverlay(onClose: () => void, onKey?: (e: KeyboardEvent) => void) {
 
 const overlayButton = "rounded-full bg-white/10 px-3 py-1.5 text-sm text-white no-underline hover:bg-white/20";
 
-// The full-size viewer for uploads of one kind: the photo with a download, or the video in Drive's
-// player. Drive's player can't autoplay or say when a video ends, so videos get a film strip and a
-// Next button to move between them.
+// The full-size viewer for items of one kind: the photo with a download, or the video in Drive's or
+// YouTube's player. Neither can move on by itself here, so videos get a film strip and a Next button.
 function Viewer({ items, index, onIndex, onClose }: { items: GalleryItem[]; index: number; onIndex: (i: number) => void; onClose: () => void }) {
   const item = items[index];
   const fileId = item.drive_file_id ?? "";
@@ -347,7 +351,7 @@ function Viewer({ items, index, onIndex, onClose }: { items: GalleryItem[]; inde
             Download
           </a>
         )}
-        <a href={driveView(fileId)} target="_blank" rel="noreferrer" className={`${overlayButton} inline-flex items-center gap-1.5`}>
+        <a href={itemHref(item)} target="_blank" rel="noreferrer" className={`${overlayButton} inline-flex items-center gap-1.5`}>
           Original <NewTabIcon className="h-3.5 w-3.5" />
         </a>
         <button ref={first} type="button" onClick={onClose} className={overlayButton} aria-label="Close">
@@ -361,7 +365,7 @@ function Viewer({ items, index, onIndex, onClose }: { items: GalleryItem[]; inde
             ←
           </button>
         )}
-        <div key={item.id} className={`h-full w-full max-w-6xl ${styles.zoom}`}>{isVideo ? <Video fileId={fileId} /> : <Photo fileId={fileId} />}</div>
+        <div key={item.id} className={`h-full w-full max-w-6xl ${styles.zoom}`}>{isVideo ? <Video item={item} /> : <Photo fileId={fileId} />}</div>
         {items.length > 1 && (
           <button type="button" onClick={() => step(1)} aria-label="Next" className={`${overlayButton} absolute right-0 z-10 hidden sm:block`}>
             →
@@ -417,7 +421,7 @@ function FilmStrip({ items, index, onIndex }: { items: GalleryItem[]; index: num
                 className={`relative block aspect-video h-12 overflow-hidden rounded ring-2 transition sm:h-16 ${i === index ? "ring-accent" : "opacity-60 ring-transparent hover:opacity-100"}`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element -- served by Google */}
-                <img src={driveImage(video.drive_file_id ?? "", 240)} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+                <img src={video.youtube_id ? youtubeThumbnail(video.youtube_id) : driveImage(video.drive_file_id ?? "", 240)} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
                 <span className="absolute bottom-0.5 left-0.5 rounded bg-black/60 px-1 font-mono text-[10px] text-white">{i === index ? "Now" : i + 1}</span>
               </button>
             </li>
@@ -457,8 +461,9 @@ function Photo({ fileId }: { fileId: string }) {
   );
 }
 
-function Video({ fileId }: { fileId: string }) {
-  return <iframe src={drivePlayer(fileId)} title="Event video" allow="autoplay; fullscreen" allowFullScreen className="h-full w-full rounded-md bg-black" />;
+function Video({ item }: { item: GalleryItem }) {
+  const src = item.youtube_id ? youtubePlayer(item.youtube_id) : drivePlayer(item.drive_file_id ?? "");
+  return <iframe src={src} title={item.caption ?? "Event video"} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen className="h-full w-full rounded-md bg-black" />;
 }
 
 function host(url: string) {

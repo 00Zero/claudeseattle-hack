@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/lib/admin";
-import { driveImage, driveView } from "@/lib/gallery";
+import { driveImage, driveView, youtubeThumbnail, youtubeWatch } from "@/lib/gallery";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPacific } from "@/lib/time";
 import { Arranger, type ArrangedItem } from "./arranger";
-import { AddPhotographer, UploadPicker, type PickableUpload } from "./add-forms";
+import { AddPhotographer, AddYouTube, UploadPicker, type PickableUpload } from "./add-forms";
 
 // Arranges the public /gallery: which uploads and photographers' thumbnails it shows, in what
 // order and under which headings. Uploads not yet in the gallery are private in Drive, so their
@@ -27,8 +27,10 @@ type Item = {
   thumbnail_url: string | null;
   image_url: string | null;
   link_url: string | null;
+  youtube_id: string | null;
   visible: boolean;
   highlighted: boolean;
+  highlight_position: number | null;
   media_uploads: Upload | null;
 };
 
@@ -49,7 +51,7 @@ export default async function GalleryAdminPage() {
   const [{ data: itemData, error }, { data: uploadData }] = await Promise.all([
     admin
       .from("gallery_items")
-      .select(`id, caption, credit, thumbnail_url, image_url, link_url, visible, highlighted, media_uploads(${uploadFields})`)
+      .select(`id, caption, credit, thumbnail_url, image_url, link_url, youtube_id, visible, highlighted, highlight_position, media_uploads(${uploadFields})`)
       .order("position")
       .order("id"),
     admin.from("media_uploads").select(`${uploadFields}, gallery_items(id)`).is("deleted_at", null).order("created_at", { ascending: false }).limit(2000),
@@ -60,12 +62,32 @@ export default async function GalleryAdminPage() {
 
   const items: ArrangedItem[] = rows.map((r) => {
     const u = r.media_uploads;
+    if (r.youtube_id) {
+      return {
+        id: r.id,
+        kind: "video",
+        visible: r.visible,
+        highlighted: r.highlighted,
+        highlight_position: r.highlight_position,
+        caption: r.caption,
+        credit: null,
+        link_url: null,
+        thumbnail_url: null,
+        image_url: null,
+        thumb: youtubeThumbnail(r.youtube_id),
+        view: youtubeWatch(r.youtube_id),
+        who: "YouTube",
+        deleted: false,
+        fromDrive: false,
+      };
+    }
     if (!u) {
       return {
         id: r.id,
         kind: "external",
         visible: r.visible,
         highlighted: r.highlighted,
+        highlight_position: r.highlight_position,
         caption: r.caption,
         credit: r.credit,
         link_url: r.link_url,
@@ -75,6 +97,7 @@ export default async function GalleryAdminPage() {
         view: r.link_url ?? "",
         who: r.credit ?? "Photographer",
         deleted: false,
+        fromDrive: false,
       };
     }
     // Visible uploads are shared, so Google serves their preview directly (and faster).
@@ -84,6 +107,7 @@ export default async function GalleryAdminPage() {
       kind: u.mime_type.startsWith("video/") ? "video" : "photo",
       visible: r.visible,
       highlighted: r.highlighted,
+      highlight_position: r.highlight_position,
       caption: r.caption,
       credit: null,
       link_url: null,
@@ -93,6 +117,7 @@ export default async function GalleryAdminPage() {
       view: driveView(u.drive_file_id),
       who: uploader(u),
       deleted: Boolean(u.deleted_at),
+      fromDrive: true,
     };
   });
 
@@ -116,7 +141,7 @@ export default async function GalleryAdminPage() {
         <h1 className="text-2xl font-semibold">Gallery</h1>
         <p className="text-sm text-foreground/70">
           What <Link href="/gallery">/gallery</Link> shows, to everyone: {shown} shown, {items.length - shown} hidden or deleted. The page
-          opens with a carousel of the highlighted (★) items, then has a section for videos, one for each photographer, and one for
+          opens with a carousel of the highlighted (★) items, in the order you set under Carousel order, then has a section for videos, one for each photographer, and one for
           audience photos, each in the order below; drag or use the arrows to reorder. Adding an upload makes that one file viewable by anyone
           with its Drive link (the folder stays restricted); hiding or removing it makes it private again.
         </p>
@@ -130,6 +155,15 @@ export default async function GalleryAdminPage() {
           Photos and videos from <Link href="/admin/media">Media</Link> that aren&apos;t in the gallery, newest first. Check the ones to show; double-click one, or use View, to open it in Drive.
         </p>
         <UploadPicker uploads={pickable} />
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">Add YouTube videos</h2>
+        <p className="text-sm text-foreground/70">
+          Paste links to public or unlisted videos. They go in the Videos section with YouTube&apos;s thumbnail, and the video&apos;s title
+          becomes its caption, which you can edit. Clicking one opens it in the viewer and starts playing it.
+        </p>
+        <AddYouTube />
       </section>
 
       <section className="space-y-3">

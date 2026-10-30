@@ -1,3 +1,5 @@
+import { parseVideo } from "@/app/(judge)/_lib/video";
+
 // The /gallery page's items (public_gallery, in *_shared_gallery.sql) and the Google links for
 // uploads. An upload in the gallery is shared to anyone with its link, so Google serves its
 // thumbnail, the full photo, the download and the video player; these links need no sign-in.
@@ -7,6 +9,7 @@ export type GalleryKind = "photo" | "video" | "external";
 export type GalleryItem = {
   id: string;
   highlighted: boolean;
+  highlight_position: number | null;
   caption: string | null;
   credit: string | null;
   kind: GalleryKind;
@@ -14,10 +17,18 @@ export type GalleryItem = {
   image_url: string | null;
   link_url: string | null;
   drive_file_id: string | null;
+  youtube_id: string | null;
 };
 
-// The public_gallery columns the page reads, in GalleryItem's shape.
-export const GALLERY_COLUMNS = "id, highlighted, caption, credit, kind, thumbnail_url, image_url, link_url, drive_file_id";
+// public_gallery exposes only what the page may show.
+export const GALLERY_COLUMNS = "*";
+
+// The carousel's items, in the order set on /admin/gallery. A list sort is stable, so items with no
+// carousel position keep their order after the others.
+export function carouselItems<T extends { highlighted: boolean; highlight_position: number | null }>(items: T[]) {
+  const rank = (item: T) => item.highlight_position ?? Number.MAX_SAFE_INTEGER;
+  return items.filter((i) => i.highlighted).sort((a, b) => rank(a) - rank(b));
+}
 
 // width in CSS pixels; Drive converts .heic and other photo formats to JPEG for these.
 export function driveImage(fileId: string, width: number) {
@@ -39,9 +50,36 @@ export function drivePlayer(fileId: string) {
   return `https://drive.google.com/file/d/${encodeURIComponent(fileId)}/preview`;
 }
 
+// The id from a YouTube link in any of its forms, or null if it isn't one.
+export function youtubeIdFrom(link: string) {
+  const video = parseVideo(link);
+  return video?.provider === "youtube" ? video.id : null;
+}
+
+export function youtubeWatch(id: string) {
+  return `https://www.youtube.com/watch?v=${encodeURIComponent(id)}`;
+}
+
+// Starts when opened: the click that opened it lets the player autoplay. rel=0 keeps suggestions to
+// the same channel.
+export function youtubePlayer(id: string) {
+  return `${parseVideo(youtubeWatch(id))?.embedUrl}?autoplay=1&rel=0&playsinline=1`;
+}
+
+// hqdefault exists for every video; the larger sizes don't.
+export function youtubeThumbnail(id: string) {
+  return `https://i.ytimg.com/vi/${encodeURIComponent(id)}/hqdefault.jpg`;
+}
+
+// Uploads and YouTube videos open in the page's viewer; photographers' photos open on their site.
+export function opensInViewer(item: GalleryItem) {
+  return item.kind !== "external" && Boolean(item.drive_file_id || item.youtube_id);
+}
+
 // Where the thumbnail links without JavaScript, and for a middle-click or a new tab.
 export function itemHref(item: GalleryItem) {
   if (item.kind === "external") return item.link_url ?? "#";
+  if (item.youtube_id) return youtubeWatch(item.youtube_id);
   return item.drive_file_id ? driveView(item.drive_file_id) : "#";
 }
 
