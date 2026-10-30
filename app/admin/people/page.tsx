@@ -3,6 +3,7 @@ import { requireAdminPage } from "@/lib/admin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SubmitButton } from "../submit-button";
 import { approvePerson, clearOverride, declinePerson } from "./actions";
+import { AllowEmailForm } from "./allow-email-form";
 import { RequestButtons } from "./request-buttons";
 import { RoleForm } from "./role-form";
 import { TechnicalLevelsSection } from "../technical-levels";
@@ -178,6 +179,19 @@ export default async function PeoplePage({ searchParams }: PageProps<"/admin/peo
           <button className="rounded border border-foreground/20 px-3 py-1.5 text-sm">Search</button>
         </form>
       </div>
+
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-lg font-semibold">Allow an email</h2>
+          <p className="text-sm text-foreground/70">
+            Let someone in without waiting for a sign-in request, such as a walk-in who isn&apos;t on Luma. This creates
+            an approved account that signs in with this email (or approves the one that already does). A Luma email gets
+            an account linked to its registration; a Claude account email switches its registration&apos;s account to
+            sign in with it.
+          </p>
+        </div>
+        <AllowEmailForm />
+      </section>
 
       <section className="space-y-3">
         <div>
