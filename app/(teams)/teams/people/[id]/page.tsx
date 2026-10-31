@@ -52,7 +52,7 @@ export default async function PersonPage({ params }: PageProps<"/teams/people/[i
 
   return (
     <div className="space-y-6">
-      <Link href="/teams/people" className="text-sm text-fg-muted underline">
+      <Link href={viewer.profile.platform_role === "admin" ? "/admin/people" : "/teams/people"} className="text-sm text-fg-muted underline">
         ← People
       </Link>
 
