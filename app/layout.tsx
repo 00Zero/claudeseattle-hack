@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Newsreader } from "next/font/google";
+import { Suspense } from "react";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { FEEDBACK_MAX_LENGTH, getFeedbackSender } from "@/lib/feedback";
 import { getLiveBanners } from "@/lib/banners";
@@ -79,7 +80,11 @@ export default async function RootLayout({
         <ThemeSync />
         <main className="mx-auto max-w-4xl px-4 py-8">{children}</main>
         {showFeedback && <FeedbackButton maxLength={FEEDBACK_MAX_LENGTH} />}
-        {gaId && !profile && <Analytics id={gaId} />}
+        {gaId && !isAdmin && !profile?.is_test && (
+          <Suspense>
+            <Analytics id={gaId} signedIn={Boolean(profile)} />
+          </Suspense>
+        )}
       </body>
     </html>
   );
