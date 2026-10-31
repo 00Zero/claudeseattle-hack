@@ -1,12 +1,12 @@
 // Technical level 1–5 (docs/REQUIREMENTS.md, Teams nice-to-have 6): the scale the profile form
-// shows and lib/technical-rating.ts gives the model. Safe for client components.
+// shows, without the numbers, and lib/technical-rating.ts gives the model. Safe for client components.
 
 export const TECHNICAL_LEVELS = [
-  { level: 1, label: "Barely uses Claude or GitHub" },
-  { level: 2, label: "Uses Claude chat regularly; little or no code" },
-  { level: 3, label: "Writes or edits code with AI help; has used GitHub on own projects" },
-  { level: 4, label: "Builds working apps with Claude Code or similar; contributes to shared repos (branches, PRs)" },
-  { level: 5, label: "Runs multi-agent workflows and maintains repos with several contributors" },
+  { level: 1, label: "I mostly chat with Claude or other AI tools" },
+  { level: 2, label: "I use Claude to run workflows for my work, but I don't generate code" },
+  { level: 3, label: "I write or edit code with AI and have used GitHub, but only for parts of a project" },
+  { level: 4, label: "I build complete apps with Claude Code or similar, and work in shared repos with branches and PRs" },
+  { level: 5, label: "I run multi-agent workflows and maintain repos with several contributors" },
 ] as const;
 
 // What others see instead of the number.

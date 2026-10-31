@@ -77,7 +77,7 @@ function Suggestion({ promise, onSuggest }: { promise: Promise<number | null>; o
   if (level == null) return null;
   return (
     <p className="text-sm text-foreground/70">
-      Suggested from your registration and LinkedIn: {level}. Adjust it if it&apos;s off.
+      We picked the closest match from your registration and LinkedIn. Change it if it&apos;s off.
     </p>
   );
 }
@@ -89,9 +89,6 @@ function TechnicalLevel({ saved, suggestedLevel }: { saved: number | null; sugge
   return (
     <fieldset className="space-y-2">
       <legend className="text-sm font-medium">How hands-on are you with code?</legend>
-      <p className="text-sm text-foreground/70">
-        Others never see the number. Team pages show you as technical at 3 or higher.
-      </p>
       {saved == null && (
         <Suspense fallback={<p className="text-sm text-foreground/70">Getting a suggestion from your registration…</p>}>
           <Suggestion promise={suggestedLevel} onSuggest={onSuggest} />
@@ -109,9 +106,7 @@ function TechnicalLevel({ saved, suggestedLevel }: { saved: number | null; sugge
               onChange={() => setLevel(t.level)}
               className="mt-1"
             />
-            <span>
-              <span className="font-medium">{t.level}</span> <span className="text-foreground/80">{t.label}</span>
-            </span>
+            <span>{t.label}</span>
           </label>
         ))}
       </div>

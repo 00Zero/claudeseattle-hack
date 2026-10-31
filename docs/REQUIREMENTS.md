@@ -129,7 +129,7 @@ A mobile-first tool people use on their phones at the happy hour and at Sunday c
 3. Luma re-import updates approval and check-in badges live (the import itself is shared; this is just reading it).
 4. LinkedIn enrichment used for matching (and, if people opt in, shown on profile cards).
 5. Mentor assignment to teams; one mentor can have several teams.
-6. Technical level as a self-rated 1–5 ("how hands-on are you with code") instead of yes/no. The number is never shown to others; teams and profile cards show a band (none / some / builder). `is_technical` becomes rating ≥ 3.
+6. Technical level as a self-rated 1–5 ("how hands-on are you with code") instead of yes/no. The number is never shown to others; teams and profile cards show a band (none / some / builder). `is_technical` becomes rating ≥ 4; the form shows the five descriptions without their numbers.
 
    Claude-written "why this team fits" blurb when viewing a team.
 

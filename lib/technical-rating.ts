@@ -13,14 +13,14 @@ import { TECHNICAL_LEVELS } from "@/lib/technical-levels";
 // person saves their own.
 //
 // Privacy: inputs include matching-only signals (CLAUDE.md, "Luma answers ... are for matching
-// only"). The person sees only the suggested number; the one-sentence reason is admin-only.
+// only"). The person sees only which option is preselected; the one-sentence reason is admin-only.
 // Job-search answers and the business survey are never sent.
 // Server-side only, through the Vercel AI Gateway (CLAUDE.md, "Models"). Every function here uses
 // the service role, so callers check who's asking first: the profile page passes only the
 // signed-in user's own id, and the bulk path runs after assertAdmin().
 
 const MODEL = "anthropic/claude-sonnet-5.5";
-const VERSION = 1; // bump to re-suggest everyone after a prompt change
+const VERSION = 2; // bump to re-suggest everyone after a prompt change
 
 let client: Anthropic | null = null;
 function gateway() {
@@ -75,13 +75,13 @@ const SCALE = TECHNICAL_LEVELS.map((t) => `${t.level}: ${t.label}`).join("\n");
 
 const SYSTEM = `You rate how hands-on with code a hackathon attendee is, on a 1 to 5 scale, so team formation can balance teams. The event is a one-day hackathon in Seattle where teams build AI tools and workflows for small businesses, working in a shared GitHub repo with Claude Code.
 
-Scale:
+Scale, worded the way attendees read it:
 ${SCALE}
 
 How to judge:
 - Self-reports run high: many people pick the top GitHub answer or "daily user" without the work to back it. Weigh concrete evidence (job titles and past roles, LinkedIn skills, what they say they have built or done with git, field of study) above self-assessment.
 - A software engineer or developer by profession is at least 4. Running multi-agent workflows or maintaining repos with other contributors, shown by more than a checkbox, is 5.
-- Uses AI tools daily but has no code or git evidence: 2. Some coding or own GitHub projects: 3.
+- Chats with AI tools, even daily, with no workflow, code or git evidence: 1. Runs workflows with AI tools but has no code or git evidence: 2. Some coding or own GitHub projects, but no complete apps or work in shared repos: 3.
 - When evidence is thin or conflicting, choose the lower level the evidence supports.
 
 Reply with the level and one plain sentence (at most 25 words) on the evidence it rests on. The reason is read only by organizers.
