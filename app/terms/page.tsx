@@ -46,10 +46,10 @@ export default function TermsPage() {
       <section id="analytics" className="scroll-mt-20 space-y-3">
         <h2 className="text-lg font-semibold">Analytics</h2>
         <p>
-          This section applies to everyone who visits this website. We use Google Analytics to count visits to our public pages. It
-          uses cookies, and it tells Google which pages you viewed, how you got here, and your browser, device, and approximate
-          location. It doesn&apos;t run while you&apos;re signed in, and it doesn&apos;t receive your name, your email address, or
-          anything you enter on this website. You can read{" "}
+          This section applies to everyone who visits this website. We use Google Analytics to count visits and to see how this
+          website is used, including by people who are signed in. It uses cookies, and it tells Google which pages you viewed, which
+          links you followed, how you got here, whether you&apos;re signed in, and your browser, device, and approximate location. It
+          doesn&apos;t receive your name, your email address, or anything you enter or search for on this website. You can read{" "}
           <a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener noreferrer" className="underline">
             how Google uses this data
           </a>{" "}
