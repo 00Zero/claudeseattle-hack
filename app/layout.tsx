@@ -5,6 +5,7 @@ import { FEEDBACK_MAX_LENGTH, getFeedbackSender } from "@/lib/feedback";
 import { getLiveBanners } from "@/lib/banners";
 import { eventName } from "@/lib/event";
 import { siteName, siteUrl } from "@/lib/site";
+import { Analytics } from "@/components/site/analytics";
 import { FeedbackButton } from "@/components/site/feedback-button";
 import { SiteBanners } from "@/components/site/site-banners";
 import { TestAccountBanner } from "@/components/site/test-account-banner";
@@ -62,6 +63,8 @@ export default async function RootLayout({
   const isAdmin = profile?.platform_role === "admin";
   const showFeedback = profile ? Boolean(await getFeedbackSender().catch(() => null)) : false;
   const banners = await liveBanners;
+  // Set only in Vercel's Production environment, so previews and localhost send nothing.
+  const gaId = process.env.NEXT_PUBLIC_GA_ID;
 
   return (
     // suppressHydrationWarning: the inline script below sets data-theme before React hydrates.
@@ -76,6 +79,7 @@ export default async function RootLayout({
         <ThemeSync />
         <main className="mx-auto max-w-4xl px-4 py-8">{children}</main>
         {showFeedback && <FeedbackButton maxLength={FEEDBACK_MAX_LENGTH} />}
+        {gaId && !profile && <Analytics id={gaId} />}
       </body>
     </html>
   );
