@@ -43,6 +43,23 @@ export default function TermsPage() {
           its license and for how they use it; the hosts are not liable for any project or its use.
         </p>
       </section>
+      <section id="analytics" className="scroll-mt-20 space-y-3">
+        <h2 className="text-lg font-semibold">Analytics</h2>
+        <p>
+          This section applies to everyone who visits this website. We use Google Analytics to count visits to our public pages. It
+          uses cookies, and it tells Google which pages you viewed, how you got here, and your browser, device, and approximate
+          location. It doesn&apos;t run while you&apos;re signed in, and it doesn&apos;t receive your name, your email address, or
+          anything you enter on this website. You can read{" "}
+          <a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener noreferrer" className="underline">
+            how Google uses this data
+          </a>{" "}
+          and block it with Google&apos;s{" "}
+          <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener noreferrer" className="underline">
+            opt-out add-on
+          </a>
+          .
+        </p>
+      </section>
     </div>
   );
 }
