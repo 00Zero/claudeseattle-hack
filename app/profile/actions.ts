@@ -38,7 +38,7 @@ export async function saveProfile(_prev: FormState, formData: FormData): Promise
   if (!firstName || !lastName) return { status: "error", message: "First and last name are required." };
   if (!ROLE_BUCKETS.includes(roleBucket)) return { status: "error", message: "Pick the role that fits you best." };
   if (![1, 2, 3, 4, 5].includes(technicalLevel)) {
-    return { status: "error", message: "Pick how hands-on you are with code (1 to 5)." };
+    return { status: "error", message: "Pick how hands-on you are with code." };
   }
   const linkedinInput = text(formData, "linkedin_url", 300);
   const linkedin = normalizeLinkedinUrl(linkedinInput);
@@ -59,7 +59,7 @@ export async function saveProfile(_prev: FormState, formData: FormData): Promise
       role_bucket: roleBucket,
       // The person's own level; is_technical stays the column balance, filters and matching read.
       technical_level: technicalLevel,
-      is_technical: technicalLevel >= 3,
+      is_technical: technicalLevel >= 4,
       job_title: text(formData, "job_title") || null,
       company: text(formData, "company") || null,
       linkedin_url: linkedin,
