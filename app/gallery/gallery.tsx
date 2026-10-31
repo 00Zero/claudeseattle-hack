@@ -7,6 +7,7 @@ import {
   driveDownload,
   driveImage,
   drivePlayer,
+  driveStream,
   galleryHome,
   gallerySections,
   itemHref,
@@ -318,15 +319,26 @@ function useOverlay(onClose: () => void, onKey?: (e: KeyboardEvent) => void) {
 
 const overlayButton = "rounded-full bg-white/10 px-3 py-1.5 text-sm text-white no-underline hover:bg-white/20";
 
-// The full-size viewer for items of one kind: the photo with a download, or the video in Drive's or
-// YouTube's player. Neither can move on by itself here, so videos get a film strip and a Next button.
+// The full-size viewer for items of one kind: the photo with a download, or the video. Videos get a
+// film strip and a Next button, and when one ends the next plays, until they've all played once.
+// A phone on its side gives the height to the video: the strip goes, and the arrows sit beside it.
 function Viewer({ items, index, onIndex, onClose }: { items: GalleryItem[]; index: number; onIndex: (i: number) => void; onClose: () => void }) {
   const item = items[index];
   const fileId = item.drive_file_id ?? "";
   const isVideo = item.kind === "video";
-  const step = useCallback((by: number) => onIndex((index + by + items.length) % items.length), [index, items.length, onIndex]);
+  // Where this run of videos began; choosing a video starts a new run.
+  const startedAt = useRef(index);
+  const pick = useCallback(
+    (i: number) => {
+      startedAt.current = i;
+      onIndex(i);
+    },
+    [onIndex],
+  );
+  const step = useCallback((by: number) => pick((index + by + items.length) % items.length), [index, items.length, pick]);
   const onKey = useCallback(
     (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLVideoElement) return; // the player's own keys: arrows seek
       if (e.key === "ArrowRight") step(1);
       if (e.key === "ArrowLeft") step(-1);
     },
@@ -334,12 +346,17 @@ function Viewer({ items, index, onIndex, onClose }: { items: GalleryItem[]; inde
   );
   const first = useOverlay(onClose, onKey);
 
+  function playNext() {
+    const next = (index + 1) % items.length;
+    if (next !== startedAt.current) onIndex(next);
+  }
+
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-label={isVideo ? "Video" : "Photo"}
-      className={`fixed inset-0 z-50 flex flex-col bg-black/90 p-3 text-white backdrop-blur-sm sm:p-6 ${styles.fade}`}
+      className={`fixed inset-0 z-50 flex flex-col bg-black/90 p-3 text-white backdrop-blur-sm lg:p-6 ${styles.fade}`}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div className="flex flex-wrap items-center gap-2">
@@ -359,26 +376,28 @@ function Viewer({ items, index, onIndex, onClose }: { items: GalleryItem[]; inde
         </button>
       </div>
 
-      <div className="relative flex min-h-0 flex-1 items-center justify-center py-3" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="flex min-h-0 flex-1 items-center gap-2 py-2 lg:py-3" onClick={(e) => e.target === e.currentTarget && onClose()}>
         {items.length > 1 && (
-          <button type="button" onClick={() => step(-1)} aria-label="Previous" className={`${overlayButton} absolute left-0 z-10 hidden sm:block`}>
+          <button type="button" onClick={() => step(-1)} aria-label="Previous" className={`${overlayButton} hidden shrink-0 landscape:block sm:block`}>
             ←
           </button>
         )}
-        <div key={item.id} className={`h-full w-full max-w-6xl ${styles.zoom}`}>{isVideo ? <Video item={item} /> : <Photo fileId={fileId} />}</div>
+        <div key={isVideo ? "video" : item.id} className={`mx-auto h-full w-full min-w-0 max-w-6xl ${styles.zoom}`}>
+          {isVideo ? <Video item={item} onEnded={playNext} /> : <Photo fileId={fileId} />}
+        </div>
         {items.length > 1 && (
-          <button type="button" onClick={() => step(1)} aria-label="Next" className={`${overlayButton} absolute right-0 z-10 hidden sm:block`}>
+          <button type="button" onClick={() => step(1)} aria-label="Next" className={`${overlayButton} hidden shrink-0 landscape:block sm:block`}>
             →
           </button>
         )}
       </div>
 
       {isVideo ? (
-        <FilmStrip items={items} index={index} onIndex={onIndex} />
+        <FilmStrip items={items} index={index} onIndex={pick} />
       ) : (
         <div className="flex items-center justify-between gap-3">
           {items.length > 1 ? (
-            <button type="button" onClick={() => step(-1)} className={`${overlayButton} sm:hidden`}>
+            <button type="button" onClick={() => step(-1)} className={`${overlayButton} landscape:hidden sm:hidden`}>
               ← Prev
             </button>
           ) : (
@@ -386,7 +405,7 @@ function Viewer({ items, index, onIndex, onClose }: { items: GalleryItem[]; inde
           )}
           <p className="min-w-0 truncate text-center text-sm text-white/80">{item.caption}</p>
           {items.length > 1 ? (
-            <button type="button" onClick={() => step(1)} className={`${overlayButton} sm:hidden`}>
+            <button type="button" onClick={() => step(1)} className={`${overlayButton} landscape:hidden sm:hidden`}>
               Next →
             </button>
           ) : (
@@ -399,7 +418,8 @@ function Viewer({ items, index, onIndex, onClose }: { items: GalleryItem[]; inde
 }
 
 // Every video as a small tile, with the current one marked, and a Next button that wraps to the
-// first after the last.
+// first after the last. Tiles have a set width and height: with only an aspect ratio, Safari left
+// gaps between them and didn't scroll the current one into view.
 function FilmStrip({ items, index, onIndex }: { items: GalleryItem[]; index: number; onIndex: (i: number) => void }) {
   const current = useRef<HTMLLIElement>(null);
   useEffect(() => {
@@ -407,10 +427,10 @@ function FilmStrip({ items, index, onIndex }: { items: GalleryItem[]; index: num
   }, [index]);
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 max-lg:landscape:hidden">
       {items[index].caption && <p className="truncate text-center text-sm text-white/80">{items[index].caption}</p>}
-      <div className="flex items-center gap-3">
-        <ol className="flex min-w-0 flex-1 gap-2 overflow-x-auto p-0.5">
+      <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap sm:gap-3">
+        <ol className="flex w-full min-w-0 gap-2 overflow-x-auto p-0.5 sm:w-auto sm:flex-1">
           {items.map((video, i) => (
             <li key={video.id} ref={i === index ? current : null} className="shrink-0">
               <button
@@ -418,19 +438,24 @@ function FilmStrip({ items, index, onIndex }: { items: GalleryItem[]; index: num
                 onClick={() => onIndex(i)}
                 aria-label={`Video ${i + 1} of ${items.length}${video.caption ? `: ${video.caption}` : ""}`}
                 aria-current={i === index}
-                className={`relative block aspect-video h-12 overflow-hidden rounded ring-2 transition sm:h-16 ${i === index ? "ring-accent" : "opacity-60 ring-transparent hover:opacity-100"}`}
+                className={`relative block h-12 w-20 overflow-hidden rounded ring-2 transition sm:h-16 sm:w-28 ${i === index ? "ring-accent" : "opacity-60 ring-transparent hover:opacity-100"}`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element -- served by Google */}
-                <img src={video.youtube_id ? youtubeThumbnail(video.youtube_id) : driveImage(video.drive_file_id ?? "", 240)} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+                <img src={video.youtube_id ? youtubeThumbnail(video.youtube_id) : driveImage(video.drive_file_id ?? "", 240)} alt="" referrerPolicy="no-referrer" className="absolute inset-0 h-full w-full object-cover" />
                 <span className="absolute bottom-0.5 left-0.5 rounded bg-black/60 px-1 font-mono text-[10px] text-white">{i === index ? "Now" : i + 1}</span>
               </button>
             </li>
           ))}
         </ol>
         {items.length > 1 && (
-          <button type="button" onClick={() => onIndex((index + 1) % items.length)} className="btn shrink-0">
-            Next video →
-          </button>
+          <>
+            <button type="button" onClick={() => onIndex((index - 1 + items.length) % items.length)} className={`${overlayButton} flex-1 py-2.5 sm:hidden`}>
+              ← Previous
+            </button>
+            <button type="button" onClick={() => onIndex((index + 1) % items.length)} className="btn flex-1 justify-center sm:flex-none">
+              Next video →
+            </button>
+          </>
         )}
       </div>
     </div>
@@ -461,7 +486,22 @@ function Photo({ fileId }: { fileId: string }) {
   );
 }
 
-function Video({ item }: { item: GalleryItem }) {
+// Drive videos play in our own <video>, so there's one set of controls and it can start at once and
+// report the end. One element plays them all: phones only let an element that has already played
+// start again with sound. YouTube videos, and a file this browser can't play, use the host's player.
+function Video({ item, onEnded }: { item: GalleryItem; onEnded: () => void }) {
+  const [failed, setFailed] = useState<string | null>(null);
+  const video = useRef<HTMLVideoElement>(null);
+  const stream = item.drive_file_id && failed !== item.id ? driveStream(item.drive_file_id) : null;
+
+  useEffect(() => {
+    // If the browser won't start it, the controls are there.
+    video.current?.play().catch(() => {});
+  }, [stream]);
+
+  if (stream) {
+    return <video ref={video} src={stream} controls playsInline onEnded={onEnded} onError={() => setFailed(item.id)} className="h-full w-full rounded-md bg-black object-contain" />;
+  }
   const src = item.youtube_id ? youtubePlayer(item.youtube_id) : drivePlayer(item.drive_file_id ?? "");
   return <iframe src={src} title={item.caption ?? "Event video"} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen className="h-full w-full rounded-md bg-black" />;
 }

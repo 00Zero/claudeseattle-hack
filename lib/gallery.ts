@@ -44,10 +44,18 @@ export function driveDownload(fileId: string) {
   return `https://drive.usercontent.google.com/download?id=${encodeURIComponent(fileId)}&export=download&confirm=t`;
 }
 
-// Drive's own player. Drive won't serve a video file to another site's <video> tag, so this is the
-// only way to play one here; it can't autoplay or say when a video ends.
+// Drive's own player: it can't autoplay or say when a video ends, and on iPhones its controls sit on
+// top of Safari's. It's the fallback for driveStream.
 export function drivePlayer(fileId: string) {
   return `https://drive.google.com/file/d/${encodeURIComponent(fileId)}/preview`;
+}
+
+// A video file for our own <video> tag. Drive's download links refuse video requests from other
+// sites, but its API serves a file shared by link. The key is in the browser by design; Google
+// Cloud limits it to the Drive API on our sites.
+export function driveStream(fileId: string) {
+  const key = process.env.NEXT_PUBLIC_GOOGLE_DRIVE_API_KEY;
+  return key ? `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&key=${encodeURIComponent(key)}` : null;
 }
 
 // The id from a YouTube link in any of its forms, or null if it isn't one.
