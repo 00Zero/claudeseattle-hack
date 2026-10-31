@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { accessFromRules, type Access, type AccessRule } from "@/lib/access";
 import { requireAdminPage } from "@/lib/admin";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -72,6 +73,18 @@ async function loadAuthEmails() {
 }
 
 const fullName = (p: Person) => `${p.first_name} ${p.last_name}`.trim() || "(no name yet)";
+
+function ProfileLink({ person }: { person: Person }) {
+  return (
+    <Link
+      href={`/teams/people/${person.id}`}
+      prefetch={false}
+      className="font-medium underline decoration-foreground/30 underline-offset-2 hover:decoration-foreground"
+    >
+      {fullName(person)}
+    </Link>
+  );
+}
 
 // Status plus where it came from: an admin override, the Luma import, or nothing yet.
 function StatusBadge({ person }: { person: Person }) {
@@ -263,7 +276,9 @@ export default async function PeoplePage({ searchParams }: PageProps<"/admin/peo
               <tbody className="divide-y divide-foreground/10">
                 {queue.map((p) => (
                   <tr key={p.id}>
-                    <td className={`${td} pl-3`}>{fullName(p)}</td>
+                    <td className={`${td} pl-3`}>
+                      <ProfileLink person={p} />
+                    </td>
                     <td className={`${td} break-all`}>{authEmails.get(p.id)}</td>
                     <td className={`${td} whitespace-nowrap`}>
                       {new Date(p.created_at).toLocaleDateString("en-US", {
@@ -305,7 +320,7 @@ export default async function PeoplePage({ searchParams }: PageProps<"/admin/peo
               {people.map((p) => (
                 <tr key={p.id}>
                   <td className={`${td} pl-3`}>
-                    {fullName(p)}
+                    <ProfileLink person={p} />
                     {!p.profile_confirmed && <span className="block text-xs text-foreground/50">profile not confirmed</span>}
                   </td>
                   <td className={`${td} break-all`}>{defaultEmail.get(p.id)}</td>

@@ -51,7 +51,7 @@ export async function accountEmails(admin: ReturnType<typeof createAdminClient>)
 const pacificDay = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
 
 // Supabase returns at most 1,000 rows per request.
-async function all<T>(query: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>) {
+export async function all<T>(query: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>) {
   const rows: T[] = [];
   for (let from = 0; ; from += 1000) {
     const { data, error } = await query(from, from + 999);
