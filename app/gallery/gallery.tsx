@@ -495,10 +495,7 @@ function Embed({ src, title }: { src: string; title: string }) {
 
 type YouTubeApi = {
   playVideo(): void;
-  mute(): void;
-  unMute(): void;
   loadVideoById(id: string): void;
-  getPlayerState(): number;
   destroy(): void;
 };
 
@@ -523,51 +520,25 @@ function loadYouTubeApi() {
   return youtubeApi;
 }
 
-// YouTube's states: 0 is ended, -1 and 5 mean it hasn't started, and 3 is loading.
-const NOT_STARTED = [-1, 5];
-// How often to check that a video started; if it hasn't, it plays muted.
-const START_MS = 1200;
-
 // YouTube's player, driven through its API so the page can start a video and hear when it ends. One
-// player plays them all. iPhones won't let a page start a video with sound, so when YouTube says it
-// was blocked, or it hasn't started after a moment, it plays muted, with a button for the sound. A
-// blocked video can show as loading first, so loading doesn't count as started.
+// player plays them all. iPhones won't let a page start a video with sound, so there the first one
+// waits on YouTube's play button; once it has played, the next ones start by themselves.
 function YouTube({ id, title, onEnded }: { id: string; title: string; onEnded: () => void }) {
   const box = useRef<HTMLDivElement>(null);
   const player = useRef<YouTubeApi | null>(null);
   const ended = useRef(onEnded);
   const shown = useRef<string | null>(null);
-  const timer = useRef(0);
-  const [muted, setMuted] = useState(false);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     ended.current = onEnded;
   }, [onEnded]);
 
-  const playMuted = useCallback(() => {
-    window.clearInterval(timer.current);
-    player.current?.mute();
-    player.current?.playVideo();
-    setMuted(true);
-  }, []);
-
-  const start = useCallback(() => {
-    window.clearInterval(timer.current);
-    timer.current = window.setInterval(() => {
-      const state = player.current?.getPlayerState();
-      if (state === undefined) return;
-      if (NOT_STARTED.includes(state)) playMuted();
-      else if (state !== 3) window.clearInterval(timer.current);
-    }, START_MS);
-  }, [playMuted]);
-
   useEffect(() => {
     if (!player.current || shown.current === id) return;
     shown.current = id;
     player.current.loadVideoById(id);
-    start();
-  }, [id, start]);
+  }, [id]);
 
   useEffect(() => {
     const host = box.current;
@@ -583,11 +554,8 @@ function YouTube({ id, title, onEnded }: { id: string; title: string; onEnded: (
           height: "100%",
           playerVars: { autoplay: 1, playsinline: 1, rel: 0 },
           events: {
-            onReady: () => {
-              player.current?.playVideo();
-              start();
-            },
-            onAutoplayBlocked: playMuted,
+            onReady: () => player.current?.playVideo(),
+            // 0 is ended.
             onStateChange: (e: { data: number }) => {
               if (e.data === 0) ended.current();
             },
@@ -597,7 +565,6 @@ function YouTube({ id, title, onEnded }: { id: string; title: string; onEnded: (
       .catch(() => setFailed(true));
     return () => {
       gone = true;
-      window.clearInterval(timer.current);
       player.current?.destroy();
       player.current = null;
       host?.replaceChildren();
@@ -607,23 +574,7 @@ function YouTube({ id, title, onEnded }: { id: string; title: string; onEnded: (
   }, []);
 
   if (failed) return <Embed src={youtubePlayer(id)} title={title} />;
-  return (
-    <div className="relative h-full w-full overflow-hidden rounded-md bg-black">
-      <div ref={box} title={title} className="h-full w-full" />
-      {muted && (
-        <button
-          type="button"
-          onClick={() => {
-            player.current?.unMute();
-            setMuted(false);
-          }}
-          className={`${overlayButton} absolute left-2 top-2 bg-black/70`}
-        >
-          Tap for sound
-        </button>
-      )}
-    </div>
-  );
+  return <div ref={box} title={title} className="h-full w-full overflow-hidden rounded-md bg-black" />;
 }
 
 function host(url: string) {
