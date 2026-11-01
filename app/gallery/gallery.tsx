@@ -7,7 +7,6 @@ import {
   driveDownload,
   driveImage,
   drivePlayer,
-  driveStream,
   galleryHome,
   gallerySections,
   itemHref,
@@ -338,7 +337,6 @@ function Viewer({ items, index, onIndex, onClose }: { items: GalleryItem[]; inde
   const step = useCallback((by: number) => pick((index + by + items.length) % items.length), [index, items.length, pick]);
   const onKey = useCallback(
     (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLVideoElement) return; // the player's own keys: arrows seek
       if (e.key === "ArrowRight") step(1);
       if (e.key === "ArrowLeft") step(-1);
     },
@@ -486,24 +484,138 @@ function Photo({ fileId }: { fileId: string }) {
   );
 }
 
-// Drive videos play in our own <video>, so there's one set of controls and it can start at once and
-// report the end. One element plays them all: phones only let an element that has already played
-// start again with sound. YouTube videos, and a file this browser can't play, use the host's player.
 function Video({ item, onEnded }: { item: GalleryItem; onEnded: () => void }) {
-  const [failed, setFailed] = useState<string | null>(null);
-  const video = useRef<HTMLVideoElement>(null);
-  const stream = item.drive_file_id && failed !== item.id ? driveStream(item.drive_file_id) : null;
+  if (item.youtube_id) return <YouTube id={item.youtube_id} title={item.caption ?? "Event video"} onEnded={onEnded} />;
+  return <Embed src={drivePlayer(item.drive_file_id ?? "")} title={item.caption ?? "Event video"} />;
+}
+
+function Embed({ src, title }: { src: string; title: string }) {
+  return <iframe src={src} title={title} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen className="h-full w-full rounded-md bg-black" />;
+}
+
+type YouTubeApi = {
+  playVideo(): void;
+  mute(): void;
+  unMute(): void;
+  loadVideoById(id: string): void;
+  getPlayerState(): number;
+  destroy(): void;
+};
+
+declare global {
+  interface Window {
+    YT?: { Player: new (element: HTMLElement, options: object) => YouTubeApi };
+    onYouTubeIframeAPIReady?: () => void;
+  }
+}
+
+let youtubeApi: Promise<void> | null = null;
+
+function loadYouTubeApi() {
+  youtubeApi ??= new Promise((resolve, reject) => {
+    if (window.YT?.Player) return resolve();
+    window.onYouTubeIframeAPIReady = resolve;
+    const script = document.createElement("script");
+    script.src = "https://www.youtube.com/iframe_api";
+    script.onerror = reject;
+    document.head.append(script);
+  });
+  return youtubeApi;
+}
+
+// YouTube's states; 0 is ended.
+const STARTED = [1, 3];
+// How long a video gets to start with sound before it starts muted.
+const START_MS = 1200;
+
+// YouTube's player, driven through its API so the page can start a video and hear when it ends. One
+// player plays them all. iPhones won't let a page start a video with sound, so if it hasn't started
+// after a moment it plays muted, with a button for the sound.
+function YouTube({ id, title, onEnded }: { id: string; title: string; onEnded: () => void }) {
+  const box = useRef<HTMLDivElement>(null);
+  const player = useRef<YouTubeApi | null>(null);
+  const ended = useRef(onEnded);
+  const shown = useRef<string | null>(null);
+  const timer = useRef(0);
+  const [muted, setMuted] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    // If the browser won't start it, the controls are there.
-    video.current?.play().catch(() => {});
-  }, [stream]);
+    ended.current = onEnded;
+  }, [onEnded]);
 
-  if (stream) {
-    return <video ref={video} src={stream} controls playsInline onEnded={onEnded} onError={() => setFailed(item.id)} className="h-full w-full rounded-md bg-black object-contain" />;
-  }
-  const src = item.youtube_id ? youtubePlayer(item.youtube_id) : drivePlayer(item.drive_file_id ?? "");
-  return <iframe src={src} title={item.caption ?? "Event video"} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen className="h-full w-full rounded-md bg-black" />;
+  const start = useCallback(() => {
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => {
+      const current = player.current;
+      if (!current || STARTED.includes(current.getPlayerState())) return;
+      current.mute();
+      current.playVideo();
+      setMuted(true);
+    }, START_MS);
+  }, []);
+
+  useEffect(() => {
+    if (!player.current || shown.current === id) return;
+    shown.current = id;
+    player.current.loadVideoById(id);
+    start();
+  }, [id, start]);
+
+  useEffect(() => {
+    const host = box.current;
+    let gone = false;
+    loadYouTubeApi()
+      .then(() => {
+        if (gone || !host || !window.YT) return;
+        shown.current = id;
+        player.current = new window.YT.Player(host.appendChild(document.createElement("div")), {
+          host: "https://www.youtube-nocookie.com",
+          videoId: id,
+          width: "100%",
+          height: "100%",
+          playerVars: { autoplay: 1, playsinline: 1, rel: 0 },
+          events: {
+            onReady: () => {
+              player.current?.playVideo();
+              start();
+            },
+            onStateChange: (e: { data: number }) => {
+              if (e.data === 0) ended.current();
+            },
+          },
+        });
+      })
+      .catch(() => setFailed(true));
+    return () => {
+      gone = true;
+      window.clearTimeout(timer.current);
+      player.current?.destroy();
+      player.current = null;
+      host?.replaceChildren();
+    };
+    // The first video only: later ones load into the same player, above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (failed) return <Embed src={youtubePlayer(id)} title={title} />;
+  return (
+    <div className="relative h-full w-full overflow-hidden rounded-md bg-black">
+      <div ref={box} title={title} className="h-full w-full" />
+      {muted && (
+        <button
+          type="button"
+          onClick={() => {
+            player.current?.unMute();
+            setMuted(false);
+          }}
+          className={`${overlayButton} absolute left-2 top-2 bg-black/70`}
+        >
+          Tap for sound
+        </button>
+      )}
+    </div>
+  );
 }
 
 function host(url: string) {
