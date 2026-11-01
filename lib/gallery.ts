@@ -45,7 +45,8 @@ export function driveDownload(fileId: string) {
 }
 
 // Drive's own player. Drive won't serve a video file to another site's <video> tag, so this is the
-// only way to play one here; it can't autoplay or say when a video ends.
+// only way to play one here; it can't autoplay or say when a video ends, and on iPhones its controls
+// sit on top of Safari's. That's why the event's videos are on YouTube.
 export function drivePlayer(fileId: string) {
   return `https://drive.google.com/file/d/${encodeURIComponent(fileId)}/preview`;
 }
@@ -60,8 +61,8 @@ export function youtubeWatch(id: string) {
   return `https://www.youtube.com/watch?v=${encodeURIComponent(id)}`;
 }
 
-// Starts when opened: the click that opened it lets the player autoplay. rel=0 keeps suggestions to
-// the same channel.
+// A plain embed, for when YouTube's player script can't load. rel=0 keeps suggestions to the same
+// channel.
 export function youtubePlayer(id: string) {
   return `${parseVideo(youtubeWatch(id))?.embedUrl}?autoplay=1&rel=0&playsinline=1`;
 }
