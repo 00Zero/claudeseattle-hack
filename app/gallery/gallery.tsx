@@ -523,14 +523,15 @@ function loadYouTubeApi() {
   return youtubeApi;
 }
 
-// YouTube's states; 0 is ended.
-const STARTED = [1, 3];
-// How long a video gets to start with sound before it starts muted.
+// YouTube's states: 0 is ended, -1 and 5 mean it hasn't started, and 3 is loading.
+const NOT_STARTED = [-1, 5];
+// How often to check that a video started; if it hasn't, it plays muted.
 const START_MS = 1200;
 
 // YouTube's player, driven through its API so the page can start a video and hear when it ends. One
-// player plays them all. iPhones won't let a page start a video with sound, so if it hasn't started
-// after a moment it plays muted, with a button for the sound.
+// player plays them all. iPhones won't let a page start a video with sound, so when YouTube says it
+// was blocked, or it hasn't started after a moment, it plays muted, with a button for the sound. A
+// blocked video can show as loading first, so loading doesn't count as started.
 function YouTube({ id, title, onEnded }: { id: string; title: string; onEnded: () => void }) {
   const box = useRef<HTMLDivElement>(null);
   const player = useRef<YouTubeApi | null>(null);
@@ -544,16 +545,22 @@ function YouTube({ id, title, onEnded }: { id: string; title: string; onEnded: (
     ended.current = onEnded;
   }, [onEnded]);
 
-  const start = useCallback(() => {
-    window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => {
-      const current = player.current;
-      if (!current || STARTED.includes(current.getPlayerState())) return;
-      current.mute();
-      current.playVideo();
-      setMuted(true);
-    }, START_MS);
+  const playMuted = useCallback(() => {
+    window.clearInterval(timer.current);
+    player.current?.mute();
+    player.current?.playVideo();
+    setMuted(true);
   }, []);
+
+  const start = useCallback(() => {
+    window.clearInterval(timer.current);
+    timer.current = window.setInterval(() => {
+      const state = player.current?.getPlayerState();
+      if (state === undefined) return;
+      if (NOT_STARTED.includes(state)) playMuted();
+      else if (state !== 3) window.clearInterval(timer.current);
+    }, START_MS);
+  }, [playMuted]);
 
   useEffect(() => {
     if (!player.current || shown.current === id) return;
@@ -580,6 +587,7 @@ function YouTube({ id, title, onEnded }: { id: string; title: string; onEnded: (
               player.current?.playVideo();
               start();
             },
+            onAutoplayBlocked: playMuted,
             onStateChange: (e: { data: number }) => {
               if (e.data === 0) ended.current();
             },
@@ -589,7 +597,7 @@ function YouTube({ id, title, onEnded }: { id: string; title: string; onEnded: (
       .catch(() => setFailed(true));
     return () => {
       gone = true;
-      window.clearTimeout(timer.current);
+      window.clearInterval(timer.current);
       player.current?.destroy();
       player.current = null;
       host?.replaceChildren();
